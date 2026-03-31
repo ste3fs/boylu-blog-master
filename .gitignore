@@ -1,0 +1,14 @@
+.tools/
+local-backups/
+release/
+
+# Keep repo source-only at the root.
+*.zip
+*.7z
+*.rar
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

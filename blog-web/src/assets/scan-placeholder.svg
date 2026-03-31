@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-labelledby="title desc">
+  <title id="title">boylu scan placeholder</title>
+  <desc id="desc">A placeholder panel for scan or contact information.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="28" fill="url(#bg)" />
+  <rect x="34" y="34" width="252" height="252" rx="20" fill="#ffffff" opacity="0.96" />
+  <g fill="#1d4ed8">
+    <rect x="58" y="58" width="52" height="52" rx="8" />
+    <rect x="210" y="58" width="52" height="52" rx="8" />
+    <rect x="58" y="210" width="52" height="52" rx="8" />
+  </g>
+  <g fill="#0f172a">
+    <rect x="74" y="74" width="20" height="20" rx="4" />
+    <rect x="226" y="74" width="20" height="20" rx="4" />
+    <rect x="74" y="226" width="20" height="20" rx="4" />
+    <rect x="138" y="74" width="16" height="16" rx="3" />
+    <rect x="162" y="74" width="16" height="16" rx="3" />
+    <rect x="138" y="98" width="16" height="16" rx="3" />
+    <rect x="162" y="98" width="16" height="16" rx="3" />
+    <rect x="138" y="138" width="16" height="16" rx="3" />
+    <rect x="162" y="138" width="16" height="16" rx="3" />
+    <rect x="186" y="138" width="16" height="16" rx="3" />
+    <rect x="138" y="162" width="16" height="16" rx="3" />
+    <rect x="186" y="162" width="16" height="16" rx="3" />
+    <rect x="210" y="138" width="16" height="16" rx="3" />
+    <rect x="210" y="162" width="16" height="16" rx="3" />
+    <rect x="138" y="186" width="16" height="16" rx="3" />
+    <rect x="162" y="186" width="16" height="16" rx="3" />
+    <rect x="186" y="186" width="16" height="16" rx="3" />
+    <rect x="210" y="186" width="16" height="16" rx="3" />
+  </g>
+  <text x="160" y="294" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#ffffff">boylu</text>
+</svg>

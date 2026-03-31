@@ -1,0 +1,17 @@
+[Unit]
+Description=boylu blog backend service
+After=network.target mysql.service redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/boylu-blog/server
+EnvironmentFile=/etc/boylu-blog/boylu-blog.env
+ExecStart=/usr/bin/java -jar /opt/boylu-blog/server/mojian-blog.jar --spring.profiles.active=prod
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
