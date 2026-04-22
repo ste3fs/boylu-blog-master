@@ -1,11 +1,34 @@
 .tools/
 local-backups/
 release/
+.deploy-temp/
 
 # Keep repo source-only at the root.
+*.tar
+*.tar.gz
+*.tgz
 *.zip
 *.7z
 *.rar
+
+# Dependencies / build outputs
+node_modules/
+dist/
+target/
+
+# Temporary deployment / restore artifacts
+*_deploy*.sh
+*_deploy*.tar.gz
+*_deploy*.zip
+_deploy_*
+_restore_*
+*.fix-*
+
+# Playwright E2E
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/.env.local
 
 # OS / editor noise
 .DS_Store
