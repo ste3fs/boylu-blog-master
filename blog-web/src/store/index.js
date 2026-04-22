@@ -30,13 +30,23 @@ export default new Vuex.Store({
     setSiteInfo(state, info) {
       state.webSiteInfo = info
     },
-    SET_TOKEN(state, token) {
-      state.token = token
-      setToken(token)
+    SET_TOKEN(state, payload) {
+      const token = typeof payload === 'string' ? payload : payload?.token
+      const expires = typeof payload === 'object' && payload?.expires ? payload.expires : 7
+      state.token = token || ''
+      if (token) {
+        setToken(token, expires)
+      } else {
+        removeToken()
+      }
     },
     SET_USER_INFO(state, userInfo) {
       state.userInfo = userInfo
-      sessionStorage.setItem("user", JSON.stringify(userInfo))
+      if (userInfo) {
+        sessionStorage.setItem("user", JSON.stringify(userInfo))
+      } else {
+        sessionStorage.removeItem("user")
+      }
     },
 
     SET_SEARCH_VISIBLE(state, visible) {
@@ -89,11 +99,13 @@ export default new Vuex.Store({
     /**
      * 登录
      */
-    async loginAction({ commit }, loginData) {
+    async loginAction({ commit }, payload) {
+      const loginData = payload?.loginData || payload
+      const rememberMe = !!payload?.rememberMe
       try {
         const res = await loginApi(loginData)
         if (res.data) {
-          commit('SET_TOKEN', res.data.token)
+          commit('SET_TOKEN', { token: res.data.token, expires: rememberMe ? 30 : 7 })
           commit('SET_USER_INFO', res.data)
           return Promise.resolve(res)
         }

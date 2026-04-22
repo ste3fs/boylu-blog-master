@@ -15,10 +15,13 @@
         </div>
       </div>
       <div class="hero-visual">
-        <div class="avatar-orbit orbit-a"></div>
-        <div class="avatar-orbit orbit-b"></div>
-        <div class="avatar-shell">
-          <img :src="avatarSrc" alt="boylu avatar" />
+        <div class="hero-visual__glow hero-visual__glow--a"></div>
+        <div class="hero-visual__glow hero-visual__glow--b"></div>
+        <div class="hero-avatar-orbit">
+          <div class="hero-avatar-shell">
+            <img :src="avatarSrc" alt="boylu avatar" />
+          </div>
+          <span class="hero-avatar-status">ONLINE</span>
         </div>
       </div>
     </article>
@@ -81,6 +84,9 @@
 </template>
 
 <script>
+import { copyText } from "@/utils/contact";
+import { resolveImageUrl } from "@/utils/image";
+
 export default {
   name: "SignalPanel",
   props: {
@@ -112,12 +118,10 @@ export default {
       return this.$store.state.webSiteInfo || {};
     },
     avatarSrc() {
-      const avatar = this.siteInfo.authorAvatar || "/boylu-avatar.jpg";
-      if (!avatar.includes("/localFile/")) {
-        return avatar;
-      }
-      const version = this.$store.state.imageVersion;
-      return `${avatar}${avatar.includes("?") ? "&" : "?"}v=${version}`;
+      return this.resolveSafeAvatar([
+        this.siteInfo.authorAvatar,
+        this.siteInfo.touristAvatar,
+      ]);
     },
     summaryText() {
       return (
@@ -163,25 +167,23 @@ export default {
         now.getSeconds()
       )}`;
     },
-    copyValue(label, value) {
+    resolveSafeAvatar(candidates = []) {
+      const match = candidates
+        .map((url) => (url || "").toString().trim())
+        .find(Boolean);
+
+      return resolveImageUrl(match, this.siteInfo.logo || this.$store.state.defaultImage);
+    },
+    async copyValue(label, value) {
       if (!value) {
         this.$message.warning(`${label}还没有配置`);
         return;
       }
-      const textarea = document.createElement("textarea");
-      textarea.value = value;
-      textarea.setAttribute("readonly", "readonly");
-      textarea.style.position = "absolute";
-      textarea.style.left = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.select();
-      try {
-        document.execCommand("copy");
+      const copied = await copyText(value);
+      if (copied) {
         this.$message.success(`${label}已复制`);
-      } catch (error) {
+      } else {
         this.$message.error(`复制${label}失败`);
-      } finally {
-        document.body.removeChild(textarea);
       }
     },
   },
@@ -210,13 +212,15 @@ export default {
 .hero-card {
   min-height: 300px;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) 220px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(260px, 360px);
+  gap: 24px;
   background:
-    radial-gradient(circle at top left, rgba(56, 189, 248, 0.22), transparent 36%),
-    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.18), transparent 28%),
-    linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(37, 99, 235, 0.9));
-  color: #f8fafc;
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 36%),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.1), transparent 28%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  color: var(--text-primary);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.08);
 }
 
 .hero-copy {
@@ -230,7 +234,8 @@ export default {
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
   letter-spacing: 0.16em;
   font-size: 12px;
   font-weight: 700;
@@ -244,7 +249,7 @@ export default {
 
 .hero-copy p {
   max-width: 640px;
-  color: rgba(248, 250, 252, 0.82);
+  color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.75;
 }
@@ -259,9 +264,9 @@ export default {
 .chip {
   padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(59, 130, 246, 0.08);
   font-size: 13px;
-  color: #e2e8f0;
+  color: #475569;
 }
 
 .action-row,
@@ -289,8 +294,9 @@ export default {
 }
 
 .ghost-btn {
-  background: rgba(255, 255, 255, 0.12);
-  color: inherit;
+  background: rgba(241, 245, 249, 0.92);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
 }
 
 .ghost-btn:disabled {
@@ -308,43 +314,99 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 100%;
 }
 
-.avatar-shell {
+.hero-visual__glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(26px);
+  pointer-events: none;
+}
+
+.hero-visual__glow--a {
+  top: 8%;
+  left: -8%;
+  width: 120px;
+  height: 120px;
+  background: rgba(#38bdf8, 0.22);
+}
+
+.hero-visual__glow--b {
+  right: -6%;
+  bottom: 2%;
+  width: 140px;
+  height: 140px;
+  background: rgba(#8b5cf6, 0.18);
+}
+
+.hero-avatar-orbit {
   position: relative;
   z-index: 1;
-  width: 168px;
-  height: 168px;
-  padding: 10px;
-  border-radius: 42px;
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  width: min(100%, 240px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(56, 189, 248, 0.16), transparent 34%),
+    radial-gradient(circle at 72% 76%, rgba(37, 99, 235, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.92));
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 18px 40px rgba(37, 99, 235, 0.08);
 }
 
-.avatar-shell img {
+.hero-avatar-orbit::before,
+.hero-avatar-orbit::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+}
+
+.hero-avatar-orbit::before {
+  inset: 16px;
+  border: 1px solid rgba(59, 130, 246, 0.14);
+}
+
+.hero-avatar-orbit::after {
+  inset: 34px;
+  border: 1px solid rgba(125, 211, 252, 0.24);
+}
+
+.hero-avatar-shell {
+  position: relative;
+  width: 124px;
+  height: 124px;
+  padding: 5px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(#38bdf8, 0.9), rgba(#8b5cf6, 0.9));
+  box-shadow: 0 16px 28px rgba(59, 130, 246, 0.16);
+}
+
+.hero-avatar-shell img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 34px;
+  border-radius: 50%;
 }
 
-.avatar-orbit {
+.hero-avatar-status {
   position: absolute;
-  border: 1px solid rgba(191, 219, 254, 0.35);
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
   border-radius: 999px;
-}
-
-.orbit-a {
-  width: 190px;
-  height: 190px;
-  animation: spinSlow 14s linear infinite;
-}
-
-.orbit-b {
-  width: 220px;
-  height: 220px;
-  transform: rotate(28deg);
-  animation: spinSlowReverse 16s linear infinite;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
 .card-title {
@@ -494,12 +556,7 @@ export default {
 }
 
 .signal-panel.sidebar-mode .hero-visual {
-  min-height: 160px;
-}
-
-.signal-panel.sidebar-mode .avatar-shell {
-  width: 132px;
-  height: 132px;
+  min-height: 220px;
 }
 
 .signal-panel.sidebar-mode .wechat-card {
@@ -516,7 +573,7 @@ export default {
   }
 
   .hero-visual {
-    min-height: 200px;
+    min-height: 240px;
   }
 
   .wechat-footer {
@@ -535,33 +592,23 @@ export default {
     grid-template-columns: 1fr;
   }
 
-  .avatar-shell {
-    width: 136px;
-    height: 136px;
+  .hero-visual {
+    min-height: 188px;
+  }
+
+  .hero-avatar-orbit {
+    width: min(100%, 200px);
+  }
+
+  .hero-avatar-shell {
+    width: 108px;
+    height: 108px;
   }
 }
 
 @include responsive(md) {
   .signal-panel {
     display: none;
-  }
-}
-
-@keyframes spinSlow {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes spinSlowReverse {
-  from {
-    transform: rotate(28deg);
-  }
-  to {
-    transform: rotate(-332deg);
   }
 }
 </style>

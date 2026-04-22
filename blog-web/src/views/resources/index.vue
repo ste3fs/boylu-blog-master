@@ -181,6 +181,7 @@ import { getDictDataApi } from '@/api/dict';
 import { getResourcesApi } from '@/api/resources';
 import { formatTime } from '@/utils/time';
 import { verifyCodeApi } from '@/api/resources';
+import { copyText as copyPlainText } from '@/utils/contact';
 export default {
   name: 'ResourcesView',
   components: {
@@ -324,10 +325,14 @@ export default {
      * 复制文本
      */
     copyText(text) {
-      navigator.clipboard.writeText(text).then(() => {
+      copyPlainText(text).then(copied => {
+        if (copied) {
         this.$message.success('复制成功')
-      }).catch(() => {
+        } else {
         this.$message.error('复制失败')
+        }
+      }).catch(() => {
+        this.$message.error('澶嶅埗澶辫触')
       })
     },
 

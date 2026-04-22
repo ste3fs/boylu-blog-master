@@ -184,10 +184,21 @@ const routes = [
                   icon: 'fas fa-comments',
                   hidden: true
                 }
+              },
+              {
+                path: '/ai',
+                name: 'AiAssistant',
+                component: () => import('@/views/ai/index.vue'),
+                meta: {
+                  transition: 'fade',
+                  title: 'AI 助手 - boylu博客',
+                  icon: 'fas fa-robot',
+                  fullscreen: true
+                }
               }, {
                 path: '/login',
                 name: 'Login',
-                component: () => import('@/views/login/index.vue'),
+                component: () => import('@/views/Login/index.vue'),
                 meta: {
                   title: '登录',
                   hidden: true,

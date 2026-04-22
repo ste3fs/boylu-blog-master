@@ -38,8 +38,13 @@
       </h3>
       <div class="announcement-content">
         <div class="announcement-item" v-for="(item, index) in announcements" :key="index">
-          <!-- <i :class="item.icon"></i> -->
-          <span v-html="item.content"></span>
+          <div class="announcement-date" v-if="item.createTime">
+            <i class="far fa-clock"></i>
+            <span>发布于 {{ formatNoticeTime(item.createTime) }}</span>
+          </div>
+          <div class="announcement-body">
+            <span v-html="item.content"></span>
+          </div>
         </div>
       </div>
     </el-card>
@@ -74,6 +79,7 @@
 import { getRecommendArticlesApi } from '@/api/article'
 import Tag from './components/tagCloud.vue'
 import SignalPanel from '@/views/home/components/signalPanel.vue'
+import { copyText } from '@/utils/contact'
 
 export default {
   name: 'Sidebar',
@@ -119,7 +125,7 @@ export default {
           icCopy: true
         },
         {
-          icon: 'fas fa-at',
+          icon: 'fas fa-envelope',
           title: '邮箱',
           type: 'email',
           content: '点击复制邮箱',
@@ -174,6 +180,13 @@ export default {
     }
   },
   methods: {
+    formatNoticeTime(value) {
+      if (!value) {
+        return ''
+      }
+      const text = String(value).replace('T', ' ')
+      return text.length >= 10 ? text.slice(0, 10) : text
+    },
     resolveImage(url) {
       const fallback = url || this.$store.state.defaultImage
       if (!fallback) {
@@ -195,13 +208,14 @@ export default {
     /**
      * 复制到剪贴板
      */
-    copyToClipboard(item) {
+    async copyToClipboard(item) {
       if (item.icCopy) {
-        navigator.clipboard.writeText(item.link).then(() => {
+        const copied = await copyText(item.link)
+        if (copied) {
           this.$message.success(`${item.title}账号已复制到剪贴板`);
-        }).catch(() => {
+        } else {
           this.$message.error('复制失败，请手动复制');
-        });
+        }
       } else {
         window.open(item.link, '_blank')
       }
@@ -585,8 +599,9 @@ export default {
   .announcement-content {
     .announcement-item {
       display: flex;
+      flex-direction: column;
       align-items: flex-start;
-      gap: 12px;
+      gap: 8px;
       padding: 12px 0;
       border-bottom: 1px dashed rgba(99, 102, 241, 0.1);
 
@@ -599,31 +614,43 @@ export default {
         padding-top: 0;
       }
 
-      i {
-        font-size: 1rem;
-        color: #6366f1;
-        flex-shrink: 0;
-        margin-top: 3px;
+      .announcement-date {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+
+        i {
+          font-size: 0.8rem;
+          color: #6366f1;
+          flex-shrink: 0;
+        }
       }
 
-      span {
-        font-size: 0.9rem;
-        color: var(--text-secondary);
-        line-height: 1.6;
+      .announcement-body {
+        width: 100%;
+
+        span {
+          font-size: 0.9rem;
+          color: var(--text-secondary);
+          line-height: 1.7;
+          word-break: break-word;
+        }
       }
 
       &:hover {
-        i {
+        .announcement-date i {
           transform: scale(1.1);
         }
 
-        span {
+        .announcement-body span {
           color: var(--text-primary);
         }
       }
 
-      i,
-      span {
+      .announcement-date i,
+      .announcement-body span {
         transition: all 0.3s ease;
       }
     }

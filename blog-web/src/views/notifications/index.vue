@@ -305,7 +305,12 @@ export default {
   },
   created() {
     if(!this.$store.state.userInfo){
-      this.$router.push('/login')
+      this.$router.push({
+        path: '/login',
+        query: {
+          redirect: this.$route?.fullPath || '/notifications'
+        }
+      })
       return
     }
     this.fetchNotifications()

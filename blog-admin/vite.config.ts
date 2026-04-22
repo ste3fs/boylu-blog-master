@@ -7,7 +7,7 @@ import { svgBuilder } from './src/plugins/svgBuilder'
 
 function normalizeBasePath(pathValue: string) {
   if (!pathValue) {
-    return '/admin/'
+    return '/boylu1107/'
   }
   const withLeadingSlash = pathValue.startsWith('/') ? pathValue : `/${pathValue}`
   return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`
@@ -17,7 +17,7 @@ export default defineConfig(({ command, mode }: ConfigEnv): UserConfig => {
   // 获取环境变量
   const env = loadEnv(mode, process.cwd())
   const adminBasePath = mode === 'production'
-    ? normalizeBasePath(env.VITE_APP_ADMIN_BASE_PATH || '/admin/')
+    ? normalizeBasePath(env.VITE_APP_ADMIN_BASE_PATH || '/boylu1107/')
     : '/'
   
   return {

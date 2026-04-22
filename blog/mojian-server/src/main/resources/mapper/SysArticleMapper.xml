@@ -188,7 +188,9 @@
             COUNT( id ) AS count
         FROM
             sys_article
-        WHERE date(create_time) &gt;= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
+        WHERE
+            status = 1
+            AND YEAR(create_time) = YEAR(CURDATE())
         group by `date` order by `date` asc
     </select>
 

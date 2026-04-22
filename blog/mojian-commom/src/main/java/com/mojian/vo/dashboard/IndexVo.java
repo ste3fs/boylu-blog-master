@@ -24,10 +24,12 @@ public class IndexVo {
     private Long messageCount ;
 
     @ApiModelProperty(value = "访问量")
-    private int visitCount;
+    private Long visitCount;
 
     @ApiModelProperty(value = "贡献度")
     private List<ContributionData> contributionData;
 
+    @ApiModelProperty(value = "访问趋势")
+    private List<VisitTrendData> visitTrendData;
 
 }

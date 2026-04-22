@@ -8,34 +8,39 @@
 
       <div class="nav-left">
         <router-link to="/" class="logo">
-          <img :src="$store.state.webSiteInfo.logo" :alt="$store.state.webSiteInfo.name">
+          <img :src="siteLogoSrc" :alt="$store.state.webSiteInfo.name">
           <span class="logo-text">{{$store.state.webSiteInfo.name}}</span>
         </router-link>
       </div>
 
-      <div class="nav-center">
-        <div 
-          v-for="item in filteredMenuItems" 
+      <div class="nav-center" @mouseleave="resetDockState">
+        <div
+          v-for="(item, index) in filteredMenuItems"
           :key="item.path"
           class="nav-item"
           @mouseleave="handleMouseLeave"
         >
-          <router-link 
+          <router-link
             :to="item.path"
             class="nav-link"
-            :class="{ 
+            :class="{
               'has-dropdown': item.children,
               'active': isActive(item),
               [item.colorClass]: true
             }"
-            @mouseenter="handleMouseEnter(item)"
+            :style="getDockItemStyle(index)"
+            @mouseenter.native="handleMouseEnter(item, index, $event)"
+            @mousemove.native="handleDockMove(index, $event)"
           >
-            <i :class="item.icon"></i>
-            {{ item.name }}
-            <i v-if="item.children" class="fas fa-chevron-down dropdown-icon"></i>
+            <span class="nav-link__glow"></span>
+            <span class="nav-link__content">
+              <i :class="item.icon"></i>
+              {{ item.name }}
+              <i v-if="item.children" class="fas fa-chevron-down dropdown-icon"></i>
+            </span>
           </router-link>
-          
-          <div v-if="item.children" 
+
+          <div v-if="item.children"
                class="dropdown-menu"
                :class="{ active: activeDropdown === item.name }"
           >
@@ -45,7 +50,7 @@
               :key="child.path"
               class="dropdown-item"
               :class="{ 'active': isChildActive(child) }"
-              @click="handleDropdownItemClick(child)"
+              @click="child.colorClass === 'contact-link' ? triggerContactAction() : handleDropdownItemClick(child)"
             >
               <i :class="child.icon"></i>
               {{ child.name }}
@@ -74,12 +79,12 @@
         <div class="user-info">
           <div v-if="$store.state.userInfo" class="user-section" @mouseleave="showDropdown = false">
             <div class="avatar" @mouseenter="showDropdown = true">
-              <el-avatar :src="$store.state.userInfo.avatar"  />
+              <el-avatar :src="userAvatarSrc" icon="el-icon-user-solid" />
             </div>
             <!-- 用户下拉菜单 -->
             <div class="user-dropdown" v-show="showDropdown">
               <div class="dropdown-header">
-                <img :src="$store.state.userInfo.avatar" :alt="$store.state.userInfo.nickname">
+                <img :src="userAvatarSrc" :alt="$store.state.userInfo.nickname">
                 <div class="user-details">
                   <span class="username">{{ $store.state.userInfo.nickname }}</span>
                   <span class="role">{{ $store.state.userInfo.role === 'admin' ? '管理员' : '普通用户' }}</span>
@@ -97,8 +102,10 @@
             </div>
           </div>
           <div v-else class="avatar" @click="handleLogin">
-            <el-avatar class="avatar-icon"
-              :src="$store.state.webSiteInfo.touristAvatar" 
+            <el-avatar
+              class="avatar-icon"
+              icon="el-icon-user-solid"
+              :src="guestAvatarSrc"
             />
           </div>
         </div>
@@ -108,6 +115,8 @@
 </template>
 
 <script>
+import { handleContactAction, resolveContactAction } from '@/utils/contact'
+import { resolveImageUrl } from '@/utils/image'
 
 export default {
   name: 'TheHeader',
@@ -163,14 +172,20 @@ export default {
           icon: 'fas fa-fire',
           colorClass: 'hot-link'
         },
-        { 
-          name: '资源', 
-          path: '/resources', 
+        {
+          name: '资源',
+          path: '/resources',
           icon: 'fas fa-cloud-download-alt',
           colorClass: 'resource-link'
         },
-        { 
-          name: '相册', 
+        {
+          name: 'AI 助手',
+          path: '/ai',
+          icon: 'fas fa-robot',
+          colorClass: 'ai-link'
+        },
+        {
+          name: '相册',
           path: '/photos', 
           icon: 'fas fa-images',
           colorClass: 'photos-link'
@@ -201,14 +216,14 @@ export default {
             },
             { 
               name: '联系站长', 
-              path: 'mailto:3453619783@qq.com', 
+              path: '', 
               icon: 'fas fa-envelope',
               colorClass: 'contact-link',
-              external: true 
+              external: false 
             },
             { 
               name: '后台管理', 
-              path: import.meta.env.VITE_APP_ADMIN_URL || 'http://localhost:3001/login',
+              path: import.meta.env.VITE_APP_ADMIN_URL || '/boylu1107/login',
               icon: 'fas fa-tv',
               colorClass: 'admin-link',
               external: true 
@@ -217,20 +232,78 @@ export default {
         }
       ],
       activeDropdown: null,
+      hoveredNavIndex: null,
+      hoveredNavOffset: 0,
+      hoveredNavTargetOffset: 0,
+      dockAnimationFrame: null,
       showDropdown: false,
       showSearch: false,
       unreadCount: 0,
     }
   },
   computed: {
+    contactAction() {
+      return resolveContactAction(this.$store.state.webSiteInfo)
+    },
+    siteLogoSrc() {
+      return this.resolveSafeAvatar([
+        this.$store.state.webSiteInfo?.logo,
+        this.$store.state.webSiteInfo?.authorAvatar,
+        this.$store.state.webSiteInfo?.touristAvatar
+      ])
+    },
+    userAvatarSrc() {
+      return this.resolveSafeAvatar([
+        this.$store.state.userInfo?.avatar,
+        this.$store.state.webSiteInfo?.authorAvatar,
+        this.$store.state.webSiteInfo?.logo
+      ])
+    },
+    guestAvatarSrc() {
+      return this.resolveSafeAvatar([
+        this.$store.state.webSiteInfo?.touristAvatar,
+        this.$store.state.webSiteInfo?.authorAvatar,
+        this.$store.state.webSiteInfo?.logo
+      ])
+    },
+    resolvedMenuItems() {
+      return this.menuItems.map(item => {
+        if (!item.children) {
+          return item
+        }
+
+        return {
+          ...item,
+          children: item.children.map(child => {
+            if (child.colorClass !== 'contact-link') {
+              return child
+            }
+
+            return {
+              ...child,
+              path: this.contactAction.path || child.path || '__contact__',
+              external: Boolean(this.contactAction.external),
+              icon: this.contactAction.icon || child.icon
+            }
+          })
+        }
+      })
+    },
     filteredMenuItems() {
-      return this.menuItems.map(item => ({
+      return this.resolvedMenuItems.map(item => ({
         ...item,
         path: item.children ? item.children[0].path : item.path
       }))
     }
   },
   methods: {
+    resolveSafeAvatar(candidates = []) {
+      const match = candidates
+        .map(url => (url || '').toString().trim())
+        .find(Boolean)
+
+      return resolveImageUrl(match, this.$store.state.webSiteInfo.logo || this.$store.state.defaultImage)
+    },
     handleOpenMobileMenu() {
       this.$store.commit('SET_MOBILE_MENU_VISIBLE', true)
     },
@@ -238,8 +311,12 @@ export default {
       this.$store.commit('SET_SEARCH_VISIBLE', true)
     },
     handleLogin() {
-      // 处理登录逻辑
-      this.$router.push('/login')
+      this.$router.push({
+        path: '/login',
+        query: {
+          redirect: this.$route?.fullPath || '/'
+        }
+      })
     },
     closeAllPanels() {
       this.showMobileSearch = false
@@ -252,13 +329,109 @@ export default {
       this.searchQuery = tag
       this.$refs.mobileSearchInput.focus()
     },
-    handleMouseEnter(item) {
+    handleMouseEnter(item, index, event) {
+      this.hoveredNavIndex = index
+      this.updateDockOffset(event)
       if (item.children) {
         this.activeDropdown = item.name
       }
     },
+    handleDockMove(index, event) {
+      this.hoveredNavIndex = index
+      this.updateDockOffset(event)
+    },
+    updateDockOffset(event) {
+      const currentTarget = event && event.currentTarget
+      if (!currentTarget || typeof currentTarget.getBoundingClientRect !== 'function') {
+        this.hoveredNavTargetOffset = 0
+        return
+      }
+
+      const rect = currentTarget.getBoundingClientRect()
+      if (!rect.width) {
+        this.hoveredNavTargetOffset = 0
+        return
+      }
+
+      const cursorRatio = (event.clientX - rect.left) / rect.width
+      const normalized = Math.max(-1, Math.min(1, (cursorRatio - 0.5) * 2))
+      this.hoveredNavTargetOffset = Number(normalized.toFixed(3))
+      this.startDockAnimation()
+    },
+    startDockAnimation() {
+      if (this.dockAnimationFrame) {
+        return
+      }
+
+      const step = () => {
+        const delta = this.hoveredNavTargetOffset - this.hoveredNavOffset
+        if (Math.abs(delta) < 0.006) {
+          this.hoveredNavOffset = this.hoveredNavTargetOffset
+          this.dockAnimationFrame = null
+          return
+        }
+
+        this.hoveredNavOffset = Number((this.hoveredNavOffset + delta * 0.14).toFixed(4))
+        this.dockAnimationFrame = window.requestAnimationFrame(step)
+      }
+
+      this.dockAnimationFrame = window.requestAnimationFrame(step)
+    },
+    getDockItemStyle(index) {
+      if (this.hoveredNavIndex === null) {
+        return {
+          '--dock-scale': 1,
+          '--dock-lift': '0px',
+          '--dock-shift': '0px',
+          '--dock-glow-opacity': 0,
+          '--dock-label-opacity': 0.92
+        }
+      }
+
+      const distance = Math.abs(this.hoveredNavIndex - index)
+      const direction = index > this.hoveredNavIndex ? 1 : -1
+      const directionalOffset = this.hoveredNavOffset * 4.2
+      const profiles = {
+        0: {
+          scale: 1.085,
+          lift: -4.5,
+          shift: directionalOffset,
+          glow: 0.68,
+          label: 1
+        },
+        1: {
+          scale: 1.028,
+          lift: -1.4,
+          shift: direction * 1.5 + this.hoveredNavOffset * 1.2,
+          glow: 0.24,
+          label: 0.975
+        }
+      }
+
+      const profile = profiles[distance] || {
+        scale: 1,
+        lift: 0,
+        shift: 0,
+        glow: 0,
+        label: 0.92
+      }
+
+      return {
+        '--dock-scale': profile.scale,
+        '--dock-lift': `${profile.lift}px`,
+        '--dock-shift': `${profile.shift}px`,
+        '--dock-glow-opacity': profile.glow,
+        '--dock-label-opacity': profile.label
+      }
+    },
     handleMouseLeave() {
       this.activeDropdown = null
+    },
+    resetDockState() {
+      this.activeDropdown = null
+      this.hoveredNavIndex = null
+      this.hoveredNavTargetOffset = 0
+      this.startDockAnimation()
     },
     isActive(item) {
       if (item.children) {
@@ -270,6 +443,10 @@ export default {
     },
     isChildActive(child) {
       return this.$route.path === child.path
+    },
+    triggerContactAction() {
+      this.activeDropdown = null
+      handleContactAction(this, this.$store.state.webSiteInfo)
     },
     handleDropdownItemClick(item) {
       this.activeDropdown = null
@@ -369,10 +546,11 @@ export default {
   align-items: center;
   height: 64px;
   position: relative;
+  gap: 18px;
 }
 
 .nav-left {
-  margin-right: 50px;
+  margin-right: 20px;
   .logo {
     display: flex;
     align-items: center;
@@ -422,21 +600,39 @@ export default {
 
 .nav-center {
   display: flex;
-  gap: $spacing-md;
-  flex: 1;
-  font-size: 1em;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 10px;
+  margin-right: 8px;
+  border: 1px solid rgba($primary, 0.07);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.56)),
+    rgba($primary, 0.035);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 14px 28px rgba(15, 23, 42, 0.06);
+  flex-wrap: nowrap;
+  overflow: visible;
+
   .nav-item {
     position: relative;
     white-space: nowrap;
+    flex: 1 1 0;
+    min-width: 0;
 
     &:hover {
+      z-index: 6;
+
       .dropdown-menu {
         opacity: 1;
         visibility: visible;
         transform: translateX(-50%) translateY(0);
         pointer-events: auto;
       }
-      
+
       .nav-link .dropdown-icon {
         transform: rotate(180deg);
       }
@@ -444,105 +640,150 @@ export default {
   }
 
   .nav-link {
-    color: var(--text-secondary);
-    text-decoration: none;
-    font-weight: 500;
-    transition: all 0.3s ease;
+    --dock-scale: 1;
+    --dock-lift: 0px;
+    --dock-shift: 0px;
+    --dock-glow-opacity: 0;
+    --dock-label-opacity: 0.9;
+    position: relative;
     display: flex;
     align-items: center;
-    gap: $spacing-sm;
-    padding: $spacing-sm;
-    border-radius: $border-radius-md;
-    font-size: 0.95em;
-    position: relative;
-    height: 40px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    justify-content: center;
+    width: 100%;
+    min-height: 42px;
+    padding: 0 16px;
+    border-radius: 999px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.92em;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transform: translate3d(var(--dock-shift), var(--dock-lift), 0) scale3d(var(--dock-scale), var(--dock-scale), 1);
+    transform-origin: center bottom;
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), color 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease, background 0.24s ease;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 7px 16px rgba(15, 23, 42, 0.04);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    overflow: visible;
+    will-change: transform;
+    backface-visibility: hidden;
+  }
 
-    i {
-      font-size: 1.1em;
-    }
+  .nav-link i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: transform 0.22s ease;
+    font-size: 1.08em;
+    flex-shrink: 0;
+  }
 
-    &:hover, &.active {
-      color: $primary;
-      // background: var(--hover-bg);
-    }
+  .nav-link:hover,
+  .nav-link.active {
+    color: $primary;
+    border-color: rgba($primary, 0.12);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba($primary, 0.07));
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  }
 
-    &.has-dropdown {
-      padding-right: $spacing-lg;
-
-      .dropdown-icon {
-        position: absolute;
-        right: $spacing-sm;
-        font-size: 0.8em;
-        transition: transform 0.3s ease;
-      }
-    }
-
-    &.home-link i { color: #4CAF50; }
-    &.archive-link i { color: #9C27B0; }
-    &.clock-link i { color: #00BCD4; }
-    &.category-link i { color: #FF9800; }
-    &.tag-link i { color: #E91E63; }
-    &.talk-link i { color: #2196F3; }
-    &.code-link i { color: #607D8B; }
-    &.hot-link i { color: #F44336; }
-    &.photos-link i { color: #9b36f4; }
-    &.message-link i { color: #009688; }
-    &.friend-link i { color: #3F51B5; }
-    &.about-link i { color: #795548; }
-    &.about-me-link i { color: #8BC34A; }
-    &.github-link i { color: #333333; }
-    &.contact-link i { color: #0f766e; }
-    &.changelog-link i { color: #673AB7; }
-    &.resource-link i { color: #009688; }
-
-    &:hover {
-      i {
-        transform: scale(1.1);
-      }
-    }
-
-    i {
-      transition: transform 0.3s ease;
-      font-size: 1.2em;
+  .nav-link.has-dropdown {
+    .dropdown-icon {
+      font-size: 0.72em;
+      margin-left: 2px;
+      line-height: 1;
+      transition: transform 0.26s ease;
     }
   }
 
+  .nav-link.home-link i { color: #4CAF50; }
+  .nav-link.archive-link i { color: #9C27B0; }
+  .nav-link.clock-link i { color: #00BCD4; }
+  .nav-link.category-link i { color: #FF9800; }
+  .nav-link.tag-link i { color: #E91E63; }
+  .nav-link.talk-link i { color: #2196F3; }
+  .nav-link.code-link i { color: #607D8B; }
+  .nav-link.hot-link i { color: #F44336; }
+  .nav-link.photos-link i { color: #9b36f4; }
+  .nav-link.message-link i { color: #009688; }
+  .nav-link.friend-link i { color: #3F51B5; }
+  .nav-link.about-link i { color: #795548; }
+  .nav-link.about-me-link i { color: #8BC34A; }
+  .nav-link.github-link i { color: #333333; }
+  .nav-link.contact-link i { color: #0f766e; }
+  .nav-link.changelog-link i { color: #673AB7; }
+  .nav-link.resource-link i { color: #009688; }
+  .nav-link.ai-link i { color: #2563eb; }
+
+  .nav-link:hover i,
+  .nav-link.active i {
+    transform: translateY(-1px) scale(1.06);
+  }
+
+  .nav-link__content {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    width: 100%;
+    opacity: var(--dock-label-opacity);
+  }
+
+  .nav-link__glow {
+    position: absolute;
+    inset: 4px;
+    border-radius: inherit;
+    background: radial-gradient(circle at center top, rgba($primary, 0.16), transparent 72%);
+    opacity: var(--dock-glow-opacity);
+    transition: opacity 0.24s ease;
+    pointer-events: none;
+  }
+
   @media screen and (max-width: 1400px) {
+    gap: 8px;
+    padding: 6px 8px;
+
     .nav-link {
-      font-size: 0.85em;
-      padding: $spacing-sm $spacing-sm;
-      gap: $spacing-xs;
+      padding: 0 13px;
+      font-size: 0.84em;
     }
   }
 
   @media screen and (max-width: 1200px) {
-    gap: $spacing-sm;
-    
+    gap: 6px;
+    margin-right: 6px;
+
     .nav-link {
-      font-size: 0.8em;
-      padding: $spacing-xs $spacing-sm;
+      padding: 0 11px;
+      min-height: 39px;
+      font-size: 0.78em;
 
       i {
-        font-size: 1em;
-      }
-
-      .dropdown-icon {
-        display: none;
+        font-size: 0.98em;
       }
     }
   }
 
   @media screen and (max-width: 1000px) {
     .nav-link {
+      padding: 0 10px;
+      font-size: 0.74em;
+
       i {
         display: none;
       }
-      
-      padding: $spacing-xs $spacing-xs;
-      font-size: 0.75em;
+
+      .dropdown-icon {
+        display: none;
+      }
+    }
+
+    .nav-link__content {
+      gap: 5px;
     }
   }
 }
@@ -592,15 +833,23 @@ export default {
 
   .message-btn {
     position: relative;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    padding: 8px;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
     color: var(--text-secondary);
     text-decoration: none;
     transition: all 0.3s ease;
     border-radius: 50%;
-    
+    box-sizing: border-box;
+
     i {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
       font-size: 1.2em;
       transition: transform 0.3s ease;
     }
@@ -968,6 +1217,7 @@ export default {
     &.github-link i { color: #FFFFFF; }
     &.contact-link i { color: #5eead4; }
     &.changelog-link i { color: #9575CD; }
+    &.ai-link i { color: #60a5fa; }
   }
 }
 
@@ -977,30 +1227,28 @@ export default {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
   }
   100% {
     transform: translateY(0);
   }
 }
 
-.nav-link:hover i {
-  animation: iconFloat 0.6s ease-in-out;
+.nav-link:hover i,
+.nav-link.active i {
+  animation: iconFloat 0.5s ease-in-out;
 }
 
-/* 修改字体相关样式 */
 .nav-link {
   font-family: 'Poppins', sans-serif;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.2px;
-  /* ... 其他样式保持不变 ... */
 }
 
 .logo-text {
   font-family: 'Poppins', sans-serif;
   font-weight: 600;
   letter-spacing: -0.5px;
-  /* ... 其他样式保持不变 ... */
 }
 
-</style> 
+</style>

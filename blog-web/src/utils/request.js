@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getToken,removeToken } from '@/utils/cookie'
+import { getToken, removeToken } from '@/utils/cookie'
 import store from '@/store'
 import router from '@/router'
 
@@ -8,17 +8,29 @@ const service = axios.create({
   timeout: 30000
 })
 
-// 请求拦截器
+function buildLoginRedirect() {
+  const currentPath = router.currentRoute?.fullPath || '/'
+  if (currentPath.startsWith('/login')) {
+    return { path: '/login' }
+  }
+
+  return {
+    path: '/login',
+    query: {
+      redirect: currentPath || '/'
+    }
+  }
+}
+
 service.interceptors.request.use(
-  config => {
-    // 可以在这里添加请求头等配置
+  (config) => {
     const token = getToken()
     if (token) {
-      config.headers['Authorization'] = token
+      config.headers.Authorization = token
     }
     return config
   },
-  error => {
+  (error) => {
     if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
       return Promise.reject(new Error('请求超时，请稍后重试'))
     }
@@ -26,28 +38,28 @@ service.interceptors.request.use(
   }
 )
 
-// 响应拦截器
 service.interceptors.response.use(
-  response => {
+  (response) => {
     const res = response.data
+
     if (res.code === 200) {
       return res
-    } else if(res.code === 404){
-      return Promise.reject(new Error('请求路径不存在'))
-    }else if(res.code === 401){
-      removeToken()
-      //这里获取不到this，所以需要使用全局变量
-      store.commit('SET_USER_INFO', null)
-      router.push('/login')
-      return Promise.reject(new Error('当前登录已过期，请重新登录'))
-    }else {
-      // 可以在这里统一处理错误
-      return Promise.reject(new Error(res.message || '请求失败'))
     }
+
+    if (res.code === 404) {
+      return Promise.reject(new Error('请求路径不存在'))
+    }
+
+    if (res.code === 401) {
+      removeToken()
+      store.commit('SET_USER_INFO', null)
+      router.push(buildLoginRedirect())
+      return Promise.reject(new Error('当前登录已过期，请重新登录'))
+    }
+
+    return Promise.reject(new Error(res.message || '请求失败'))
   },
-  error => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
 export default service

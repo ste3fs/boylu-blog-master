@@ -245,7 +245,13 @@ const onSuccess = (captcha: any) => {
 const login = () => {
   loading.value = true;
   userStore
-    .login(loginForm)
+    .login({
+      loginData: {
+        ...loginForm,
+        rememberMe: rememberMe.value,
+      },
+      rememberMe: rememberMe.value,
+    })
     .then(() => {
       showSliderVerify.value = false;
       sliderVerifyRef?.value?.verifySuccessEvent();
@@ -276,6 +282,7 @@ const toggleTheme = () => {
 };
 
 const handleLogin = async () => {
+  loginForm.rememberMe = rememberMe.value;
   loginFormRef.value?.validate((flag) => {
     if (!flag) {
       return;

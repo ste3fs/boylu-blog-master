@@ -14,6 +14,9 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.socket.server.standard.ServerEndpointExporter;
+import org.springframework.http.CacheControl;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author: boylu
@@ -39,7 +42,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
         if (sysFileOss != null) {
             registry.addResourceHandler(sysFileOss.getPathPatterns())
-                    .addResourceLocations("file:" + sysFileOss.getStoragePath());
+                    .addResourceLocations("file:" + sysFileOss.getStoragePath())
+                    .setCacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic());
         }
     }
 

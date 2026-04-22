@@ -116,6 +116,14 @@ const statistics = ref([
 ])
 
 const contributionData = ref([])
+interface VisitTrendItem {
+  date: string
+  label: string
+  visitCount: number | string
+  viewCount: number | string
+}
+
+const visitTrendData = ref<VisitTrendItem[]>([])
 
 // 图表相关
 const lineChartRef = ref<HTMLElement>()
@@ -124,51 +132,58 @@ const lineChart = shallowRef<echarts.ECharts | null>(null)
 const pieChart = shallowRef<echarts.ECharts | null>(null)
 
 // 折线图配置
-const getLineChartOption = (): EChartsOption => ({
-  tooltip: {
-    trigger: 'axis'
-  },
-  grid: {
-    left: '3%',
-    right: '4%',
-    bottom: '3%',
-    containLabel: true
-  },
-  xAxis: {
-    type: 'category',
-    boundaryGap: false,
-    data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-  },
-  yAxis: {
-    type: 'value'
-  },
-  series: [
-    {
-      name: '访问量',
-      type: 'line',
-      smooth: true,
-      data: [820, 932, 901, 934, 1290, 1330, 1320],
-      areaStyle: {
-        opacity: 0.3
-      },
-      itemStyle: {
-        color: '#409EFF'
-      }
+const getLineChartOption = (): EChartsOption => {
+  const labels = visitTrendData.value.map(item => item.label || item.date)
+  const visitorData = visitTrendData.value.map(item => Number(item.visitCount || 0))
+  const viewData = visitTrendData.value.map(item => Number(item.viewCount || 0))
+
+  return {
+    tooltip: {
+      trigger: 'axis'
     },
-    {
-      name: '浏览量',
-      type: 'line',
-      smooth: true,
-      data: [620, 732, 701, 734, 1090, 1130, 1120],
-      areaStyle: {
-        opacity: 0.3
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: labels
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1
+    },
+    series: [
+      {
+        name: '访客数',
+        type: 'line',
+        smooth: true,
+        data: visitorData,
+        areaStyle: {
+          opacity: 0.3
+        },
+        itemStyle: {
+          color: '#409EFF'
+        }
       },
-      itemStyle: {
-        color: '#67C23A'
+      {
+        name: '浏览量',
+        type: 'line',
+        smooth: true,
+        data: viewData,
+        areaStyle: {
+          opacity: 0.3
+        },
+        itemStyle: {
+          color: '#67C23A'
+        }
       }
-    }
-  ]
-})
+    ]
+  }
+}
 
 // 饼图配置
 const getPieChartOption = (): EChartsOption => ({
@@ -209,12 +224,12 @@ const getPieChartOption = (): EChartsOption => ({
 
 // 初始化图表
 const initCharts = () => {
+  if (lineChartRef.value) {
+    lineChart.value = echarts.init(lineChartRef.value)
+    lineChart.value.setOption(getLineChartOption())
+  }
+
   getBottomDataApi().then(res => {
-    if (lineChartRef.value) {
-      lineChart.value = echarts.init(lineChartRef.value)
-      lineChart.value.setOption(getLineChartOption())
-    }
-    
     if (pieChartRef.value) {
       pieChart.value = echarts.init(pieChartRef.value)
         const option = getPieChartOption()
@@ -241,6 +256,7 @@ onMounted(() => {
     statistics.value[2].value = res.data.messageCount
     statistics.value[3].value = res.data.visitCount
     contributionData.value = res.data.contributionData
+    visitTrendData.value = res.data.visitTrendData || []
     initCharts()
   })
   window.addEventListener('resize', handleResize)

@@ -18,6 +18,7 @@ import com.mojian.mapper.SysCategoryMapper;
 import com.mojian.mapper.SysTagMapper;
 import com.mojian.service.SysArticleService;
 import com.mojian.utils.AiUtil;
+import com.mojian.utils.LocalFileUrlNormalizeUtil;
 import com.mojian.utils.PageUtil;
 import com.mojian.vo.article.ArticleListVo;
 import com.mojian.vo.article.SysArticleDetailVo;
@@ -57,6 +58,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
         SysArticleDetailVo sysArticleDetailVo = new SysArticleDetailVo();
         BeanUtils.copyProperties(sysArticle, sysArticleDetailVo);
+        normalizeArticleDetail(sysArticleDetailVo);
 
         SysCategory sysCategory = sysCategoryMapper.selectById(sysArticle.getCategoryId());
         sysArticleDetailVo.setCategoryName(sysCategory.getName());
@@ -73,6 +75,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
         SysArticle obj = new SysArticle();
         BeanUtils.copyProperties(sysArticle, obj);
+        normalizeArticleFileUrls(obj);
         obj.setUserId(StpUtil.getLoginIdAsLong());
 
         //添加分类
@@ -100,6 +103,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
         SysArticle obj = new SysArticle();
         BeanUtils.copyProperties(sysArticle, obj);
+        normalizeArticleFileUrls(obj);
 
         //没有管理员权限就只能修改自己的文章
         if (!StpUtil.hasRole(Constants.ADMIN)) {
@@ -157,6 +161,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             SysArticle entity = SysArticle.builder().userId(StpUtil.getLoginIdAsLong()).contentMd(markdown)
                     .isOriginal(Constants.NO).originalUrl(url)
                     .title(title.get(0).text()).cover("https://api.btstu.cn/sjbz/api.php?lx=dongman&format=images").content(newContent).build();
+            normalizeArticleFileUrls(entity);
 
             baseMapper.insert(entity);
             //为该文章添加标签
@@ -200,5 +205,23 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             tagIds.add(sysTag.getId());
         }
         sysTagMapper.addArticleTagRelations(obj.getId(), tagIds);
+    }
+
+    private void normalizeArticleFileUrls(SysArticle article) {
+        if (article == null) {
+            return;
+        }
+        article.setCover(LocalFileUrlNormalizeUtil.normalizeUrl(article.getCover()));
+        article.setContent(LocalFileUrlNormalizeUtil.normalizeText(article.getContent()));
+        article.setContentMd(LocalFileUrlNormalizeUtil.normalizeText(article.getContentMd()));
+    }
+
+    private void normalizeArticleDetail(SysArticleDetailVo article) {
+        if (article == null) {
+            return;
+        }
+        article.setCover(LocalFileUrlNormalizeUtil.normalizeUrl(article.getCover()));
+        article.setContent(LocalFileUrlNormalizeUtil.normalizeText(article.getContent()));
+        article.setContentMd(LocalFileUrlNormalizeUtil.normalizeText(article.getContentMd()));
     }
 }

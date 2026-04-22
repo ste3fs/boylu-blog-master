@@ -6,6 +6,10 @@
           <div class="announcement-icon">
             <i class="fas fa-bullhorn"></i>
           </div>
+          <div v-if="notice.createTime" class="announcement-meta">
+            <i class="far fa-clock"></i>
+            <span>发布于 {{ formatNoticeTime(notice.createTime) }}</span>
+          </div>
           <div class="announcement-text">
             <span v-html="notice.content"></span>
           </div>
@@ -38,6 +42,13 @@ export default {
     } 
   },
   methods: {
+    formatNoticeTime(value) {
+      if (!value) {
+        return ''
+      }
+      const text = String(value).replace('T', ' ')
+      return text.length >= 16 ? text.slice(0, 16) : text
+    },
     close() {
       setCookieExpires('notice',this.notice.id,365)
       this.visible = false
@@ -70,18 +81,20 @@ export default {
 .announcement-wrapper {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 16px;
   flex: 1;
   overflow: hidden;
-  max-width: 800px;
+  max-width: 980px;
   position: relative;
   backdrop-filter: blur(8px);
   border-radius: 4px;
+  padding: 0 12px 0 56px;
 }
 
 .announcement-icon {
   position: absolute;
-  left: 30px;
+  left: 20px;
   font-size: 16px;
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   z-index: 1;
@@ -89,13 +102,29 @@ export default {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
+.announcement-meta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+
+  i {
+    font-size: 12px;
+  }
+}
+
 .announcement-text {
-  width: calc(100% - 70px);
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
-  margin-left: 70px;
   position: relative;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   letter-spacing: 0.3px;
 
   span {
@@ -176,5 +205,24 @@ export default {
 .slide-fade-leave-to {
   transform: translateY(-100%);
   opacity: 0;
+}
+
+@media (max-width: 768px) {
+  .announcement-content {
+    padding: 0 12px;
+  }
+
+  .announcement-wrapper {
+    gap: 10px;
+    padding-left: 44px;
+  }
+
+  .announcement-icon {
+    left: 14px;
+  }
+
+  .announcement-meta {
+    display: none;
+  }
 }
 </style> 

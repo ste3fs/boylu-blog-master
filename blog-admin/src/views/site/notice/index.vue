@@ -60,7 +60,7 @@
                         </span>
                     </template>
                 </el-table-column>
-                <el-table-column label="创建时间" align="center" prop="createTime" width="180"/>
+                <el-table-column label="发布时间" align="center" prop="createTime" width="180"/>
                 <el-table-column label="操作" align="center" width="150">
                     <template #default="scope">
                         <el-button type="primary" link icon="Edit"  v-permission="['sys:notice:update']" @click="handleUpdate(scope.row)">修改

@@ -9,21 +9,22 @@ import com.mojian.common.RedisConstants;
 import com.mojian.entity.SysArticle;
 import com.mojian.entity.SysCategory;
 import com.mojian.entity.SysNotifications;
+import com.mojian.mapper.SysArticleMapper;
+import com.mojian.mapper.SysCategoryMapper;
 import com.mojian.service.ArticleService;
-import com.mojian.utils.IpUtil;
 import com.mojian.utils.NotificationsUtil;
+import com.mojian.utils.PageUtil;
 import com.mojian.utils.RedisUtil;
 import com.mojian.vo.article.ArchiveListVo;
 import com.mojian.vo.article.ArticleDetailVo;
 import com.mojian.vo.article.ArticleListVo;
 import com.mojian.vo.article.CategoryListVo;
-import com.mojian.mapper.SysArticleMapper;
-import com.mojian.mapper.SysCategoryMapper;
-import com.mojian.utils.PageUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -43,42 +44,30 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     public IPage<ArticleListVo> getArticleList(Integer tagId, Integer categoryId, String keyword) {
-        return sysArticleMapper.getArticleListApi(PageUtil.getPage(), tagId, categoryId, keyword);
+        IPage<ArticleListVo> page = sysArticleMapper.getArticleListApi(PageUtil.getPage(), tagId, categoryId, keyword);
+        applyRealtimeQuantity(page.getRecords());
+        return page;
     }
 
     @Override
     public ArticleDetailVo getArticleDetail(Long id) {
         ArticleDetailVo detailVo = sysArticleMapper.getArticleDetail(id);
-        // 判断是否点赞
+        if (detailVo == null) {
+            return null;
+        }
+
         Object userId = StpUtil.getLoginIdDefaultNull();
         if (userId != null) {
             detailVo.setIsLike(sysArticleMapper.getUserIsLike(id, Integer.parseInt(userId.toString())));
         }
 
-        //添加阅读量
-        String ip = IpUtil.getIp();
-        ThreadUtil.execAsync(() -> {
-            Map<Object, Object> map = redisUtil.hGetAll(RedisConstants.ARTICLE_QUANTITY);
-            List<String> ipList = (List<String>) map.get(id.toString());
-            if (ipList != null) {
-                if (!ipList.contains(ip)) {
-                    ipList.add(ip);
-                }
-            } else {
-                ipList = new ArrayList<>();
-                ipList.add(ip);
-            }
-            map.put(id.toString(), ipList);
-            redisUtil.hSetAll(RedisConstants.ARTICLE_QUANTITY, map);
-        });
+        detailVo.setQuantity(increaseRealtimeQuantity(id, detailVo.getQuantity()));
         return detailVo;
     }
 
     @Override
     public List<ArchiveListVo> getArticleArchive() {
-
-        List<ArchiveListVo> list = new ArrayList<>();
-
+        List<ArchiveListVo> list = new ArrayList<ArchiveListVo>();
         List<Integer> years = sysArticleMapper.getArticleArchive();
         for (Integer year : years) {
             List<ArticleListVo> articleListVos = sysArticleMapper.getArticleByYear(year);
@@ -104,24 +93,24 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     public Boolean like(Long articleId) {
-        // 判断是否点赞
         int userId = StpUtil.getLoginIdAsInt();
         Boolean isLike = sysArticleMapper.getUserIsLike(articleId, userId);
         if (isLike) {
-            // 点过则取消点赞
             sysArticleMapper.unLike(articleId, userId);
         } else {
             sysArticleMapper.like(articleId, userId);
-            ThreadUtil.execAsync(() -> {
-                //发送通知事件
-                SysNotifications notifications = SysNotifications.builder()
-                        .title("文章点赞通知")
-                        .articleId(articleId)
-                        .isRead(0)
-                        .type("like")
-                        .fromUserId(StpUtil.getLoginIdAsLong())
-                        .build();
-                notificationsUtil.publish(notifications);
+            ThreadUtil.execAsync(new Runnable() {
+                @Override
+                public void run() {
+                    SysNotifications notifications = SysNotifications.builder()
+                            .title("文章点赞通知")
+                            .articleId(articleId)
+                            .isRead(0)
+                            .type("like")
+                            .fromUserId(StpUtil.getLoginIdAsLong())
+                            .build();
+                    notificationsUtil.publish(notifications);
+                }
             });
         }
         return true;
@@ -131,6 +120,72 @@ public class ArticleServiceImpl implements ArticleService {
     public List<SysCategory> getCategoryAll() {
         return sysCategoryMapper.selectList(new LambdaQueryWrapper<SysCategory>()
                 .orderByAsc(SysCategory::getSort));
+    }
+
+    private void applyRealtimeQuantity(List<ArticleListVo> articles) {
+        if (articles == null || articles.isEmpty()) {
+            return;
+        }
+        Map<Object, Object> quantityMap = redisUtil.hGetAll(RedisConstants.ARTICLE_QUANTITY);
+        for (ArticleListVo article : articles) {
+            if (article == null || article.getId() == null) {
+                continue;
+            }
+            Object redisValue = quantityMap.get(article.getId().toString());
+            article.setQuantity(resolveQuantity(article.getQuantity(), redisValue));
+        }
+    }
+
+    private Integer increaseRealtimeQuantity(Long articleId, Integer dbQuantity) {
+        if (articleId == null) {
+            return dbQuantity == null ? 0 : dbQuantity;
+        }
+        String hashKey = articleId.toString();
+        Object cachedValue = redisUtil.hGet(RedisConstants.ARTICLE_QUANTITY, hashKey);
+        int nextQuantity = resolveQuantity(dbQuantity, cachedValue) + 1;
+        redisUtil.hSet(RedisConstants.ARTICLE_QUANTITY, hashKey, nextQuantity);
+        return nextQuantity;
+    }
+
+    private Integer resolveQuantity(Integer dbQuantity, Object redisValue) {
+        int databaseValue = dbQuantity == null ? 0 : dbQuantity.intValue();
+        int realtimeValue = parseQuantity(redisValue);
+        return Math.max(databaseValue, realtimeValue);
+    }
+
+    private int parseQuantity(Object value) {
+        if (value == null) {
+            return 0;
+        }
+        if (value instanceof Number) {
+            return Math.max(0, ((Number) value).intValue());
+        }
+        if (value instanceof Collection) {
+            return ((Collection<?>) value).size();
+        }
+        if (value.getClass().isArray()) {
+            return Array.getLength(value);
+        }
+
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty() || "null".equalsIgnoreCase(text)) {
+            return 0;
+        }
+        if (text.matches("\\d+")) {
+            try {
+                return Integer.parseInt(text);
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
+        }
+        if (text.startsWith("[") && text.endsWith("]")) {
+            String content = text.substring(1, text.length() - 1).trim();
+            if (content.isEmpty()) {
+                return 0;
+            }
+            return content.split("\\s*,\\s*").length;
+        }
+        return 1;
     }
 
     private List<ArticleListVo> getArticlesByCondition(SFunction<SysArticle, Object> conditionField) {

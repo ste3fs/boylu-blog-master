@@ -1,8 +1,21 @@
 <template>
   <div class="contribution-graph">
-    <div class="months">
-      <span v-for="month in months" :key="month">{{ month }}</span>
+    <div class="graph-head">
+      <div class="graph-title">本年文章发布分布</div>
+      <div class="graph-subtitle">{{ currentYear }} 年 1 月 1 日至今天</div>
     </div>
+
+    <div class="months" :style="monthsGridStyle">
+      <span
+        v-for="item in monthLabels"
+        :key="item.label"
+        class="month-label"
+        :style="{ gridColumnStart: item.weekIndex + 1 }"
+      >
+        {{ item.label }}
+      </span>
+    </div>
+
     <div class="graph-wrapper">
       <div class="weekdays">
         <span>周日</span>
@@ -14,117 +27,157 @@
         <span>周六</span>
       </div>
       <div class="graph">
-        <div v-for="(week, weekIndex) in weeklyData" 
-             :key="weekIndex" 
-             class="week">
-          <div v-for="(day, dayIndex) in week" 
-               :key="dayIndex" 
-               class="day"
-               :class="getActivityClass(day.count)"
-               :data-empty="day.count === -1"
-               :title="day.date ? `${formatDate(day.date)} · ${day.count} 次贡献` : ''">
-          </div>
+        <div
+          v-for="(week, weekIndex) in weeklyData"
+          :key="weekIndex"
+          class="week"
+        >
+          <div
+            v-for="(day, dayIndex) in week"
+            :key="dayIndex"
+            class="day"
+            :class="getActivityClass(day.count)"
+            :data-empty="day.empty"
+            :title="day.date ? `${formatDate(day.date)} · 发布 ${day.count} 篇` : ''"
+          />
         </div>
       </div>
     </div>
+
     <div class="legend">
       <span>较少</span>
-        <div v-for="level in 5" 
-             :key="level" 
-             class="day"
-             :class="`activity-${level - 1}`">
-        </div>
+      <div
+        v-for="level in 5"
+        :key="level"
+        class="day"
+        :class="`activity-${level - 1}`"
+      />
       <span>较多</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-interface DayData {
-  date: string;
-  count: number;
-}
-
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 
 dayjs.locale('zh-cn')
 
-const props = defineProps<{
-  data: any
-}>()
-
-
-// 生成过去一年的空数据结构
-const generateEmptyYear = () => {
-  const data: DayData[] = []
-  const endDate = dayjs()
-  const startDate = dayjs().subtract(1, 'year').add(1, 'day')
-  let currentDate = startDate
-  
-  while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
-    data.push({
-      date: currentDate.format('YYYY-MM-DD'),
-      count: 0
-    })
-    currentDate = currentDate.add(1, 'day')
-  }
-  return data
+interface DayData {
+  date: string
+  count: number
+  empty?: boolean
 }
 
-// 合并实际数据到完整年份数据中
-const mergedData = computed(() => {
-  const emptyYear = generateEmptyYear()
-  const dataMap = new Map(props.data?.map((item: DayData) => [item.date, item.count]))
-  
-  return emptyYear.map(day => ({
-    date: day.date,
-    count: dataMap.get(day.date) ?? 0
-  })) as DayData[]
+const props = defineProps<{
+  data: DayData[]
+}>()
+
+const today = computed(() => dayjs())
+const currentYear = computed(() => today.value.year())
+const startDate = computed(() => dayjs().startOf('year'))
+const startOffset = computed(() => startDate.value.day())
+
+const dataMap = computed(() => {
+  return new Map((props.data || []).map(item => [item.date, Number(item.count || 0)]))
 })
 
-// 固定显示12个月份
-const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+const calendarDays = computed(() => {
+  const result: DayData[] = []
+  let cursor = startDate.value
 
-// 计算每个月开始的位置
+  while (cursor.isBefore(today.value, 'day') || cursor.isSame(today.value, 'day')) {
+    const date = cursor.format('YYYY-MM-DD')
+    result.push({
+      date,
+      count: dataMap.value.get(date) ?? 0,
+    })
+    cursor = cursor.add(1, 'day')
+  }
+
+  return result
+})
+
 const weeklyData = computed(() => {
   const weeks: DayData[][] = []
   let week: DayData[] = []
-  const startDate = dayjs().subtract(1, 'year').add(1, 'day')
-  let currentDate = startDate
-  
-  // 补充开始日期之前的空格子
-  const startDayOfWeek = currentDate.day()
-  for (let i = 0; i < startDayOfWeek; i++) {
-    week.push({ date: '', count: -1 }) // -1 表示空格子
+
+  for (let i = 0; i < startOffset.value; i++) {
+    week.push({ date: '', count: 0, empty: true })
   }
-  
-  // 填充实际数据
-  mergedData.value.forEach((day, index) => {
+
+  calendarDays.value.forEach((day) => {
     week.push(day)
     if (week.length === 7) {
       weeks.push(week)
       week = []
     }
   })
-  
-  // 补充最后一周的空格子
+
   if (week.length > 0) {
     while (week.length < 7) {
-      week.push({ date: '', count: -1 })
+      week.push({ date: '', count: 0, empty: true })
     }
     weeks.push(week)
   }
-  
+
   return weeks
+})
+
+const monthLabels = computed(() => {
+  const labels: Array<{ label: string; weekIndex: number }> = []
+  let cursor = startDate.value.startOf('month')
+
+  while (cursor.isBefore(today.value, 'month') || cursor.isSame(today.value, 'month')) {
+    const diffDays = cursor.diff(startDate.value, 'day')
+    const weekIndex = Math.floor((diffDays + startOffset.value) / 7)
+    labels.push({
+      label: `${cursor.month() + 1}月`,
+      weekIndex,
+    })
+    cursor = cursor.add(1, 'month')
+  }
+
+  return labels
+})
+
+const monthsGridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${Math.max(weeklyData.value.length, 1)}, minmax(0, 1fr))`,
+}))
+
+const maxCount = computed(() => {
+  const counts = calendarDays.value.map(item => item.count)
+  return counts.length ? Math.max(...counts) : 0
 })
 
 const formatDate = (dateStr: string) => {
   return dayjs(dateStr).format('YYYY年M月D日 dddd')
 }
 
+const getActivityLevel = (value: number) => {
+  if (value <= 0) {
+    return 0
+  }
+
+  if (maxCount.value <= 4) {
+    return Math.min(4, value)
+  }
+
+  const ratio = value / maxCount.value
+  if (ratio <= 0.25) {
+    return 1
+  }
+  if (ratio <= 0.5) {
+    return 2
+  }
+  if (ratio <= 0.75) {
+    return 3
+  }
+  return 4
+}
+
 const getActivityClass = (value: number) => {
-  return `activity-${value}`
+  return `activity-${getActivityLevel(value)}`
 }
 </script>
 
@@ -134,18 +187,37 @@ const getActivityClass = (value: number) => {
   font-size: 14px;
 }
 
+.graph-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.graph-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.graph-subtitle {
+  font-size: 12px;
+  color: #909399;
+}
+
 .months {
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
   margin-bottom: 15px;
   color: #666;
-  padding: 0 15px;
+  padding: 0 15px 0 0;
   margin-left: 20px;
   width: calc(100% - 30px);
 }
 
-.months span {
-  text-align: center;
+.month-label {
+  text-align: left;
+  white-space: nowrap;
 }
 
 .graph-wrapper {
@@ -192,20 +264,35 @@ const getActivityClass = (value: number) => {
   background-color: #ebedf0;
   cursor: pointer;
   transition: transform 0.1s ease;
-  &[data-empty="true"] {
-    visibility: hidden;
-  }
+}
+
+.day[data-empty="true"] {
+  visibility: hidden;
 }
 
 .day:hover {
   transform: scale(1.2);
 }
 
-.activity-0 { background-color: #ebedf0; }
-.activity-1 { background-color: #9be9a8; }
-.activity-2 { background-color: #40c463; }
-.activity-3 { background-color: #30a14e; }
-.activity-4 { background-color: #216e39; }
+.activity-0 {
+  background-color: #ebedf0;
+}
+
+.activity-1 {
+  background-color: #9be9a8;
+}
+
+.activity-2 {
+  background-color: #40c463;
+}
+
+.activity-3 {
+  background-color: #30a14e;
+}
+
+.activity-4 {
+  background-color: #216e39;
+}
 
 .legend {
   display: flex;
@@ -217,14 +304,33 @@ const getActivityClass = (value: number) => {
   font-size: 14px;
 }
 
-
-
-/* 暗色主题适配 */
 @media (prefers-color-scheme: dark) {
-  .activity-0 { background-color: #161b22; }
-  .activity-1 { background-color: #0e4429; }
-  .activity-2 { background-color: #006d32; }
-  .activity-3 { background-color: #26a641; }
-  .activity-4 { background-color: #39d353; }
+  .graph-title {
+    color: #e6e6e6;
+  }
+
+  .graph-subtitle {
+    color: #a8abb2;
+  }
+
+  .activity-0 {
+    background-color: #161b22;
+  }
+
+  .activity-1 {
+    background-color: #0e4429;
+  }
+
+  .activity-2 {
+    background-color: #006d32;
+  }
+
+  .activity-3 {
+    background-color: #26a641;
+  }
+
+  .activity-4 {
+    background-color: #39d353;
+  }
 }
-</style> 
+</style>

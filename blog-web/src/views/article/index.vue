@@ -316,6 +316,9 @@ import Comment from '@/components/Comment/index.vue'
 import PaymentDialog from '@/components/PaymentDialog/index.vue'
 import MembershipDialog from '@/components/MembershipDialog/index.vue'
 import { marked } from 'marked'
+import { copyText } from '@/utils/contact'
+import { normalizeLocalFileText, normalizeLocalFileUrl } from '@/utils/localFileUrl'
+import { estimateReadMinutes } from '@/utils/readTime'
 
 const loadingPlaceholder = new URL('../../assets/loading.svg', import.meta.url).href
 const imageErrorPlaceholder = new URL('../../assets/img-error.svg', import.meta.url).href
@@ -379,7 +382,8 @@ export default {
         const res = await getArticleDetailApi(this.$route.params.id)
         this.article = {
           ...res.data,
-          content: res.data.content ? this.addLazyLoadToImages(res.data.content) : ''
+          avatar: normalizeLocalFileUrl(res.data.avatar || ''),
+          content: res.data.content ? this.addLazyLoadToImages(normalizeLocalFileText(res.data.content)) : ''
         }
 
         // 等待下一个 tick，确保文章内容渲染完成
@@ -410,8 +414,7 @@ export default {
         }, 100)
 
         // 计算阅读时间
-        const textContent = this.article.content.replace(/<[^>]+>/g, ' ')
-        this.readTime = Math.ceil(textContent.split(/\s+/).length / 300)
+        this.readTime = estimateReadMinutes(this.article.contentMd || this.article.content || '')
 
       } catch (error) {
         this.$message.error('获取文章详情失败')
@@ -540,10 +543,10 @@ export default {
      * 复制链接
      */
     async copyLink() {
-      try {
-        await navigator.clipboard.writeText(this.currentUrl)
+      const copied = await copyText(this.currentUrl)
+      if (copied) {
         this.$message.success('链接已复制到剪贴板')
-      } catch (err) {
+      } else {
         this.$message.error('复制失败，请手动复制')
       }
       this.closeShareMenu()
@@ -620,9 +623,9 @@ export default {
 
         // 添加点击事件
         copyButton.addEventListener('click', async () => {
-          try {
-            const code = pre.querySelector('code')
-            await navigator.clipboard.writeText(code.textContent)
+          const code = pre.querySelector('code')
+          const copied = await copyText(code ? code.textContent : '')
+          if (copied) {
             copyButton.innerHTML = '<i class="fas fa-check"></i> 已复制'
             copyButton.classList.add('copied')
             setTimeout(() => {
@@ -630,7 +633,7 @@ export default {
               copyButton.classList.remove('copied')
             }, 2000)
             this.$message.success('复制成功')
-          } catch (err) {
+          } else {
             this.$message.error('复制失败，请手动复制')
           }
         })

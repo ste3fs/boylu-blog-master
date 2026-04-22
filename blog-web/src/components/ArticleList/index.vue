@@ -41,7 +41,7 @@
               <span class="category-tag">{{ post.categoryName }}</span>
               <span class="read-time">
                 <i class="far fa-clock"></i>
-                {{ Math.ceil(post.contentMd.split(" ").length / 300) }}分钟阅读
+                {{ getReadTime(post) }}分钟阅读
               </span>
             </div>
           </div>
@@ -67,6 +67,8 @@
 
 <script>
 import { formatTime } from '@/utils/time'
+import { estimateReadMinutes } from '@/utils/readTime'
+
 export default {
   name: 'ArticleList',
   props: {
@@ -98,6 +100,12 @@ export default {
   methods: {
     formatTime(time) {
       return formatTime(time)
+    },
+    getReadTime(post) {
+      const source = post.contentMd || post.content || post.summary || ''
+      return estimateReadMinutes(source, {
+        summaryOnly: !post.contentMd && !post.content && !!post.summary
+      })
     },
     resolveImage(url) {
       const fallback = url || this.$store.state.defaultImage

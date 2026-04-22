@@ -29,12 +29,14 @@ export const useUserStore = defineStore("user", () => {
    * @param {LoginData}
    * @returns
    */
-  function login(loginData: any) {
+  function login(payload: any) {
+    const loginData = payload?.loginData || payload;
+    const rememberMe = !!payload?.rememberMe;
     return new Promise<void>((resolve, reject) => {
       loginApi(loginData)
         .then((response) => {
           const { data } = response;
-          setToken(data.token)
+          setToken(data.token, rememberMe ? 30 : 1 / 24)
           resolve();
         })
         .catch((error) => {

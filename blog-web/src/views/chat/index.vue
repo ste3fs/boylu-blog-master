@@ -370,6 +370,7 @@ import { formatTime } from "@/utils/time";
 import { uploadFileApi } from "@/api/file";
 import { disableScroll, enableScroll } from "@/utils/scroll";
 import { showLoading, hideLoading } from "@/utils/loading";
+import { copyText } from "@/utils/contact";
 import { marked } from 'marked'; // 使用命名导入
 import hljs from 'highlight.js'
 import 'highlight.js/styles/atom-one-dark.css'
@@ -467,7 +468,12 @@ export default {
         if (newVal) {
           this.init();
         } else {
-          this.$router.push('/login')
+          this.$router.push({
+            path: '/login',
+            query: {
+              redirect: this.$route?.fullPath || '/chat'
+            }
+          })
           if (this.ws) {
             this.ws.close();
           }
@@ -479,7 +485,12 @@ export default {
   created() {
     // 如果用户信息存在，则连接WebSocket
     if (!this.$store.state.userInfo) {
-      this.$router.push('/login')
+      this.$router.push({
+        path: '/login',
+        query: {
+          redirect: this.$route?.fullPath || '/chat'
+        }
+      })
       return;
     }
     this.init();
@@ -747,7 +758,10 @@ export default {
         copyButton.addEventListener('click', async () => {
           try {
             const code = pre.querySelector('code')
-            await navigator.clipboard.writeText(code.textContent)
+            const copied = await copyText(code ? code.textContent : '')
+            if (!copied) {
+              throw new Error('copy failed')
+            }
             copyButton.innerHTML = '<i class="fas fa-check"></i> 已复制'
             copyButton.classList.add('copied')
             setTimeout(() => {

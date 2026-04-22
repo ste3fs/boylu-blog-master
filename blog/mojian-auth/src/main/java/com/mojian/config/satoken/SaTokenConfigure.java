@@ -26,7 +26,9 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                         "/swagger-resources",
                         "/api/**",
                         "/wechat/**",
-                        "/localFile/**"
+                        "/localFile/**",
+                        "/file/content/**",
+                        "/file/view/**"
                 );
     }
 }

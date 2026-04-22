@@ -7,7 +7,9 @@ import com.mojian.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -20,36 +22,75 @@ public class TaskQuartz {
     private final SysArticleMapper articleMapper;
 
     public void neatMultipleParams(String s, Boolean b, Long l, Double d, Integer i) {
-      //  System.out.println(StringUtils.format("执行多参方法： 字符串类型{}，布尔类型{}，长整型{}，浮点型{}，整形{}", s, b, l, d, i));
+        // no-op
     }
 
     public void neatParams(String params) {
-        System.out.println("执行有参方法：" + params);
+        System.out.println("execute params method: " + params);
     }
 
     public void neatNoParams() {
-        System.out.println("执行无参方法");
+        System.out.println("execute no params method");
     }
-
 
     /**
      * 定时同步阅读量
      */
     public void syncQuantity() {
-        // 获取带阅读量的前缀key集合
-        List<SysArticle> articles = new ArrayList<>();
         Map<Object, Object> map = redisUtil.hGetAll(RedisConstants.ARTICLE_QUANTITY);
-        // 取出所有数据更新到数据库
-        for (Map.Entry<Object, Object> stringEntry : map.entrySet()) {
-            Object id = stringEntry.getKey();
-            List<String> list = (List<String>) stringEntry.getValue();
-            SysArticle article = SysArticle.builder()
-                    .id(Long.parseLong(id.toString())).quantity(list.size())
-                    .build();
-            articles.add(article);
+        if (map == null || map.isEmpty()) {
+            return;
         }
-        articleMapper.updateBatchQuantity(articles);
+
+        List<SysArticle> articles = new ArrayList<SysArticle>();
+        for (Map.Entry<Object, Object> entry : map.entrySet()) {
+            if (entry.getKey() == null) {
+                continue;
+            }
+            int quantity = parseQuantity(entry.getValue());
+            articles.add(SysArticle.builder()
+                    .id(Long.parseLong(entry.getKey().toString()))
+                    .quantity(quantity)
+                    .build());
+        }
+
+        if (!articles.isEmpty()) {
+            articleMapper.updateBatchQuantity(articles);
+        }
     }
 
+    private int parseQuantity(Object value) {
+        if (value == null) {
+            return 0;
+        }
+        if (value instanceof Number) {
+            return Math.max(0, ((Number) value).intValue());
+        }
+        if (value instanceof Collection) {
+            return ((Collection<?>) value).size();
+        }
+        if (value.getClass().isArray()) {
+            return Array.getLength(value);
+        }
 
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty() || "null".equalsIgnoreCase(text)) {
+            return 0;
+        }
+        if (text.matches("\\d+")) {
+            try {
+                return Integer.parseInt(text);
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
+        }
+        if (text.startsWith("[") && text.endsWith("]")) {
+            String content = text.substring(1, text.length() - 1).trim();
+            if (content.isEmpty()) {
+                return 0;
+            }
+            return content.split("\\s*,\\s*").length;
+        }
+        return 1;
+    }
 }

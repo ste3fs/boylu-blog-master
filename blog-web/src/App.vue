@@ -1,13 +1,14 @@
 <template>
   <div id="app">
-    <TheHeader />
     <MobileMenu />
     <SearchDialog />
-    <router-view class="main-container" />
-    <TheFooter />
-    <FloatingButtons />
-    <Lantern />
-    <RandomVideo />
+    <TheHeader v-if="showShellUi" />
+    <router-view :class="{ 'main-container': showShellUi }" />
+    <TheFooter v-if="showShellUi" />
+    <FloatingButtons v-if="showShellUi" />
+    <AiFloatingAssistant v-if="showShellUi" />
+    <Lantern v-if="showShellUi" />
+    <RandomVideo v-if="showShellUi" />
     <div class="cursor-container"></div>
     <ContextMenu ref="contextMenuRef" />
   </div>
@@ -17,6 +18,7 @@
 import TheHeader from '@/layout/Header/index.vue'
 import TheFooter from '@/layout/Footer/index.vue'
 import FloatingButtons from '@/components/common/FloatingButtons.vue'
+import AiFloatingAssistant from '@/components/ai/AiFloatingAssistant.vue'
 import { getWebConfigApi, reportApi,getNoticeApi } from '@/api/site'
 import { mapActions } from 'vuex'
 import { initTheme } from '@/utils/theme'
@@ -33,11 +35,18 @@ export default {
     TheHeader,
     TheFooter,
     FloatingButtons,
+    AiFloatingAssistant,
     SearchDialog,
     MobileMenu,
     Lantern,
     RandomVideo,
     ContextMenu,
+  },
+
+  computed: {
+    showShellUi() {
+      return !(this.$route && this.$route.meta && this.$route.meta.fullscreen)
+    }
   },
 
   async created() {

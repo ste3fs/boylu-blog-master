@@ -42,6 +42,21 @@ public class RedisConstants {
     public static final String BLOG_VIEWS_COUNT = "blog_views_count";
 
     /**
+     * 每日博客浏览量
+     */
+    public static final String BLOG_VIEWS_DAILY = "blog:stat:views:daily:";
+
+    /**
+     * 每日唯一访客数
+     */
+    public static final String UNIQUE_VISITOR_DAILY = "blog:stat:visitor:daily:";
+
+    /**
+     * 每日唯一访客去重集合
+     */
+    public static final String UNIQUE_VISITOR_DAILY_SET = "blog:stat:visitor:daily:set:";
+
+    /**
      * 防重提交 redis key
      */
     public static final String REPEAT_SUBMIT_KEY = "repeat_submit:";
@@ -117,4 +132,9 @@ public class RedisConstants {
      * 网站配置
      */
     public static final String WEB_CONFIG_KEY = "sys_webconfig";
+
+    /**
+     * 鏂囦欢璁块棶缂撳瓨
+     */
+    public static final String FILE_VIEW_CACHE_KEY = "file:view:";
 }

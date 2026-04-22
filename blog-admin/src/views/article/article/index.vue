@@ -90,7 +90,7 @@
           </template>
         </el-table-column>
         <el-table-column label="阅读量" align="center" prop="quantity" />
-        <el-table-column label="创建时间" align="center" prop="createTime" width="180" />
+        <el-table-column label="发布时间" align="center" prop="createTime" width="180" />
         <el-table-column label="操作" align="center" width="200" fixed="right">
           <template #default="scope">
             <el-button type="primary" link icon="Edit" @click="handleUpdate(scope.row)"

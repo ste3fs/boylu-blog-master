@@ -20,7 +20,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -87,8 +90,23 @@ public class HomeServiceImpl implements HomeService {
             // 保存唯一标识
             redisUtil.sAdd(RedisConstants.UNIQUE_VISITOR, md5);
         }
+
+        String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+        String dailyVisitorSetKey = RedisConstants.UNIQUE_VISITOR_DAILY_SET + today;
+        String dailyVisitorCountKey = RedisConstants.UNIQUE_VISITOR_DAILY + today;
+        String dailyViewCountKey = RedisConstants.BLOG_VIEWS_DAILY + today;
+
+        if (!Boolean.TRUE.equals(redisUtil.sIsMember(dailyVisitorSetKey, md5))) {
+            redisUtil.increment(dailyVisitorCountKey, 1);
+            redisUtil.sAdd(dailyVisitorSetKey, md5);
+            redisUtil.expire(dailyVisitorCountKey, 90, TimeUnit.DAYS);
+            redisUtil.expire(dailyVisitorSetKey, 90, TimeUnit.DAYS);
+        }
+
         // 访问量+1
         redisUtil.increment(RedisConstants.BLOG_VIEWS_COUNT, 1);
+        redisUtil.increment(dailyViewCountKey, 1);
+        redisUtil.expire(dailyViewCountKey, 90, TimeUnit.DAYS);
     }
 
     @Override

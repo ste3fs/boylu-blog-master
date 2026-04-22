@@ -1,19 +1,21 @@
 <template>
-  <div v-show="visible" 
-       class="context-menu"
-       :class="{ 'menu-show': visible }"
-       :style="{ left: adjustedX + 'px', top: adjustedY + 'px' }">
+  <div
+    v-show="visible"
+    class="context-menu"
+    :class="{ 'menu-show': visible }"
+    :style="{ left: adjustedX + 'px', top: adjustedY + 'px' }"
+  >
     <div class="menu-item" @click="handleRefresh">
-      <i class="fas fa-sync" style="color: #409EFF"></i>
+      <i class="fas fa-sync" style="color: #409eff"></i>
       刷新页面
     </div>
     <div class="menu-item" @click="handleBack">
-      <i class="fas fa-arrow-left" style="color: #67C23A"></i>
-      返回上页
+      <i class="fas fa-arrow-left" style="color: #67c23a"></i>
+      返回上一页
     </div>
     <div class="menu-item" @click="handleForward">
-      <i class="fas fa-arrow-right" style="color: #E6A23C"></i>
-      前进下页
+      <i class="fas fa-arrow-right" style="color: #e6a23c"></i>
+      前进下一页
     </div>
     <div class="menu-item" @click="handleCopyUrl">
       <i class="fas fa-copy" style="color: #909399"></i>
@@ -21,14 +23,19 @@
     </div>
     <div class="divider"></div>
     <div class="menu-item" @click="toggleTheme">
-      <i :class="['fas', isDark ? 'fa-sun' : 'fa-moon']" :style="{ color: isDark ? '#E6A23C' : '#409EFF' }"></i>
+      <i
+        :class="['fas', isDark ? 'fa-sun' : 'fa-moon']"
+        :style="{ color: isDark ? '#e6a23c' : '#409eff' }"
+      ></i>
       {{ isDark ? '浅色模式' : '深色模式' }}
     </div>
   </div>
 </template>
 
 <script>
+import { copyText } from '@/utils/contact'
 import { getThemeMode, setThemeMode } from '@/utils/theme'
+
 export default {
   name: 'ContextMenu',
   data() {
@@ -39,7 +46,7 @@ export default {
       menuWidth: 0,
       menuHeight: 0,
       isDark: false,
-      excludeSelectors: ['.chat-messages','.image-preview']
+      excludeSelectors: ['.chat-messages', '.image-preview']
     }
   },
   computed: {
@@ -58,10 +65,6 @@ export default {
     })
   },
   methods: {
-    /**
-     * 显示右键菜单
-     * @param event 
-     */
     show(event) {
       const isInExcludeArea = this.excludeSelectors.some(selector => {
         const element = event.target.closest(selector)
@@ -76,7 +79,7 @@ export default {
       this.x = event.clientX
       this.y = event.clientY
       this.visible = true
-      
+
       this.$nextTick(() => {
         this.menuWidth = this.$el.offsetWidth
         this.menuHeight = this.$el.offsetHeight
@@ -84,51 +87,37 @@ export default {
         this.y = event.clientY
       })
     },
-    /**
-     * 隐藏右键菜单
-     */
     hide() {
       this.visible = false
     },
-    /**
-     * 刷新页面
-     */
     handleRefresh() {
       window.location.reload()
       this.hide()
     },
-    /**
-     * 返回上页
-     */
     handleBack() {
       this.$router.back()
       this.hide()
     },
-    /**
-     * 前进下页
-     */
     handleForward() {
       this.$router.forward()
       this.hide()
     },
-    /**
-     * 复制链接
-     */
-    handleCopyUrl() {
-      navigator.clipboard.writeText(window.location.href)
-      this.$message.success('链接已复制到剪贴板')
+    async handleCopyUrl() {
+      const copied = await copyText(window.location.href)
+      if (copied) {
+        this.$message.success('链接已复制到剪贴板')
+      } else {
+        this.$message.error('复制失败，请手动复制')
+      }
       this.hide()
     },
-    /**
-     * 切换主题
-     */
     toggleTheme() {
       this.isDark = !this.isDark
       const mode = this.isDark ? 'dark' : 'light'
       setThemeMode(mode)
       this.hide()
     }
-  },
+  }
 }
 </script>
 
@@ -154,6 +143,7 @@ export default {
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -183,4 +173,4 @@ export default {
   background-color: var(--border-color);
   margin: 5px 0;
 }
-</style> 
+</style>
