@@ -310,12 +310,10 @@
 
 <script>
 import { getArticleDetailApi, likeArticleApi } from '@/api/article'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/atom-one-dark.css'
 import Comment from '@/components/Comment/index.vue'
 import PaymentDialog from '@/components/PaymentDialog/index.vue'
 import MembershipDialog from '@/components/MembershipDialog/index.vue'
-import { marked } from 'marked'
+import { highlightCodeBlocks, renderMarkdown } from '@/utils/markdown'
 import { copyText } from '@/utils/contact'
 import { normalizeLocalFileText, normalizeLocalFileUrl } from '@/utils/localFileUrl'
 import { estimateReadMinutes } from '@/utils/readTime'
@@ -375,9 +373,6 @@ export default {
      */
     async getArticle() {
       this.loading = true
-      hljs.configure({
-        ignoreUnescapedHTML: true
-      })
       try {
         const res = await getArticleDetailApi(this.$route.params.id)
         this.article = {
@@ -392,9 +387,7 @@ export default {
         // 使用 setTimeout 确保 DOM 完全渲染
         setTimeout(() => {
           this.generateToc()
-          document.querySelectorAll('pre code').forEach((block) => {
-            hljs.highlightBlock(block)
-          })
+          highlightCodeBlocks()
           this.addCopyButtons()
           this.addLineNumbers()
           this.initImagePreview()
@@ -408,7 +401,7 @@ export default {
             const typingText = this.$refs.typingText
             if (!typingText) return
             // 使用marked解析Markdown文本
-            const htmlContent = marked(this.article.aiDescribe || '')
+            const htmlContent = renderMarkdown(this.article.aiDescribe || '')
             typingText.innerHTML = htmlContent
           }
         }, 100)

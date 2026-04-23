@@ -41,12 +41,12 @@ export default {
   computed: {
     visible() {
       const path = this.$route?.path || ''
-      return path !== '/ai' && path !== '/login' && !this.isMobileViewport
+      return !this.shouldHideForPath(path) && !this.isMobileViewport
     }
   },
   watch: {
     '$route.path'(value) {
-      if (value === '/ai' || value === '/login') {
+      if (this.shouldHideForPath(value)) {
         this.open = false
       }
     }
@@ -64,6 +64,9 @@ export default {
       if (this.isMobileViewport) {
         this.open = false
       }
+    },
+    shouldHideForPath(path) {
+      return ['/', '/ai', '/login'].includes(path)
     },
     toggle() {
       this.open = !this.open

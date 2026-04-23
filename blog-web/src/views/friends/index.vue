@@ -194,10 +194,10 @@ export default {
       this.showApplyForm = false
     },
     submitApplication() {
-      this.$refs['ruleForm'].validate((valid) => {
+      this.$refs['ruleForm'].validate(async (valid) => {
         if (valid) {
           try {
-            const res = applyFriendApi(this.form)
+            await applyFriendApi(this.form)
             this.showApplyForm = false
             this.$message.success('申请已提交，请等待审核')
             this.$refs['ruleForm'].resetFields();
@@ -205,7 +205,7 @@ export default {
             this.$message.error(error.message)
           }
         } else {
-          console.log('error submit!!')
+          return false
         }
       })
 

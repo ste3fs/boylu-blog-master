@@ -30,7 +30,7 @@
         <!-- 主题切换按钮 -->
         <div class="theme-switch">
           <el-button class="theme-button" circle @click="toggleTheme">
-            <el-icon><component :is="isDark ? 'Sunny' : 'Moon'" /></el-icon>
+            <el-icon><component :is="isDark ? Sunny : Moon" /></el-icon>
           </el-button>
         </div>
 
@@ -70,7 +70,7 @@
               <el-input
                 v-model="loginForm.username"
                 placeholder="请输入用户名"
-                prefix-icon="User"
+                :prefix-icon="User"
               />
             </el-form-item>
             <el-form-item prop="password">
@@ -78,7 +78,7 @@
                 v-model="loginForm.password"
                 type="password"
                 placeholder="请输入密码"
-                prefix-icon="Lock"
+                :prefix-icon="Lock"
                 show-password
               />
             </el-form-item>
@@ -169,6 +169,7 @@
 import router from "@/router";
 import type { FormInstance } from "element-plus";
 import { ElMessage } from "element-plus";
+import { Iphone, Lock, Moon, RefreshRight, Sunny, User, Warning } from "@element-plus/icons-vue";
 import { useUserStore } from "@/store/modules/user";
 import { useSettingsStore } from "@/store/modules/settings";
 import Logo from "@/layouts/components/Sidebar/Logo.vue";

@@ -2,9 +2,12 @@ import Vue from 'vue'
 import App from './App.vue'
 import router from './router'
 import store from './store'
+import '@/styles/global.scss'
+import '@/styles/element-ui.scss'
 import gsap from 'gsap'
 import 'animate.css'
 import VueLazyload from 'vue-lazyload'
+import { setupElementUI } from '@/plugins/element-ui'
 
 import ScrollTrigger from 'gsap/ScrollTrigger'
 gsap.registerPlugin(ScrollTrigger)
@@ -25,9 +28,7 @@ Vue.use(VueLazyload, {
   }
 })
 
-import ElementUI from 'element-ui';
-import 'element-ui/lib/theme-chalk/index.css';
-Vue.use(ElementUI);
+setupElementUI(Vue)
 
 
 //表情组件
@@ -58,11 +59,6 @@ Vue.component('mj-image-preview', ImagePreview)
 if (import.meta.hot) {
   import.meta.hot.accept()
 }
-
-
-import mavonEditor from "mavon-editor";
-import "mavon-editor/dist/css/index.css";
-Vue.use(mavonEditor);
 
 Vue.config.productionTip = false
 

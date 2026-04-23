@@ -1544,7 +1544,7 @@ CREATE TABLE `sys_file_oss`
 
 INSERT INTO `sys_file_oss` (`id`, `domain`, `access_key`, `secret_key`, `bucket`, `base_path`, `platform`, `is_enable`,
                             `storage_path`, `enable_access`, `path_patterns`, region, `create_time`)
-VALUES (1, 'http://127.0.0.1:8800/localFile/', '', '', '', 'local-plus/', 'local', 1, 'D:/Temp/', 1, 'localFile/**',
+VALUES (1, '/localFile/', '', '', '', 'local-plus/', 'local', 1, 'D:/Temp/', 1, 'localFile/**',
         null,
         '2025-02-14 10:52:33');
 

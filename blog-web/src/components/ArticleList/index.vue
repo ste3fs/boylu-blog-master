@@ -15,7 +15,13 @@
               <p class="post-excerpt">{{ post.summary }}</p>
             </div>
             <div class="post-image" @click="$emit('article-click', post.id)">
-              <img v-lazy="resolveImage(post.cover)" :key="resolveImage(post.cover)" :alt="post.title" @error="handleImageError">
+              <img
+                v-lazy="getLazyImage(post.cover)"
+                :key="resolveImage(post.cover)"
+                :data-origin="resolveImage(post.cover)"
+                :alt="post.title"
+                @error="handleImageError"
+              >
               <div class="image-placeholder">
                 <i class="fas fa-image"></i>
               </div>
@@ -30,7 +36,7 @@
               </div>
               <div class="post-date">
                 <i class="far fa-calendar"></i>
-                {{ formatTime(post.createTime) }}
+                {{ formatPublishTime(post.createTime) }}
               </div>
               <div class="post-view">
                 <i class="far fa-eye"></i>
@@ -66,8 +72,9 @@
 </template>
 
 <script>
-import { formatTime } from '@/utils/time'
+import { formatPublishTime } from '@/utils/time'
 import { estimateReadMinutes } from '@/utils/readTime'
+import { resolveImageUrl, retryImageLoad } from '@/utils/image'
 
 export default {
   name: 'ArticleList',
@@ -98,8 +105,8 @@ export default {
     }
   },
   methods: {
-    formatTime(time) {
-      return formatTime(time)
+    formatPublishTime(time) {
+      return formatPublishTime(time)
     },
     getReadTime(post) {
       const source = post.contentMd || post.content || post.summary || ''
@@ -108,19 +115,19 @@ export default {
       })
     },
     resolveImage(url) {
-      const fallback = url || this.$store.state.defaultImage
-      if (!fallback) {
-        return ''
+      return resolveImageUrl(url, this.$store.state.defaultImage)
+    },
+    getLazyImage(url) {
+      const src = this.resolveImage(url)
+      const fallback = this.resolveImage(this.$store.state.defaultImage)
+      return {
+        src,
+        error: fallback,
+        loading: fallback
       }
-      if (!fallback.includes('/localFile/')) {
-        return fallback
-      }
-      const version = this.$store.state.imageVersion
-      return `${fallback}${fallback.includes('?') ? '&' : '?'}v=${version}`
     },
     handleImageError(e) {
-      e.target.src = this.$store.state.defaultImage
-      e.target.classList.add('fallback')
+      retryImageLoad(e.target, this.$store.state.defaultImage)
     }
   }
 }

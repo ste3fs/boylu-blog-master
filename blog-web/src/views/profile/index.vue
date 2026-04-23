@@ -383,7 +383,7 @@ import { getMyArticleApi, likeArticleApi, delArticleApi } from '@/api/article'
 import { getDictDataApi } from '@/api/dict'
 import AvatarCropper from '@/components/common/AvatarCropper.vue'
 
-import { marked } from "marked";
+import { renderMarkdown } from '@/utils/markdown'
 export default {
   name: 'Profile',
   components: {
@@ -602,7 +602,7 @@ export default {
      * 解析评论内容
      */
     parseContent(content) {
-      return marked(content || "");
+      return renderMarkdown(content || "");
     },
     /**
      * 分页

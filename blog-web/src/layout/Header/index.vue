@@ -462,8 +462,7 @@ export default {
       this.showDropdown = false
     },
     showBage() {
-      console.log(this.$store.state.isUnread)
-     return this.$store.state.isUnread
+      return this.$store.state.isUnread
     },
     handleScroll() {
       const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop

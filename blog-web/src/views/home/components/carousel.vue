@@ -5,7 +5,13 @@
     class="custom-carousel"
   >
     <el-carousel-item v-for="(slide, index) in slides" :key="index">
-      <img v-lazy="slide.cover" :key="slide.cover" :alt="slide.title">
+      <img
+        v-lazy="getLazyImage(slide.cover)"
+        :key="resolveImage(slide.cover)"
+        :data-origin="resolveImage(slide.cover)"
+        :alt="slide.title"
+        @error="handleImageError"
+      >
       <div class="slide-content">
         <h3>{{ slide.title }}</h3>
         <p>{{ slide.description }}</p>
@@ -19,12 +25,31 @@
 </template>
 
 <script>
+import { resolveImageUrl, retryImageLoad } from '@/utils/image'
+
 export default {
   name: 'Carousel',
   props: {
     slides: {
       type: Array,
       required: true
+    }
+  },
+  methods: {
+    resolveImage(url) {
+      return resolveImageUrl(url, this.$store.state.defaultImage)
+    },
+    getLazyImage(url) {
+      const src = this.resolveImage(url)
+      const fallback = this.resolveImage(this.$store.state.defaultImage)
+      return {
+        src,
+        error: fallback,
+        loading: fallback
+      }
+    },
+    handleImageError(e) {
+      retryImageLoad(e.target, this.$store.state.defaultImage)
     }
   }
 }
@@ -99,4 +124,4 @@ export default {
     }
   }
 }
-</style> 
+</style>

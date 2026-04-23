@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <!-- 搜索工具栏 -->
-    <div class="search-wrapper">
+    <PageSearch>
       <el-form :model="queryParams" ref="queryFormRef" inline>
         <el-form-item label="表名称" prop="tableName">
           <el-input
@@ -11,34 +11,35 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleQuery">搜索</el-button>
-          <el-button @click="resetQuery">重置</el-button>
+                <el-form-item>
+          <PageSearchActions @search="handleQuery" @reset="resetQuery" />
         </el-form-item>
       </el-form>
-    </div>
+    </PageSearch>
     <el-card>
       <!-- 操作按钮区域 -->
       <template #header>
-        <div class="card-header">
-          <ButtonGroup>
-            <el-button type="primary" icon="Download" @click="handleGenCode"
-              >生成代码</el-button
-            >
-
-            <el-button type="info" icon="Upload" @click="openImportTable"
-              >导入表结构</el-button
-            >
-
+        <PageToolbar>
+          <PageToolbarGroup>
+            <el-button type="primary" :icon="Download" @click="handleGenCode">
+              生成代码
+            </el-button>
+            <el-button type="info" plain :icon="Upload" @click="openImportTable">
+              导入表结构
+            </el-button>
+          </PageToolbarGroup>
+          <PageToolbarGroup kind="danger">
             <el-button
               type="danger"
-              icon="Delete"
+              plain
+              :icon="Delete"
               @click="handleBatchDelete"
               :disabled="!ids.length"
-              >批量删除</el-button
             >
-          </ButtonGroup>
-        </div>
+              批量删除
+            </el-button>
+          </PageToolbarGroup>
+        </PageToolbar>
       </template>
 
       <!-- 数据表格 -->
@@ -69,7 +70,7 @@
           <template #default="{ row }">
             <el-button
               type="success"
-              icon="View"
+              :icon="View"
               link
               @click="handlePreview(row)"
               >预览</el-button
@@ -77,14 +78,14 @@
             <el-button
               type="danger"
               link
-              icon="Delete"
+              :icon="Delete"
               @click="handleDelete(row)"
               >删除</el-button
             >
             <el-button
               type="info"
               link
-              icon="Refresh"
+              :icon="Refresh"
               @click="handleSynchDb(row)"
               >同步</el-button
             >
@@ -92,18 +93,13 @@
         </el-table-column>
       </el-table>
 
-      <div class="pagination-container">
-        <el-pagination
-          background
-          v-model:current-page="queryParams.pageNum"
-          v-model:page-size="queryParams.pageSize"
-          :total="total"
-          :page-sizes="[10, 20, 30, 50]"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
+      <PagePagination
+        v-model:current-page="queryParams.pageNum"
+        v-model:page-size="queryParams.pageSize"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
       <!-- 预览界面 -->
       <el-dialog
         v-model="preview.open"
@@ -125,7 +121,7 @@
                 <el-button
                   type="primary"
                   link
-                  icon="CopyDocument"
+            :icon="CopyDocument"
                   @click="handleCopyCode(value)"
                   >复制代码</el-button
                 >
@@ -194,18 +190,13 @@
           <el-table-column label="更新时间" align="center" prop="updateTime" />
         </el-table>
 
-        <div class="pagination-container">
-          <el-pagination
-            background
-            v-model:current-page="dbTableParams.pageNum"
-            v-model:page-size="dbTableParams.pageSize"
-            :total="dbTableTotal"
-            :page-sizes="[10, 20, 30, 50]"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleDbTableSizeChange"
-            @current-change="handleDbTableCurrentChange"
-          />
-        </div>
+        <PagePagination
+          v-model:current-page="dbTableParams.pageNum"
+          v-model:page-size="dbTableParams.pageSize"
+          :total="dbTableTotal"
+          @size-change="handleDbTableSizeChange"
+          @current-change="handleDbTableCurrentChange"
+        />
 
         <template #footer>
           <div class="dialog-footer">
@@ -225,6 +216,7 @@
 
 <script lang="ts" setup>
 import { ElMessage, ElMessageBox } from "element-plus";
+import { CopyDocument, Delete, Download, Refresh, Upload, View } from "@element-plus/icons-vue";
 import {
   listTableApi,
   previewTableApi,
@@ -234,9 +226,20 @@ import {
   listDbTableApi,
   importTableApi,
 } from "@/api/tool/gen";
-import hljs from "highlight.js";
+import hljs from "highlight.js/lib/core";
+import java from "highlight.js/lib/languages/java";
+import javascript from "highlight.js/lib/languages/javascript";
+import sql from "highlight.js/lib/languages/sql";
+import typescript from "highlight.js/lib/languages/typescript";
+import xml from "highlight.js/lib/languages/xml";
 import "highlight.js/styles/github.css";
 import { saveAs } from 'file-saver'
+
+hljs.registerLanguage("java", java);
+hljs.registerLanguage("javascript", javascript);
+hljs.registerLanguage("sql", sql);
+hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("xml", xml);
 // refs
 const queryFormRef = ref();
 const dbQueryFormRef = ref();
@@ -277,6 +280,18 @@ const dbTableParams = reactive({
 
 // 添加代码高亮缓存
 const codeCache = new Map();
+
+const escapeHtml = (value: string) =>
+  value.replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "\"": "&quot;",
+      "'": "&#39;",
+    };
+    return entities[char];
+  });
 
 // 方法
 const getList = async () => {
@@ -337,8 +352,8 @@ const highlightedCode = (code: string) => {
   try {
     // 根据文件扩展选择语言
     const languageMap = {
-      vue: "html",
-      html: "html",
+      vue: "xml",
+      html: "xml",
       java: "java",
       xml: "xml",
       sql: "sql",
@@ -348,14 +363,16 @@ const highlightedCode = (code: string) => {
 
     const lang =
       languageMap[language as keyof typeof languageMap] || "plaintext";
-    result = hljs.highlight(code, { language: lang }).value;
+    result = hljs.getLanguage(lang)
+      ? hljs.highlight(code, { language: lang }).value
+      : escapeHtml(code);
 
     // 存入缓存
     codeCache.set(cacheKey, result);
     return result;
   } catch (error) {
     console.error("代码高亮失败:", error);
-    return code;
+    return escapeHtml(code);
   }
 };
 

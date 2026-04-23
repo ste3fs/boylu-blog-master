@@ -7,7 +7,7 @@
           class="no-redirect breadcrumb-item"
         >
         <el-icon>
-          <component :is="item.meta?.icon" /> 
+          <DynamicIcon :name="item.meta?.icon as string" />
         </el-icon>
         {{ item.meta?.title }}
       </span>
@@ -17,7 +17,7 @@
           @click.prevent="handleLink(item)"
         >
         <el-icon>
-          <component :is="item.meta?.icon" /> 
+          <DynamicIcon :name="item.meta?.icon as string" />
         </el-icon>
         {{ item.meta?.title }}
       </a>
@@ -28,6 +28,7 @@
 
 <script setup lang="ts">
 import { useRoute, useRouter, RouteLocationMatched } from 'vue-router'
+import DynamicIcon from '@/components/DynamicIcon/index.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -91,4 +92,4 @@ watch(
     margin-right: 3px;
   }
 }
-</style> 
+</style>

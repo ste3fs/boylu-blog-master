@@ -5,17 +5,23 @@
         <!-- 操作按钮区域 -->
         <el-card class="box-card">
             <template #header>
-                <div class="card-header">
-                    <ButtonGroup>
-                        <el-button v-permission="['sys:photo:add']" type="primary" icon="Plus"
+                <PageToolbar>
+                    <PageToolbarGroup>
+                        <el-button v-permission="['sys:photo:add']" type="primary" :icon="Plus"
                             @click="handleAdd">新增</el-button>
-                        <el-button v-permission="['sys:photo:delete']" type="danger" icon="Delete"
-                            :disabled="selectedIds.length === 0" @click="handleBatchDelete">批量删除</el-button>
-                        <el-button v-permission="['sys:photo:move']" type="info" icon="Notification"
+                        <el-button v-permission="['sys:photo:move']" type="info" plain :icon="Notification"
                             :disabled="selectedIds.length === 0" @click="handleBatchMove">批量移动</el-button>
-                        <el-button type="success" icon="check" @click="handleAllSelect">全/反选</el-button>
-                    </ButtonGroup>
-                </div>
+                    </PageToolbarGroup>
+                    <PageToolbarGroup kind="danger">
+                        <el-button v-permission="['sys:photo:delete']" type="danger" plain :icon="Delete"
+                            :disabled="selectedIds.length === 0" @click="handleBatchDelete">批量删除</el-button>
+                    </PageToolbarGroup>
+                    <template #right>
+                        <PageToolbarGroup kind="utility">
+                            <el-button type="success" plain :icon="Check" @click="handleAllSelect">全选/反选</el-button>
+                        </PageToolbarGroup>
+                    </template>
+                </PageToolbar>
             </template>
 
             <!-- 数据表格 -->
@@ -34,22 +40,23 @@
                                 </div>
                                 <div class="photo-desc">{{ item.description }}</div>
                             </div>
-                            <div class="photo-actions">
-                                <el-button link type="success" size="small" icon="View" @click="handlePreviewPhotos(item)">查看</el-button>
-                                <el-button link v-permission="['sys:photo:update']" type="primary" size="small" icon="Edit" @click="handleUpdate(item)">编辑</el-button>
-                                <el-button link v-permission="['sys:photo:delete']" type="danger" size="small" icon="Delete" @click="handleDelete(item)">删除</el-button>
-                            </div>
+                            <PageTableActions class="photo-actions">
+  <PageTableAction type="success" size="small" :icon="View" @click="handlePreviewPhotos(item)">??</PageTableAction>
+  <PageTableAction v-permission="['sys:photo:update']" type="primary" size="small" :icon="Edit" @click="handleUpdate(item)">??</PageTableAction>
+  <PageTableAction v-permission="['sys:photo:delete']" type="danger" size="small" :icon="Delete" @click="handleDelete(item)">??</PageTableAction>
+</PageTableActions>
                         </div>
                     </div>
                 </el-checkbox-group>
             </div>
             <!-- 分页组件 -->
-            <div class="pagination-container">
-                <el-pagination v-model:current-page="queryParams.pageNum" v-model:page-size="queryParams.pageSize"
-                    :page-sizes="[10, 20, 30, 50]" :total="total" :background="true"
-                    layout="total, sizes, prev, pager, next, jumper" @size-change="handleSizeChange"
-                    @current-change="handleCurrentChange" />
-            </div>
+            <PagePagination
+                v-model:current-page="queryParams.pageNum"
+                v-model:page-size="queryParams.pageSize"
+                :total="total"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+            />
         </el-card>
 
         <!-- 添加或修改对话框 -->
@@ -119,6 +126,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Check, Delete, Edit, Notification, Plus, View } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import UploadImage from '@/components/Upload/Image.vue'
 import { listPhotoApi, addPhotoApi, updatePhotoApi, deletePhotoApi, movePhotoApi } from '@/api/site/photo'

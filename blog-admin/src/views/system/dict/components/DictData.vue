@@ -1,22 +1,27 @@
 <template>
   <div class="dict-data">
-    <ButtonGroup>
-      <el-button
-        v-permission="['sys:dict:add']"
-        type="primary"
-        icon="Plus"
-        @click="handleAdd"
-      >
-        新增
-      </el-button>
-      <el-button
-        v-permission="['sys:dict:delete']"
-        type="danger"
-        icon="Delete"
-        :disabled="selectedIds.length === 0"
-        @click="handleBatchDelete"
-      >批量删除</el-button>
-    </ButtonGroup>
+    <PageToolbar>
+      <PageToolbarGroup>
+        <el-button
+          v-permission="['sys:dict:add']"
+          type="primary"
+          :icon="Plus"
+          @click="handleAdd"
+        >
+          ??
+        </el-button>
+      </PageToolbarGroup>
+      <PageToolbarGroup kind="danger">
+        <el-button
+          v-permission="['sys:dict:delete']"
+          type="danger"
+          plain
+          :icon="Delete"
+          :disabled="selectedIds.length === 0"
+          @click="handleBatchDelete"
+        >批量删除</el-button>
+      </PageToolbarGroup>
+    </PageToolbar>
 
     <el-table
       :data="dictDataList"
@@ -38,31 +43,28 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" align="center">
+      <el-table-column label="??" width="180" align="center">
         <template #default="{ row }">
-          <el-button type="primary" link @click="handleEdit(row)" v-permission="['sys:dict:update']">
-            <el-icon><Edit /></el-icon>修改
-          </el-button>
-          <el-button type="danger" link @click="handleDelete(row)" v-permission="['sys:dict:delete']">
-            <el-icon><Delete /></el-icon>删除
-          </el-button>
+          <PageTableActions>
+            <PageTableAction type="primary" :icon="Edit" @click="handleEdit(row)" v-permission="['sys:dict:update']">
+              ??
+            </PageTableAction>
+            <PageTableAction type="danger" :icon="Delete" @click="handleDelete(row)" v-permission="['sys:dict:delete']">
+              ??
+            </PageTableAction>
+          </PageTableActions>
         </template>
       </el-table-column>
     </el-table>
 
     <!-- 添加分页组件 -->
-    <div class="pagination-container">
-      <el-pagination
-        background
-        v-model:current-page="queryParams.pageNum"
-        v-model:page-size="queryParams.pageSize"
-        :page-sizes="[10, 20, 30, 50]"
-        :total="total"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
+    <PagePagination
+      v-model:current-page="queryParams.pageNum"
+      v-model:page-size="queryParams.pageSize"
+      :total="total"
+      @size-change="handleSizeChange"
+      @current-change="handleCurrentChange"
+    />
 
     <!-- 字典数据表单对话框 -->
     <el-dialog
@@ -120,6 +122,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, Edit, Plus } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import {
   getDictDataListApi,

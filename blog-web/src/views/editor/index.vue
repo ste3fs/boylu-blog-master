@@ -130,9 +130,14 @@ import { uploadFileApi, deleteFileApi } from '@/api/file'
 import { createArticleApi, updateArticleApi, getArticleInfoApi } from '@/api/article'
 import { getTagsApi,getCategoriesApi } from '@/api/tags'
 import { getDictDataApi } from '@/api/dict'
+import { mavonEditor } from 'mavon-editor'
+import 'mavon-editor/dist/css/index.css'
 
 export default {
     name: 'Editor',
+    components: {
+        mavonEditor
+    },
     data() {
         return {
             articleForm: {
@@ -296,7 +301,6 @@ export default {
          * 删除图片
          */
         imgDel(pos, $file) {
-            console.log(pos)
             deleteFileApi(pos[0]).then(res => {
                 this.$refs.mdRef.$img2Url(pos, '');
             });

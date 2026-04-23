@@ -10,7 +10,7 @@
         @contextmenu.prevent="openMenu($event, tag)"
       >
         <el-icon v-if="tag.meta?.icon" class="tag-icon">
-          <component :is="tag.meta.icon" />
+          <DynamicIcon :name="tag.meta.icon" />
         </el-icon>
         {{ tag.meta?.title }}
         <el-icon 
@@ -63,6 +63,7 @@ import {
   CircleClose,
   FolderDelete 
 } from '@element-plus/icons-vue'
+import DynamicIcon from '@/components/DynamicIcon/index.vue'
 import { useTagsViewStore } from '@/store/modules/tagsView'
 import { useSettingsStore } from '@/store/modules/settings'
 

@@ -1,5 +1,6 @@
 package com.mojian;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.x.file.storage.spring.EnableFileStorage;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
@@ -10,9 +11,10 @@ import org.springframework.cache.annotation.EnableCaching;
 @EnableFileStorage
 @EnableCaching
 @MapperScan("com.mojian.mapper")
+@Slf4j
 public class NeatAdminApplication {
     public static void main(String[] args) {
         SpringApplication.run(NeatAdminApplication.class, args);
-        System.out.println("系统启动成功！");
+        log.info("系统启动成功！");
     }
 }

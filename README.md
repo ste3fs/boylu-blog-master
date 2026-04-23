@@ -16,7 +16,7 @@ scripts/       本地辅助脚本
 mj-blog.sql    数据库初始化脚本
 ```
 
-更详细的目录职责见 [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)。
+更详细的目录职责见 [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)，源码摆放规则见 [docs/SOURCE_STRUCTURE_GUIDE.md](docs/SOURCE_STRUCTURE_GUIDE.md)。
 
 ## 本地启动
 

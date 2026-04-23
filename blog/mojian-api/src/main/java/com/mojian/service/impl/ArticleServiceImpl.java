@@ -12,6 +12,7 @@ import com.mojian.entity.SysNotifications;
 import com.mojian.mapper.SysArticleMapper;
 import com.mojian.mapper.SysCategoryMapper;
 import com.mojian.service.ArticleService;
+import com.mojian.utils.IpUtil;
 import com.mojian.utils.NotificationsUtil;
 import com.mojian.utils.PageUtil;
 import com.mojian.utils.RedisUtil;
@@ -21,18 +22,40 @@ import com.mojian.vo.article.ArticleListVo;
 import com.mojian.vo.article.CategoryListVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
+import org.springframework.util.StringUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.lang.reflect.Array;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ArticleServiceImpl implements ArticleService {
+
+    private static final String ANONYMOUS_VIEW_COOKIE = "boylu_viewer_id";
+
+    private static final Duration ANONYMOUS_VIEW_COOKIE_AGE = Duration.ofDays(365);
 
     private final SysArticleMapper sysArticleMapper;
 
@@ -61,7 +84,7 @@ public class ArticleServiceImpl implements ArticleService {
             detailVo.setIsLike(sysArticleMapper.getUserIsLike(id, Integer.parseInt(userId.toString())));
         }
 
-        detailVo.setQuantity(increaseRealtimeQuantity(id, detailVo.getQuantity()));
+        detailVo.setQuantity(recordRealtimeQuantity(id, detailVo.getQuantity(), userId));
         return detailVo;
     }
 
@@ -136,15 +159,126 @@ public class ArticleServiceImpl implements ArticleService {
         }
     }
 
-    private Integer increaseRealtimeQuantity(Long articleId, Integer dbQuantity) {
+    private Integer recordRealtimeQuantity(Long articleId, Integer dbQuantity, Object userId) {
         if (articleId == null) {
             return dbQuantity == null ? 0 : dbQuantity;
         }
         String hashKey = articleId.toString();
         Object cachedValue = redisUtil.hGet(RedisConstants.ARTICLE_QUANTITY, hashKey);
-        int nextQuantity = resolveQuantity(dbQuantity, cachedValue) + 1;
+        int currentQuantity = resolveQuantity(dbQuantity, cachedValue);
+        List<String> viewerKeys = resolveViewerKeys(userId);
+        if (viewerKeys.isEmpty()) {
+            return currentQuantity;
+        }
+
+        String today = LocalDate.now(ZoneId.of("Asia/Shanghai")).format(DateTimeFormatter.BASIC_ISO_DATE);
+        String viewedKey = RedisConstants.ARTICLE_DAILY_VIEWED_USER + hashKey + ":" + today;
+        if (hasAnyViewerKey(viewedKey, viewerKeys)) {
+            return currentQuantity;
+        }
+
+        redisUtil.sAdd(viewedKey, viewerKeys.toArray(new Object[0]));
+        redisUtil.expire(viewedKey, RedisConstants.DAY_EXPIRE * 2, TimeUnit.SECONDS);
+        int nextQuantity = currentQuantity + 1;
         redisUtil.hSet(RedisConstants.ARTICLE_QUANTITY, hashKey, nextQuantity);
         return nextQuantity;
+    }
+
+    private List<String> resolveViewerKeys(Object userId) {
+        if (userId != null && !String.valueOf(userId).trim().isEmpty()) {
+            return Collections.singletonList("user:" + String.valueOf(userId).trim());
+        }
+
+        HttpServletRequest request = IpUtil.getRequest();
+        Set<String> viewerKeys = new LinkedHashSet<String>();
+
+        String cookieVisitorId = getCookieValue(request, ANONYMOUS_VIEW_COOKIE);
+        if (!StringUtils.hasText(cookieVisitorId)) {
+            cookieVisitorId = UUID.randomUUID().toString().replace("-", "");
+            writeAnonymousViewerCookie(cookieVisitorId, request);
+        }
+        if (StringUtils.hasText(cookieVisitorId)) {
+            viewerKeys.add("guest:cookie:" + cookieVisitorId);
+        }
+
+        String fallbackKey = buildFallbackViewerKey(request);
+        if (StringUtils.hasText(fallbackKey)) {
+            viewerKeys.add("guest:fallback:" + fallbackKey);
+        }
+        return new ArrayList<String>(viewerKeys);
+    }
+
+    private boolean hasAnyViewerKey(String viewedKey, List<String> viewerKeys) {
+        for (String viewerKey : viewerKeys) {
+            if (StringUtils.hasText(viewerKey) && Boolean.TRUE.equals(redisUtil.sIsMember(viewedKey, viewerKey))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String getCookieValue(HttpServletRequest request, String cookieName) {
+        if (request == null || !StringUtils.hasText(cookieName)) {
+            return null;
+        }
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null || cookies.length == 0) {
+            return null;
+        }
+        for (Cookie cookie : cookies) {
+            if (cookie != null && cookieName.equals(cookie.getName()) && StringUtils.hasText(cookie.getValue())) {
+                return cookie.getValue().trim();
+            }
+        }
+        return null;
+    }
+
+    private void writeAnonymousViewerCookie(String visitorId, HttpServletRequest request) {
+        if (!StringUtils.hasText(visitorId)) {
+            return;
+        }
+        HttpServletResponse response = getCurrentResponse();
+        if (response == null) {
+            return;
+        }
+
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(ANONYMOUS_VIEW_COOKIE, visitorId)
+                .httpOnly(true)
+                .path("/")
+                .sameSite("Lax")
+                .maxAge(ANONYMOUS_VIEW_COOKIE_AGE);
+
+        if (isSecureRequest(request)) {
+            builder.secure(true);
+        }
+
+        response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
+    }
+
+    private HttpServletResponse getCurrentResponse() {
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            return attributes == null ? null : attributes.getResponse();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private boolean isSecureRequest(HttpServletRequest request) {
+        if (request == null) {
+            return false;
+        }
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        return request.isSecure() || "https".equalsIgnoreCase(forwardedProto);
+    }
+
+    private String buildFallbackViewerKey(HttpServletRequest request) {
+        String userAgent = request == null ? "" : String.valueOf(request.getHeader("User-Agent"));
+        String source = String.valueOf(IpUtil.getIp()) + "|" + userAgent;
+        if (!StringUtils.hasText(source.replace("|", "").trim())) {
+            return null;
+        }
+        return DigestUtils.md5DigestAsHex(source.getBytes(StandardCharsets.UTF_8));
     }
 
     private Integer resolveQuantity(Integer dbQuantity, Object redisValue) {

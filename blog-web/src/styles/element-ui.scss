@@ -1,3 +1,6 @@
+@use './variables.scss' as *;
+@use './mixins.scss' as *;
+
 //弹出框
 .el-dialog{
     background: var(--card-bg) !important;
@@ -220,6 +223,5 @@
         }
     }
 }
-
 
 

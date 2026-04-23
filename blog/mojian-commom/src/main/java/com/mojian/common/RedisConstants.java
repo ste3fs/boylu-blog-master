@@ -129,6 +129,11 @@ public class RedisConstants {
     public static final String ARTICLE_QUANTITY = "article_quantity";
 
     /**
+     * Article users that have already contributed one view.
+     */
+    public static final String ARTICLE_DAILY_VIEWED_USER = "article:daily-viewed:user:";
+
+    /**
      * 网站配置
      */
     public static final String WEB_CONFIG_KEY = "sys_webconfig";

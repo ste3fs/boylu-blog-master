@@ -1,70 +1,99 @@
-/**
- * 格式化时间
- * @param {string|number|Date} time 时间
- * @returns {string} 格式化后的时间
- */
+function toDate(time) {
+  const date = time instanceof Date ? time : new Date(time)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function pad(value) {
+  return String(value).padStart(2, '0')
+}
+
+function formatMonthDay(date) {
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+export function formatDate(time) {
+  const date = toDate(time)
+  if (!date) {
+    return ''
+  }
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+export function formatDateTime(time, options = {}) {
+  const date = toDate(time)
+  if (!date) {
+    return ''
+  }
+
+  const { withSeconds = false } = options
+  const base = `${formatDate(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return withSeconds ? `${base}:${pad(date.getSeconds())}` : base
+}
+
 export function formatTime(time) {
-  const date = new Date(time)
+  const date = toDate(time)
+  if (!date) {
+    return ''
+  }
+
   const now = new Date()
-  const diff = (now - date) / 1000 // 转换为秒
+  const diff = (now - date) / 1000
 
   if (diff < 60) {
     return '刚刚'
-  } else if (diff < 3600) {
-    return Math.floor(diff / 60) + '分钟前'
-  } else if (diff < 86400) {
-    return Math.floor(diff / 3600) + '小时前'
-  } else if (diff < 2592000) {
-    return Math.floor(diff / 86400) + '天前'
-  } else if (diff < 31536000) {
-    return Math.floor(diff / 2592000) + '个月前'
-  } else {
-    return formatDate(date)
   }
+  if (diff < 3600) {
+    return `${Math.floor(diff / 60)}分钟前`
+  }
+  if (diff < 86400) {
+    return `${Math.floor(diff / 3600)}小时前`
+  }
+  if (diff < 2592000) {
+    return `${Math.floor(diff / 86400)}天前`
+  }
+  if (diff < 31536000) {
+    return `${Math.floor(diff / 2592000)}个月前`
+  }
+  return formatDate(date)
 }
 
-/**
- * 格式化日期
- * @param {Date} date 日期对象
- * @returns {string} 格式化后的日期字符串 YYYY-MM-DD
- */
-function formatDate(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+export function formatPublishTime(time, options = {}) {
+  const date = toDate(time)
+  if (!date) {
+    return ''
+  }
+
+  const { maxRelativeDays = 5 } = options
+  const now = new Date()
+  const diff = (now - date) / 1000
+
+  if (diff < Math.max(1, Number(maxRelativeDays) || 5) * 86400) {
+    return formatTime(date)
+  }
+
+  return formatDate(date)
 }
 
-/**
- * 获取相对时间
- * @param {string|number|Date} time 时间
- * @returns {string} 相对时间描述
- */
 export function getRelativeTime(time) {
-  const date = new Date(time)
+  const date = toDate(time)
+  if (!date) {
+    return ''
+  }
+
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterday = new Date(today - 86400000)
+  const yesterday = new Date(today.getTime() - 86400000)
   const thisYear = new Date(now.getFullYear(), 0, 1)
 
   if (date >= today) {
-    return formatTime(time)
-  } else if (date >= yesterday) {
-    return '昨天'
-  } else if (date >= thisYear) {
-    return formatMonthDay(date)
-  } else {
-    return formatDate(date)
+    return formatTime(date)
   }
+  if (date >= yesterday) {
+    return '昨天'
+  }
+  if (date >= thisYear) {
+    return formatMonthDay(date)
+  }
+  return formatDate(date)
 }
-
-/**
- * 格式化月日
- * @param {Date} date 日期对象
- * @returns {string} MM-DD 格式的日期
- */
-function formatMonthDay(date) {
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${month}-${day}`
-} 

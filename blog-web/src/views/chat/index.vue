@@ -371,9 +371,7 @@ import { uploadFileApi } from "@/api/file";
 import { disableScroll, enableScroll } from "@/utils/scroll";
 import { showLoading, hideLoading } from "@/utils/loading";
 import { copyText } from "@/utils/contact";
-import { marked } from 'marked'; // 使用命名导入
-import hljs from 'highlight.js'
-import 'highlight.js/styles/atom-one-dark.css'
+import { renderMarkdown } from '@/utils/markdown'
 
 
 export default {
@@ -618,13 +616,11 @@ export default {
         this.ws = new WebSocket(wsUrl + this.$store.state.userInfo.id);
 
         this.ws.onopen = () => {
-          console.log("WebSocket连接已建立");
           this.reconnectAttempts = 0;
           this.startHeartbeat();
         };
 
         this.ws.onmessage = (event) => {
-          console.log("收到原始消息:", event.data);
           try {
             const message = JSON.parse(event.data);
             // 如果是心跳响应，则不处理
@@ -638,7 +634,6 @@ export default {
         };
 
         this.ws.onclose = () => {
-          console.log("WebSocket连接已关闭");
           this.stopHeartbeat(); // 停止心跳
           this.reconnect(); // 尝试重连
         };
@@ -656,8 +651,6 @@ export default {
      * 处理接收到的消息
      */
     handleIncomingMessage(message) {
-      console.log("收到消息:", message);
-
       if (typeof message === "string") {
         try {
           message = JSON.parse(message);
@@ -1070,13 +1063,11 @@ export default {
       }
 
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.log("达到最大重连次数，停止重连");
         this.$message.error("网络连接异常，请刷新页面重试");
         return;
       }
 
       this.reconnectAttempts++;
-      console.log(`第 ${this.reconnectAttempts} 次尝试重连...`);
 
       // 使用指数退避算法计算重连延迟
       const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
@@ -1344,7 +1335,7 @@ export default {
       // 保留已有的img标签，不需要替换
       if (content.includes('<img')) {
         // 使用 marked 解析 Markdown 内容
-        const htmlContent = marked(content);
+        const htmlContent = renderMarkdown(content);
 
         if(!content.includes('code')){
           content = content.replace(/\n/g, '<br>')
@@ -1363,7 +1354,7 @@ export default {
       content = content.replace(/\((https?:\/\/[^\s)]+)\)/g, '<img src="$1" class="emoji" style="width: 22px; height: 22px; vertical-align: middle;">');
 
       // 继续处理其他格式
-      const htmlContent = marked(content);
+      const htmlContent = renderMarkdown(content);
 
       if(!content.includes('code')){
         content = content.replace(/\n/g, '<br>')

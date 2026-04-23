@@ -11,6 +11,7 @@ import Messages from '@/views/messages/index.vue'
 import About from '@/views/about/index.vue'
 import Photos from '@/views/photos/index.vue'
 import store from '@/store';
+import { getToken } from '@/utils/cookie'
 
 Vue.use(VueRouter)
 
@@ -198,7 +199,7 @@ const routes = [
               }, {
                 path: '/login',
                 name: 'Login',
-                component: () => import('@/views/Login/index.vue'),
+                component: () => import('@/views/login/index.vue'),
                 meta: {
                   title: '登录',
                   hidden: true,
@@ -211,7 +212,7 @@ const routes = [
                 component: () => import('@/views/notifications/index.vue'),
                 meta: {
                   title: '消息通知',
-                  requiresAuth: true,
+                  requireAuth: true,
                   hidden: true
                 }
               },
@@ -250,6 +251,17 @@ router.beforeEach((to, from, next) => {
   }
   //关闭搜索框
   store.commit('SET_SEARCH_VISIBLE', false)
+
+  if (to.meta.requireAuth && !getToken()) {
+    next({
+      path: '/login',
+      query: {
+        redirect: to.fullPath
+      }
+    })
+    return
+  }
+
   next()
 })
 

@@ -17,8 +17,11 @@ import eu.bitwalker.useragentutils.Browser;
 import eu.bitwalker.useragentutils.OperatingSystem;
 import eu.bitwalker.useragentutils.UserAgent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -28,6 +31,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class HomeServiceImpl implements HomeService {
 
     private final SysWebConfigMapper sysWebConfigMapper;
@@ -35,6 +39,12 @@ public class HomeServiceImpl implements HomeService {
     private final RedisUtil redisUtil;
 
     private final SysNoticeMapper noticeMapper;
+
+    @Value("${hot-search.coderutil.access-key:}")
+    private String coderutilAccessKey;
+
+    @Value("${hot-search.coderutil.secret-key:}")
+    private String coderutilSecretKey;
 
     @Override
     public Result<SysWebConfig> getWebConfig() {
@@ -64,12 +74,28 @@ public class HomeServiceImpl implements HomeService {
 
     @Override
     public JSONObject getHotSearch(String type) {
+        if (!StringUtils.hasText(coderutilAccessKey) || !StringUtils.hasText(coderutilSecretKey)) {
+            log.warn("CoderUtil hot search credentials are not configured.");
+            return emptyHotSearchResult();
+        }
+
         HashMap<String, Object> paramMap = new HashMap<>();
-        paramMap.put("access-key", "f94be500c45148bc185be24a38c04ad3");
-        paramMap.put("secret-key", "27563ca627d5db0d57e831ca4de0f75f");
+        paramMap.put("access-key", coderutilAccessKey);
+        paramMap.put("secret-key", coderutilSecretKey);
         String url = "https://www.coderutil.com/api/resou/v1/" + type;
-        String result= HttpUtil.get(url, paramMap);
-        return com.alibaba.fastjson2.JSONObject.parseObject(result);
+        try {
+            String result = HttpUtil.get(url, paramMap);
+            return JSONObject.parseObject(result);
+        } catch (Exception e) {
+            log.warn("Failed to fetch CoderUtil hot search, type={}", type, e);
+            return emptyHotSearchResult();
+        }
+    }
+
+    private JSONObject emptyHotSearchResult() {
+        JSONObject result = new JSONObject();
+        result.put("data", Collections.emptyList());
+        return result;
     }
 
     @Override

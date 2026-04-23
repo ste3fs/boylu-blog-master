@@ -2,8 +2,8 @@
 
 This deployment layout serves:
 
-- frontend at `http://101.43.1.187/`
-- admin at `http://101.43.1.187/console-9x7k/login`
+- frontend at `http://111.229.123.234/`
+- admin at `http://111.229.123.234/boylu1107/login`
 - backend API behind `/mojian`
 - uploaded files behind `/localFile`
 
@@ -72,9 +72,11 @@ sudo nano /etc/boylu-blog/boylu-blog.env
 
 Set at least:
 
-- `PUBLIC_BASE_URL=http://101.43.1.187`
+- `PUBLIC_BASE_URL=http://111.229.123.234`
 - `DB_USERNAME=boylu`
 - `DB_PASSWORD=your_real_password`
+- `CODERUTIL_ACCESS_KEY=your_coderutil_access_key` if hot-search is enabled
+- `CODERUTIL_SECRET_KEY=your_coderutil_secret_key` if hot-search is enabled
 
 ## 6. Backend service
 
@@ -106,12 +108,12 @@ sudo systemctl reload nginx
 
 Check:
 
-- `http://101.43.1.187/`
-- `http://101.43.1.187/console-9x7k/login`
-- `http://101.43.1.187/mojian/api/webConfig`
+- `http://111.229.123.234/`
+- `http://111.229.123.234/boylu1107/login`
+- `http://111.229.123.234/mojian/api/webConfig`
 
 If uploads do not display, verify:
 
-- `sys_file_oss.domain` is `http://101.43.1.187/localFile/`
+- `sys_file_oss.domain` is `http://111.229.123.234/localFile/`
 - `sys_file_oss.storage_path` is `/opt/boylu-blog/storage/`
 - `www-data` can read and write `/opt/boylu-blog/storage/`

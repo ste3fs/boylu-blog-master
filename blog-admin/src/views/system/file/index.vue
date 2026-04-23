@@ -1,7 +1,7 @@
 <template>
     <div class="app-container">
         <!-- 搜索表单 -->
-        <div class="search-wrapper">
+        <PageSearch>
             <el-form ref="queryFormRef" :model="queryParams" :inline="true">
                 <el-form-item label="文件名" prop="filename">
                     <el-input v-model="queryParams.filename" placeholder="请输入文件名" clearable
@@ -13,21 +13,20 @@
                             :value="item.value" />
                     </el-select>
                 </el-form-item>
-                <el-form-item>
-                    <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-                    <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+                                <el-form-item>
+                    <PageSearchActions @search="handleQuery" @reset="resetQuery" />
                 </el-form-item>
             </el-form>
-        </div>
+        </PageSearch>
 
         <!-- 操作按钮区域 -->
         <el-card class="box-card">
             <template #header>
-                <div class="card-header">
-                    <ButtonGroup>
-                        <el-button type="success" icon="Setting" @click="handleOpenOssConfig">云存储配置</el-button>
-                    </ButtonGroup>
-                </div>
+                <PageToolbar>
+                    <PageToolbarGroup>
+                        <el-button type="success" :icon="Setting" @click="handleOpenOssConfig">云存储配置</el-button>
+                    </PageToolbarGroup>
+                </PageToolbar>
             </template>
             <!-- 数据表格 -->
             <el-table v-loading="loading" :data="fileList" style="width: 100%">
@@ -60,23 +59,26 @@
                     </template>
                 </el-table-column>
                 <el-table-column label="上传时间" align="center" prop="createTime" width="150" />
-                <el-table-column label="操作" align="center" width="200" fixed="right">
+                <el-table-column label="??" align="center" width="200" fixed="right">
                     <template #default="scope">
-                        <el-button v-permission="['sys:file:delete']" type="danger" link icon="Delete"
-                            @click="handleDelete(scope.row)">删除</el-button>
-                        <el-button type="primary" link icon="Download" @click="handleDownload(scope.row)">下载</el-button>
+                        <PageTableActions>
+                            <PageTableAction v-permission="['sys:file:delete']" type="danger" :icon="Delete"
+                                @click="handleDelete(scope.row)">??</PageTableAction>
+                            <PageTableAction type="primary" :icon="Download" @click="handleDownload(scope.row)">??</PageTableAction>
+                        </PageTableActions>
                     </template>
 
                 </el-table-column>
             </el-table>
 
             <!-- 分页组件 -->
-            <div class="pagination-container">
-                <el-pagination v-model:current-page="queryParams.pageNum" v-model:page-size="queryParams.pageSize"
-                    :page-sizes="[10, 20, 30, 50]" :total="total" :background="true"
-                    layout="total, sizes, prev, pager, next, jumper" @size-change="handleSizeChange"
-                    @current-change="handleCurrentChange" />
-            </div>
+            <PagePagination
+                v-model:current-page="queryParams.pageNum"
+                v-model:page-size="queryParams.pageSize"
+                :total="total"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+            />
         </el-card>
 
         <!-- 云存储配置 -->
@@ -129,7 +131,7 @@
 
             </el-form>
             <div class="dialog-footer">
-                <el-button type="primary" v-permission="['sys:oss:submit']" icon="CircleCheck"
+                <el-button type="primary" v-permission="['sys:oss:submit']" :icon="CircleCheck"
                     :loading="ossConfigLoading" @click="handleSaveOssConfig">保存</el-button>
             </div>
         </el-drawer>
@@ -138,6 +140,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { CircleCheck, Delete, Download, Refresh, Search, Setting } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { getFileListApi, deleteFileApi, getOssConfigApi, addOssApi, updateOssApi } from '@/api/file'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'

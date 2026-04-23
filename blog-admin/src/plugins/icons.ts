@@ -1,9 +1,76 @@
-import type { App } from "vue";
-import * as ElementPlusIconsVue from "@element-plus/icons-vue";
+import type { App, Component } from 'vue'
+import {
+  Back,
+  Check,
+  CircleCheck,
+  Close,
+  CopyDocument,
+  Delete,
+  Document,
+  DocumentCopy,
+  Download,
+  Edit,
+  HomeFilled,
+  Iphone,
+  Key,
+  List,
+  Lock,
+  Moon,
+  Notification,
+  Orange,
+  Plus,
+  QuestionFilled,
+  Refresh,
+  RefreshRight,
+  Search,
+  Setting,
+  Sunny,
+  Timer,
+  Unlock,
+  Upload,
+  User,
+  VideoPlay,
+  View,
+  Warning
+} from '@element-plus/icons-vue'
 
-// 注册所有图标
+const staticIcons: Record<string, Component> = {
+  Back,
+  Check,
+  CircleCheck,
+  Close,
+  CopyDocument,
+  Delete,
+  Document,
+  DocumentCopy,
+  Download,
+  Edit,
+  HomeFilled,
+  Iphone,
+  Key,
+  List,
+  Lock,
+  Moon,
+  Notification,
+  Orange,
+  Plus,
+  QuestionFilled,
+  Refresh,
+  RefreshRight,
+  Search,
+  Setting,
+  Sunny,
+  Timer,
+  Unlock,
+  Upload,
+  User,
+  VideoPlay,
+  View,
+  Warning
+}
+
 export function setupElIcons(app: App<Element>) {
-  for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-    app.component(key, component);
+  for (const [iconName, iconComponent] of Object.entries(staticIcons)) {
+    app.component(iconName, iconComponent)
   }
 }

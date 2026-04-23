@@ -36,8 +36,8 @@
           :active-value="'dark'"
           :inactive-value="'light'"
           inline-prompt
-          active-icon="Moon"
-          inactive-icon="Sunny"
+          :active-icon="Moon"
+          :inactive-icon="Sunny"
           @change="(val) => handleSave('theme', val)"
         />
       </div>
@@ -161,6 +161,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { ElMessage } from "element-plus";
+import { Moon, Sunny } from "@element-plus/icons-vue";
 import { useSettingsStore } from "@/store/modules/settings";
 import type { SettingsState } from "@/store/modules/settings";
 

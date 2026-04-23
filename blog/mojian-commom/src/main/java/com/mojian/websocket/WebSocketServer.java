@@ -62,8 +62,7 @@ public class WebSocketServer {
 
     @OnError
     public void onError(Session session, Throwable error) {
-        log.error("发生错误");
-        error.printStackTrace();
+        log.error("WebSocket 发生错误", error);
     }
 
     /**

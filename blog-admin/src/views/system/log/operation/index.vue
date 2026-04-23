@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
      <!-- 搜索表单 -->
-     <div class="search-wrapper">
+     <PageSearch>
         <el-form :model="queryParams" ref="queryFormRef" :inline="true">
         <el-form-item label="用户名" prop="username">
           <el-input
@@ -29,31 +29,27 @@
             value-format="YYYY-MM-DD"
           />
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleQuery">
-            <el-icon><Search /></el-icon>搜索
-          </el-button>
-          <el-button @click="resetQuery">
-            <el-icon><Refresh /></el-icon>重置
-          </el-button>
+                <el-form-item>
+          <PageSearchActions @search="handleQuery" @reset="resetQuery" />
         </el-form-item>
       </el-form>
-     </div>
+     </PageSearch>
 
     <el-card class="box-card">
       <!-- 操作按钮区域 -->
       <template #header>
-        <div class="card-header">
-          <ButtonGroup>
+        <PageToolbar>
+          <PageToolbarGroup kind="danger">
             <el-button
               v-permission="['sys:operateLog:delete']"
               type="danger"
-              icon="Delete"
+              plain
+              :icon="Delete"
               :disabled="selectedIds.length === 0"
               @click="handleBatchDelete"
             >批量删除</el-button>
-          </ButtonGroup>
-        </div>
+          </PageToolbarGroup>
+        </PageToolbar>
       </template>
 
       <!-- 表格区域 -->
@@ -125,34 +121,32 @@
           width="200"
           label="创建时间"
         />
-        <el-table-column label="操作" width="100" align="center">
+        <el-table-column label="??" width="100" align="center">
           <template #default="{ row }">
-            <el-button type="danger" link @click="handleDelete(row)" v-permission="['sys:operateLog:delete']">
-              <el-icon><Delete /></el-icon>删除
-            </el-button>
+            <PageTableActions>
+              <PageTableAction type="danger" :icon="Delete" @click="handleDelete(row)" v-permission="['sys:operateLog:delete']">
+                ??
+              </PageTableAction>
+            </PageTableActions>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页区域 -->
-      <div class="pagination-container">
-        <el-pagination
-          background
-          v-model:current-page="queryParams.pageNum"
-          v-model:page-size="queryParams.pageSize"
-          :page-sizes="[10, 20, 30, 50]"
-          :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
+      <PagePagination
+        v-model:current-page="queryParams.pageNum"
+        v-model:page-size="queryParams.pageSize"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete } from '@element-plus/icons-vue'
 import {
   getOperationLogsApi,
   deleteOperationLogsApi,

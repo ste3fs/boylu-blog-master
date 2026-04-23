@@ -4,9 +4,24 @@ import { loginApi,logoutApi,getUserInfoApi } from '@/api/auth'
 import { getToken, setToken, removeToken } from '@/utils/cookie'
 
 Vue.use(Vuex)
+
+function getCachedUserInfo() {
+  const cachedUser = sessionStorage.getItem("user")
+  if (!cachedUser) {
+    return null
+  }
+
+  try {
+    return JSON.parse(cachedUser)
+  } catch (error) {
+    sessionStorage.removeItem("user")
+    return null
+  }
+}
+
 export default new Vuex.Store({
   state: {
-    userInfo: sessionStorage.getItem("user") ? JSON.parse(sessionStorage.getItem("user")) : null,
+    userInfo: getCachedUserInfo(),
     defaultImage: '/boylu-logo.png',
     imageVersion: Date.now(),
     webSiteInfo: {

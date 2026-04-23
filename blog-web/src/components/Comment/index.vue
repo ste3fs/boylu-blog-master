@@ -313,8 +313,7 @@ export default {
           }
         });
       } catch (error) {
-        console.log(error);
-        this.$message.error(error.message);
+        this.$message.error(error.message || "评论失败");
       }
     },
 
@@ -362,8 +361,7 @@ export default {
           }
         });
       } catch (error) {
-        console.log(error);
-        this.$message.error(error.message);
+        this.$message.error(error.message || "回复失败");
       }
     },
 

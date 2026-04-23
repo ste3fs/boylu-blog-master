@@ -18,7 +18,7 @@
           </template>
         </el-input>
       </div>
-      <el-scrollbar height="400px">
+      <el-scrollbar height="400px" v-loading="loading">
         <div class="icon-list">
           <div
             v-for="(component, name) in filteredIcons"
@@ -39,9 +39,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import { computed, ref, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
+import { loadElementPlusIcons } from '@/utils/element-icons'
 
 const props = defineProps<{
   modelValue: string
@@ -56,16 +56,30 @@ const dialogVisible = computed({
 })
 
 const searchText = ref('')
+const loading = ref(false)
+const loaded = ref(false)
+const icons = ref<Record<string, any>>({})
 
-// 直接使用图标组件对象
-const icons = ElementPlusIconsVue
+const ensureIconsLoaded = async () => {
+  if (loaded.value || loading.value) {
+    return
+  }
+
+  loading.value = true
+  try {
+    icons.value = await loadElementPlusIcons()
+    loaded.value = true
+  } finally {
+    loading.value = false
+  }
+}
 
 const filteredIcons = computed(() => {
-  const iconEntries = Object.entries(icons)
-  if (!searchText.value) return icons
-  
+  const iconEntries = Object.entries(icons.value)
+  if (!searchText.value) return icons.value
+
   return Object.fromEntries(
-    iconEntries.filter(([name]) => 
+    iconEntries.filter(([name]) =>
       name.toLowerCase().includes(searchText.value.toLowerCase())
     )
   )
@@ -75,6 +89,16 @@ const selectIcon = (iconName: string) => {
   emit('update:modelValue', iconName)
   emit('update:visible', false)
 }
+
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      ensureIconsLoaded()
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>
@@ -131,4 +155,4 @@ const selectIcon = (iconName: string) => {
 .icon-item.active .icon-name {
   color: #409EFF;
 }
-</style> 
+</style>

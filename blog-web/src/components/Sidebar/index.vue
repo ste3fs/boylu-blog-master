@@ -56,7 +56,13 @@
       </h3>
       <div class="post-list">
         <router-link v-for="post in hot" :key="post.id" :to="`/post/${post.id}`" class="post-item">
-          <img v-lazy="resolveImage(post.cover)" :key="resolveImage(post.cover)" :alt="post.title" @error="handleImageError">
+          <img
+            v-lazy="getLazyImage(post.cover)"
+            :key="resolveImage(post.cover)"
+            :data-origin="resolveImage(post.cover)"
+            :alt="post.title"
+            @error="handleImageError"
+          >
           <div class="post-meta">
             <h4>{{ post.title }}</h4>
             <time>{{ post.createTime }}</time>
@@ -80,6 +86,7 @@ import { getRecommendArticlesApi } from '@/api/article'
 import Tag from './components/tagCloud.vue'
 import SignalPanel from '@/views/home/components/signalPanel.vue'
 import { copyText } from '@/utils/contact'
+import { resolveImageUrl, retryImageLoad } from '@/utils/image'
 
 export default {
   name: 'Sidebar',
@@ -188,22 +195,22 @@ export default {
       return text.length >= 10 ? text.slice(0, 10) : text
     },
     resolveImage(url) {
-      const fallback = url || this.$store.state.defaultImage
-      if (!fallback) {
-        return ''
+      return resolveImageUrl(url, this.$store.state.defaultImage)
+    },
+    getLazyImage(url) {
+      const src = this.resolveImage(url)
+      const fallback = this.resolveImage(this.$store.state.defaultImage)
+      return {
+        src,
+        error: fallback,
+        loading: fallback
       }
-      if (!fallback.includes('/localFile/')) {
-        return fallback
-      }
-      const version = this.$store.state.imageVersion
-      return `${fallback}${fallback.includes('?') ? '&' : '?'}v=${version}`
     },
     /**
      * 处理图片加载失败
      */
     handleImageError(e) {
-      e.target.src = this.$store.state.defaultImage
-      e.target.classList.add('fallback')
+      retryImageLoad(e.target, this.$store.state.defaultImage)
     },
     /**
      * 复制到剪贴板
@@ -225,6 +232,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use 'sass:list';
+@use 'sass:math';
+
 .sidebar {
   position: sticky;
   top: 80px;
@@ -434,16 +444,16 @@ export default {
 
       @for $i from 1 through 12 {
         &:nth-child(#{$i}) {
-          left: #{random(100)}#{"%"};
-          animation-delay: #{random(3000)}ms;
-          background: #{nth(
+          left: #{math.random(100)}#{"%"};
+          animation-delay: #{math.random(3000)}ms;
+          background: #{list.nth(
  (#6366f1,
             #8b5cf6,
             #ec4899,
             #10b981,
             #f59e0b,
             #ef4444),
-          random(6))
+          math.random(6))
         }
 
         ;

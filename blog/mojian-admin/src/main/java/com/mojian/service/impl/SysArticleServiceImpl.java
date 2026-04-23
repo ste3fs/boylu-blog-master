@@ -2,7 +2,6 @@ package com.mojian.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.thread.ThreadUtil;
-import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -25,6 +24,7 @@ import com.mojian.vo.article.SysArticleDetailVo;
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
 import com.vladsch.flexmark.util.data.MutableDataSet;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -40,6 +40,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArticle> implements SysArticleService {
 
     private final SysTagMapper sysTagMapper;
@@ -177,7 +178,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             });
             sysTagMapper.addArticleTagRelations(entity.getId(),tagIds);
 
-            System.out.println("文章抓取成功，内容为:" + JSON.toJSONString(entity));
+            log.info("文章抓取成功，articleId={}", entity.getId());
         } catch (IOException e) {
             throw new ServiceException(e.getMessage());
         }

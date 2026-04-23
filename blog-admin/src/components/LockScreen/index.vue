@@ -23,7 +23,7 @@
           v-model="password"
           type="password"
           placeholder="请输入密码解锁"
-          prefix-icon="Lock"
+          :prefix-icon="Lock"
           @keyup.enter="handleUnlock"
           class="custom-input"
         >
@@ -50,6 +50,7 @@
 <script setup lang="ts">
 import { useUserStore } from '@/store/modules/user'
 import { ElMessage } from 'element-plus'
+import { Lock, Unlock } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import { verifyPassword } from '@/api/system/user'
@@ -93,7 +94,6 @@ const handleUnlock = async () => {
   
   try {
     const {data} = await verifyPassword(password.value)
-    console.log(data)
     if (data) {
       isLocked.value = false
       sessionStorage.removeItem('isLocked')
@@ -347,4 +347,4 @@ defineExpose({
 .el-message {
   z-index: 2100 !important;
 }
-</style> 
+</style>

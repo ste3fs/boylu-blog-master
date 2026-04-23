@@ -4,13 +4,19 @@
     <div class="moments-list" v-loading="loading">
       <div v-for="moment in moments" :key="moment.id" class="moment-item">
         <div class="user-avatar">
-          <img v-lazy="moment.avatar" :key="moment.avatar" class="avatar" />
+          <img
+            v-lazy="getLazyImage(moment.avatar)"
+            :key="resolveImage(moment.avatar)"
+            :data-origin="resolveImage(moment.avatar)"
+            class="avatar"
+            @error="handleImageError"
+          />
           <!-- 移动端显示的用户信息 -->
           <div class="mobile-user-info">
             <span class="name">{{ moment.nickname }}</span>
             <span class="time">
               <i class="fas fa-clock"></i>
-              {{ formatTime(moment.createTime) }}
+              {{ formatMomentTime(moment.createTime) }}
             </span>
           </div>
         </div>
@@ -20,14 +26,20 @@
             <span class="name">{{ moment.nickname }}</span>
             <span class="time">
               <i class="fas fa-clock"></i>
-              {{ formatTime(moment.createTime) }}
+              {{ formatMomentTime(moment.createTime) }}
             </span>
           </div>
           <div class="moment-content-wrapper">
             <div class="moment-content" v-html="moment.content"></div>
             <div class="moment-images" v-if="moment.images?.length">
-              <img v-for="(img, index) in moment.images" :key="img" v-lazy="img"
-                @click="previewImage(moment.images, index)" />
+              <img
+                v-for="(img, index) in moment.images"
+                :key="img"
+                v-lazy="getLazyImage(img)"
+                :data-origin="resolveImage(img)"
+                @error="handleImageError"
+                @click="previewImage(moment.images, index)"
+              />
             </div>
           </div>
         </div>
@@ -45,8 +57,9 @@
 </template>
 
 <script>
-import { formatTime } from '@/utils/time'
+import { formatDateTime } from '@/utils/time'
 import { getMoments } from '@/api/moments'
+import { resolveImageUrl, retryImageLoad } from '@/utils/image'
 
 export default {
   name: 'Moments',
@@ -94,11 +107,32 @@ export default {
 
     previewImage(images, index) {
       // 使用图片预览组件的 show 方法
-      this.$refs.imagePreview.show(images, index)
+      this.$refs.imagePreview.show(
+        images.map((image) => this.resolveImage(image)),
+        index
+      )
     },
 
-    formatTime(time) {
-      return formatTime(time)
+    formatMomentTime(time) {
+      return formatDateTime(time)
+    },
+
+    resolveImage(url) {
+      return resolveImageUrl(url, this.$store.state.defaultImage)
+    },
+
+    getLazyImage(url) {
+      const src = this.resolveImage(url)
+      const fallback = this.resolveImage(this.$store.state.defaultImage)
+      return {
+        src,
+        error: fallback,
+        loading: fallback
+      }
+    },
+
+    handleImageError(e) {
+      retryImageLoad(e.target, this.$store.state.defaultImage, 1)
     }
   }
 }

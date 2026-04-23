@@ -25,6 +25,7 @@ _restore_*
 *.fix-*
 
 # Playwright E2E
+.playwright-cli/
 e2e/node_modules/
 e2e/test-results/
 e2e/playwright-report/

@@ -1,10 +1,10 @@
-<template>
+﻿<template>
     <div class="app-container">
-        <!-- 搜索表单 -->
-        <div class="search-wrapper">
+        <!-- 鎼滅储琛ㄥ崟 -->
+        <PageSearch>
             <el-form :model="queryParams" ref="queryFormRef" inline>
-                <el-form-item label="反馈类型" prop="type">
-                    <el-select v-model="queryParams.type" placeholder="请选择反馈类型" clearable @keyup.enter="handleQuery">
+                <el-form-item label="鍙嶉绫诲瀷" prop="type">
+                    <el-select v-model="queryParams.type" placeholder="璇烽€夋嫨鍙嶉绫诲瀷" clearable @keyup.enter="handleQuery">
                         <el-option v-for="item in feedbackTypes" :key="item.value" :label="item.label"
                             :value="item.value" />
                     </el-select>
@@ -15,33 +15,34 @@
                             :value="item.value" />
                     </el-select>
                 </el-form-item>
-                <el-form-item>
-                    <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-                    <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+                                <el-form-item>
+                    <PageSearchActions @search="handleQuery" @reset="resetQuery" />
                 </el-form-item>
             </el-form>
 
-        </div>
+        </PageSearch>
         <el-card class="box-card">
-            <!-- 操作工具栏 -->
+            <!-- 鎿嶄綔宸ュ叿鏍?-->
             <template #header>
-                <!-- <el-button type="primary" plain icon="Plus" @click="handleAdd">新增
-                </el-button> -->
-                <el-button type="danger" v-permission="['sys:feedback:delete']" plain icon="Delete" :disabled="selectedIds.length === 0"
-                    @click="handleBatchDelete">批量删除
-                </el-button>
+                <PageToolbar>
+                    <PageToolbarGroup kind="danger">
+                        <el-button type="danger" v-permission="['sys:feedback:delete']" plain :icon="Delete" :disabled="selectedIds.length === 0"
+                            @click="handleBatchDelete">鎵归噺鍒犻櫎
+                        </el-button>
+                    </PageToolbarGroup>
+                </PageToolbar>
             </template>
 
-            <!-- 数据表格 -->
+            <!-- 鏁版嵁琛ㄦ牸 -->
             <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
                 <el-table-column type="selection" width="55" align="center" />
-                <el-table-column label="反馈人头像" align="center" prop="avatar" width="100">
+                <el-table-column label="头像" align="center" prop="avatar" width="100">
                     <template #default="scope">
                         <el-avatar :src="scope.row.avatar" alt="Avatar" width="50" height="50" />
                     </template>
                 </el-table-column>
-                <el-table-column label="反馈人昵称" align="center" prop="nickname" />
-                <el-table-column label="反馈类型" align="center" prop="type">
+                <el-table-column label="昵称" align="center" prop="nickname" />
+                <el-table-column label="鍙嶉绫诲瀷" align="center" prop="type">
                     <template #default="scope">
                         <span v-for="item in feedbackTypes">
                             <el-tag v-if="item.value === scope.row.type" :key="item.value" :type="item.style">
@@ -50,9 +51,9 @@
                         </span>
                     </template>
                 </el-table-column>
-                <el-table-column label="反馈内容" align="center" prop="content" show-overflow-tooltip />
-                <el-table-column label="联系邮箱" align="center" prop="email" />
-                <el-table-column label="回复内容" align="center" prop="replyContent" show-overflow-tooltip/>
+                <el-table-column label="鍙嶉鍐呭" align="center" prop="content" show-overflow-tooltip />
+                <el-table-column label="鑱旂郴閭" align="center" prop="email" />
+                <el-table-column label="鍥炲鍐呭" align="center" prop="replyContent" show-overflow-tooltip/>
                 <el-table-column label="状态" align="center" prop="status">
                     <template #default="scope">
                         <span v-for="item in feedbackStatus">
@@ -62,32 +63,27 @@
                         </span>
                     </template>
                 </el-table-column>
-                <el-table-column label="创建时间" align="center" prop="createTime" width="170"/>
-                <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+                <el-table-column label="鍒涘缓鏃堕棿" align="center" prop="createTime" width="170"/>
+                <el-table-column label="鎿嶄綔" align="center" class-name="small-padding fixed-width">
                     <template #default="scope">
-                        <el-button type="primary" link icon="Edit" v-permission="['sys:feedback:update']"  @click="handleUpdate(scope.row)">修改
-                        </el-button>
-                        <el-button type="danger" link icon="Delete" v-permission="['sys:feedback:delete']"  @click="handleDelete(scope.row)">删除
-                        </el-button>
+                        <PageTableActions>
+                            <PageTableAction type="primary" :icon="Edit" v-permission="['sys:feedback:update']" @click="handleUpdate(scope.row)">淇敼</PageTableAction>
+                            <PageTableAction type="danger" :icon="Delete" v-permission="['sys:feedback:delete']" @click="handleDelete(scope.row)">鍒犻櫎</PageTableAction>
+                        </PageTableActions>
                     </template>
                 </el-table-column>
             </el-table>
 
-            <!-- 分页工具栏 -->
-            <div class="pagination-container">
-                <el-pagination
-                    background
-                    v-model:current-page="queryParams.pageNum"
-                    v-model:page-size="queryParams.pageSize"
-                    :page-sizes="[10, 20, 30, 50]"
-                    :total="total"
-                    layout="total, sizes, prev, pager, next, jumper"
-                    @size-change="handleSizeChange"
-                    @current-change="handleCurrentChange"
-                />
-            </div>
+            <!-- 鍒嗛〉宸ュ叿鏍?-->
+            <PagePagination
+                v-model:current-page="queryParams.pageNum"
+                v-model:page-size="queryParams.pageSize"
+                :total="total"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+            />
 
-            <!-- 添加或修改对话框 -->
+            <!-- 娣诲姞鎴栦慨鏀瑰璇濇 -->
             <el-dialog v-model="open" :title="title" width="500px" append-to-body>
                 <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
                     <el-form-item label="回复内容" prop="replyContent">
@@ -101,8 +97,8 @@
                 </el-form>
                 <template #footer>
                     <div class="dialog-footer">
-                        <el-button type="primary" @click="submitForm">确 定</el-button>
-                        <el-button @click="cancel">取 消</el-button>
+                        <el-button type="primary" @click="submitForm">确定</el-button>
+                        <el-button @click="cancel">取消</el-button>
                     </div>
                 </template>
             </el-dialog>
@@ -112,6 +108,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, Edit, Refresh, Search } from '@element-plus/icons-vue'
 import {
     listSysFeedbackApi,
     detailSysFeedbackApi,
@@ -124,19 +121,19 @@ import {
     getDictDataByDictTypesApi
 } from '@/api/system/dict'
 
-// 遮罩层
+// 閬僵灞?
 const loading = ref(true)
-// 选中数组
+// 閫変腑鏁扮粍
 const selectedIds = ref<any[]>([])
-// 总条数
+// 鎬绘潯鏁?
 const total = ref(0)
-// 表格数据
+// 琛ㄦ牸鏁版嵁
 const dataList = ref([])
-// 弹出层标题
+// 寮瑰嚭灞傛爣棰?
 const title = ref('')
-// 是否显示弹出层
+// 鏄惁鏄剧ず寮瑰嚭灞?
 const open = ref(false)
-// 查询参数
+// 鏌ヨ鍙傛暟
 const queryParams = reactive({
     pageNum: 1,
     pageSize: 10,
@@ -145,12 +142,12 @@ const queryParams = reactive({
     source: 'admin'
 })
 
-// 表单参数
+// 琛ㄥ崟鍙傛暟
 const form = reactive<any>({})
-// 表单校验
+// 琛ㄥ崟鏍￠獙
 const rules = reactive({
     replyContent: [
-        { required: false, message: "回复内容不能为空", trigger: "blur" }
+        { required: false, message: "鍥炲鍐呭涓嶈兘涓虹┖", trigger: "blur" }
     ],
     status: [
         { required: true, message: "状态不能为空", trigger: "blur" }
@@ -165,7 +162,7 @@ const feedbackStatus = ref<any[]>([])
 
 
 
-/** 查询列表 */
+/** 鏌ヨ鍒楄〃 */
 const getList = () => {
     loading.value = true
     listSysFeedbackApi(queryParams).then(response => {
@@ -182,13 +179,13 @@ const getDicts = () => {
     })
 }
 
-/** 取消按钮 */
+/** 鍙栨秷鎸夐挳 */
 const cancel = () => {
     open.value = false
     reset()
 }
 
-/** 表单重置 */
+/** 琛ㄥ崟閲嶇疆 */
 const reset = () => {
     form.value = {
         id: undefined,
@@ -203,51 +200,51 @@ const reset = () => {
     formRef.value?.resetFields()
 }
 
-/** 搜索按钮操作 */
+/** 鎼滅储鎸夐挳鎿嶄綔 */
 const handleQuery = () => {
     queryParams.pageNum = 1
     getList()
 }
 
-/** 重置按钮操作 */
+/** 閲嶇疆鎸夐挳鎿嶄綔 */
 const resetQuery = () => {
     queryFormRef.value?.resetFields()
     handleQuery()
 }
 
-/** 多选框选中数据 */
+/** 澶氶€夋閫変腑鏁版嵁 */
 const handleSelectionChange = (selection: { id: any }[]) => {
     selectedIds.value = selection.map(item => item.id)
 }
 
-/** 新增按钮操作 */
+/** 鏂板鎸夐挳鎿嶄綔 */
 const handleAdd = () => {
     reset()
     open.value = true
-    title.value = "添加反馈"
+    title.value = "娣诲姞鍙嶉"
 }
 
-/** 修改按钮操作 */
+/** 淇敼鎸夐挳鎿嶄綔 */
 const handleUpdate = (row : any) => {
     reset()
     Object.assign(form,row)
     open.value = true
-    title.value = "修改反馈"
+    title.value = "淇敼鍙嶉"
 }
 
-/** 提交按钮 */
+/** 鎻愪氦鎸夐挳 */
 const submitForm = () => {
     formRef.value?.validate((valid : any) => {
         if (valid) {
             if (form.id !== undefined) {
                 updateSysFeedbackApi(form).then(response => {
-                    ElMessage.success("修改成功")
+                    ElMessage.success("淇敼鎴愬姛")
                     open.value = false
                     getList()
                 })
             } else {
                 addSysFeedbackApi(form).then(response => {
-                    ElMessage.success("新增成功")
+                    ElMessage.success("鏂板鎴愬姛")
                     open.value = false
                     getList()
                 })
@@ -256,39 +253,39 @@ const submitForm = () => {
     })
 }
 
-/** 批量删除按钮操作 */
+/** 鎵归噺鍒犻櫎鎸夐挳鎿嶄綔 */
 const handleBatchDelete = () => {
     if (!selectedIds.value.length) {
         return
     }
-    ElMessageBox.confirm(`是否确认删除${selectedIds.value.length}条数据项?`, "警告", {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
+    ElMessageBox.confirm(`鏄惁纭鍒犻櫎${selectedIds.value.length}鏉℃暟鎹」?`, "璀﹀憡", {
+        confirmButtonText: "纭畾",
+        cancelButtonText: "鍙栨秷",
         type: "warning"
     }).then(async () => {
         await deleteSysFeedbackApi(selectedIds.value)
     }).then(() => {
         getList()
-        ElMessage.success("删除成功")
+        ElMessage.success("鍒犻櫎鎴愬姛")
     })
 }
 
-/** 删除按钮操作 */
+/** 鍒犻櫎鎸夐挳鎿嶄綔 */
 const handleDelete = (row : any) =>  {
-    ElMessageBox.confirm('是否确认删除内容为"' + row.content + '"的数据项?', "警告", {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
+    ElMessageBox.confirm('鏄惁纭鍒犻櫎鍐呭涓?' + row.content + '"鐨勬暟鎹」?', "璀﹀憡", {
+        confirmButtonText: "纭畾",
+        cancelButtonText: "鍙栨秷",
         type: "warning"
     }).then(async () => {
         await deleteSysFeedbackApi(row.id)
     }).then(() => {
         getList()
-        ElMessage.success("删除成功")
+        ElMessage.success("鍒犻櫎鎴愬姛")
     })
 }
 
 
-// 添加分页方法
+// 娣诲姞鍒嗛〉鏂规硶
 const handleSizeChange = (val : any) => {
   queryParams.pageSize = val
   getList()

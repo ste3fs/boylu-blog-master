@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <div class="search-wrapper">
+    <PageSearch>
       <!-- 搜索工具栏 -->
       <el-form :model="queryParams" ref="queryFormRef" :inline="true">
         <el-form-item label="任务名称" prop="jobName">
@@ -16,22 +16,21 @@
             <el-option v-for="dict in statusOptions" :key="dict.value" :label="dict.label" :value="dict.value" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleQuery">搜索</el-button>
-          <el-button @click="resetQuery">重置</el-button>
+                <el-form-item>
+          <PageSearchActions @search="handleQuery" @reset="resetQuery" />
         </el-form-item>
       </el-form>
-    </div>
+    </PageSearch>
 
     <el-card>
       <!-- 操作工具栏 -->
       <template #header>
-        <div class="card-header">
-          <el-button v-permission="['sys:jobLog:delete']" type="danger" icon="Delete" :disabled="!selectedIds.length"
+        <PageToolbar>
+          <el-button v-permission="['sys:jobLog:delete']" type="danger" :icon="Delete" :disabled="!selectedIds.length"
             @click="handleBatchDelete">批量删除</el-button>
-          <el-button v-permission="['sys:jobLog:clean']" type="danger" icon="Delete"
+          <el-button v-permission="['sys:jobLog:clean']" type="danger" :icon="Delete"
             @click="handleClean">清空日志</el-button>
-        </div>
+        </PageToolbar>
       </template>
 
       <!-- 数据表格 -->
@@ -53,21 +52,25 @@
           </template>
         </el-table-column>
         <el-table-column label="执行时间" align="center" prop="createTime" width="180" />
-        <el-table-column label="操作" align="center" width="150">
+        <el-table-column label="??" align="center" width="150">
           <template #default="{ row }">
-            <el-button link type="primary" icon="Document" @click="handleDetail(row)">详情</el-button>
-            <el-button v-permission="['sys:jobLog:delete']" link type="danger" icon="Delete"
-              @click="handleDelete(row)">删除</el-button>
+            <PageTableActions>
+              <PageTableAction type="primary" :icon="Document" @click="handleDetail(row)">??</PageTableAction>
+              <PageTableAction v-permission="['sys:jobLog:delete']" type="danger" :icon="Delete"
+                @click="handleDelete(row)">??</PageTableAction>
+            </PageTableActions>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-container">
-        <el-pagination background v-model:current-page="queryParams.pageNum" v-model:page-size="queryParams.pageSize"
-          :total="total" :page-sizes="[10, 20, 30, 50]" layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange" @current-change="handleCurrentChange" />
-      </div>
+      <PagePagination
+        v-model:current-page="queryParams.pageNum"
+        v-model:page-size="queryParams.pageSize"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
     </el-card>
 
     <!-- 详情抽屉 -->
@@ -110,6 +113,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, Document } from '@element-plus/icons-vue'
 import { listJobLogApi, delleteJobLogApi, cleanJobLogApi } from '@/api/monitor/jobLog'
 
 // 遍历器

@@ -349,9 +349,7 @@
 </template>
 
 <script>
-import { marked } from 'marked'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/atom-one-dark.css'
+import { renderMarkdown } from '@/utils/markdown'
 import { uploadFileApi } from '@/api/file'
 import {
   deleteAiSessionApi,
@@ -553,13 +551,6 @@ function writeModeSessionMap(modeSessionMap) {
     // Ignore storage errors.
   }
 }
-
-marked.setOptions({
-  breaks: true,
-  highlight(code) {
-    return hljs.highlightAuto(code).value
-  }
-})
 
 export default {
   name: 'AiConversation',
@@ -1281,7 +1272,7 @@ export default {
       }
     },
     renderMarkdown(content) {
-      return marked.parse(this.formatAssistantContent(content || ''))
+      return renderMarkdown(this.formatAssistantContent(content || ''))
     },
     formatAssistantContent(content) {
       if (!content) {

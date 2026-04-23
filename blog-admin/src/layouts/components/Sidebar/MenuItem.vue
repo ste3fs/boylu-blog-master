@@ -6,7 +6,7 @@
     >
       <el-menu-item :index="resolvePath(route.path)">
         <el-icon v-if="route.meta?.icon">
-          <component :is="route.meta.icon" />
+          <DynamicIcon :name="route.meta.icon" />
         </el-icon>
         <template #title>{{ route.meta?.title }}</template>
       </el-menu-item>
@@ -16,7 +16,7 @@
     <el-sub-menu :index="resolvePath(route.path)">
       <template #title>
         <el-icon v-if="route.meta?.icon">
-          <component :is="route.meta.icon" />
+          <DynamicIcon :name="route.meta.icon" />
         </el-icon>
         <span>{{ route.meta?.title }}</span>
       </template>
@@ -34,6 +34,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AppLink from './Link.vue'
+import DynamicIcon from '@/components/DynamicIcon/index.vue'
 import { isExternal } from '@/utils/validate'
 import type { RouteRecordRaw } from 'vue-router'
 
@@ -77,4 +78,4 @@ const resolvePath = (routePath: string) => {
   // 规范化路径，去除多余的斜杠
   return path.replace(/\/+/g, '/')
 }
-</script> 
+</script>

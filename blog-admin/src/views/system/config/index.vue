@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <!-- 搜索表单 -->
-    <div class="search-wrapper">
+    <PageSearch>
       <el-form :model="queryParams" ref="queryFormRef" inline>
         <el-form-item label="参数名称" prop="configName">
           <el-input
@@ -24,29 +24,32 @@
             <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="Search" @click="handleQuery"
-            >搜索</el-button
-          >
-          <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+                <el-form-item>
+          <PageSearchActions @search="handleQuery" @reset="resetQuery" />
         </el-form-item>
       </el-form>
-    </div>
+    </PageSearch>
     <el-card class="box-card">
       <!-- 操作工具栏 -->
       <template #header>
-        <el-button type="primary" plain icon="Plus" @click="handleAdd" v-permission="['sys:config:add']"
+        <PageToolbar>
+        <PageToolbarGroup>
+        <el-button type="primary" :icon="Plus" @click="handleAdd" v-permission="['sys:config:add']"
           >新增
         </el-button>
+        </PageToolbarGroup>
+        <PageToolbarGroup kind="danger">
         <el-button
           type="danger"
           plain
-          icon="Delete"
+          :icon="Delete"
           :disabled="selectedIds.length === 0"
           @click="handleBatchDelete"
           v-permission="['sys:config:delete']"
           >批量删除
         </el-button>
+        </PageToolbarGroup>
+        </PageToolbar>
       </template>
 
       <!-- 数据表格 -->
@@ -77,7 +80,7 @@
             <el-button
               type="primary"
               link
-              icon="Edit"
+              :icon="Edit"
               @click="handleUpdate(scope.row)"
               v-permission="['sys:config:update']"
               >修改
@@ -85,7 +88,7 @@
             <el-button
               type="danger"
               link
-              icon="Delete"
+              :icon="Delete"
               @click="handleDelete(scope.row)"
               v-permission="['sys:config:delete']"
               >删除
@@ -95,18 +98,13 @@
       </el-table>
 
       <!-- 分页工具栏 -->
-      <div class="pagination-container">
-        <el-pagination
-          background
-          v-model:current-page="queryParams.pageNum"
-          v-model:page-size="queryParams.pageSize"
-          :page-sizes="[10, 20, 30, 50]"
-          :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
+      <PagePagination
+        v-model:current-page="queryParams.pageNum"
+        v-model:page-size="queryParams.pageSize"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
 
       <!-- 添加或修改对话框 -->
       <el-dialog v-model="open" :title="title" width="500px" append-to-body>
@@ -142,6 +140,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
+import { Delete, Edit, Plus, Refresh, Search } from "@element-plus/icons-vue";
 import {
   listSysConfigApi,
   detailSysConfigApi,

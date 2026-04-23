@@ -1,6 +1,10 @@
 server:
   port: ${SERVER_PORT:8800}
 
+app:
+  file:
+    public-prefix: ${FILE_PUBLIC_PREFIX:/boylu/file/content/}
+
 spring:
   servlet:
     multipart:
@@ -26,7 +30,7 @@ knife4j:
     description: 一个专注于技术分享的平台
     email: 3453619783@qq.com
     concat: boylu
-    url: ${PUBLIC_BASE_URL:http://101.43.1.187}
+    url: ${PUBLIC_BASE_URL:http://111.229.123.234}
     version: v1.0
     group:
       default:
@@ -48,6 +52,11 @@ ai:
   baseUrl: ${AI_BASE_URL:https://ark.cn-beijing.volces.com/api/v3}
   model: ${AI_MODEL:}
 
+hot-search:
+  coderutil:
+    access-key: ${CODERUTIL_ACCESS_KEY:}
+    secret-key: ${CODERUTIL_SECRET_KEY:}
+
 mail:
   smtp:
     host: ${MAIL_HOST:smtp.163.com}
@@ -61,19 +70,19 @@ mail:
 qq:
   app-id: ${QQ_APP_ID:}
   app-secret: ${QQ_APP_SECRET:}
-  redirect-url: ${PUBLIC_BASE_URL:http://101.43.1.187}/mojian/api/auth/callback/qq
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/callback/qq
 
 weibo:
   app-id: ${WEIBO_APP_ID:}
   app-secret: ${WEIBO_APP_SECRET:}
-  redirect-url: ${PUBLIC_BASE_URL:http://101.43.1.187}/mojian/api/auth/weibo
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/weibo
 
 gitee:
   app-id: ${GITEE_APP_ID:}
   app-secret: ${GITEE_APP_SECRET:}
-  redirect-url: ${PUBLIC_BASE_URL:http://101.43.1.187}/mojian/api/auth/callback/gitee
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/callback/gitee
 
 github:
   app-id: ${GITHUB_APP_ID:}
   app-secret: ${GITHUB_APP_SECRET:}
-  redirect-url: ${PUBLIC_BASE_URL:http://101.43.1.187}/mojian/api/auth/callback/github
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/callback/github

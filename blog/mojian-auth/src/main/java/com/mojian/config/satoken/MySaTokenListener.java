@@ -11,6 +11,7 @@ import com.mojian.utils.RedisUtil;
 import com.mojian.utils.UserAgentUtil;
 import com.mojian.vo.user.OnlineUserVo;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class MySaTokenListener implements SaTokenListener {
 
     private final SysUserMapper userMapper;
@@ -55,70 +57,69 @@ public class MySaTokenListener implements SaTokenListener {
         onlineUserVo.setTokenValue(tokenValue);
         onlineUserVo.setPassword("");
         redisUtil.set(RedisConstants.LOGIN_TOKEN + tokenValue, JSONUtil.toJsonStr(onlineUserVo),timeout, TimeUnit.SECONDS);
-        System.out.println("---------- 自定义侦听器实现 doLogin");
+        log.debug("Sa-Token login event, loginId={}", loginId);
     }
 
     /** 每次注销时触发 */
     @Override
     public void doLogout(String loginType, Object loginId, String tokenValue) {
         redisUtil.delete(RedisConstants.LOGIN_TOKEN + tokenValue);
-        System.out.println("---------- 自定义侦听器实现 doLogout");
+        log.debug("Sa-Token logout event, loginId={}", loginId);
     }
 
     /** 每次被踢下线时触发 */
     @Override
     public void doKickout(String loginType, Object loginId, String tokenValue) {
         redisUtil.delete(RedisConstants.LOGIN_TOKEN + tokenValue);
-        System.out.println("---------- 自定义侦听器实现 doKickout");
+        log.debug("Sa-Token kickout event, loginId={}", loginId);
     }
 
     /** 每次被顶下线时触发 */
     @Override
     public void doReplaced(String loginType, Object loginId, String tokenValue) {
         redisUtil.delete(RedisConstants.LOGIN_TOKEN + tokenValue);
-        System.out.println("---------- 自定义侦听器实现 doReplaced");
+        log.debug("Sa-Token replaced event, loginId={}", loginId);
     }
 
     /** 每次被封禁时触发 */
     @Override
     public void doDisable(String loginType, Object loginId, String service, int level, long disableTime) {
-        System.out.println("---------- 自定义侦听器实现 doDisable");
+        log.debug("Sa-Token disable event, loginId={}, service={}", loginId, service);
     }
 
     /** 每次被解封时触发 */
     @Override
     public void doUntieDisable(String loginType, Object loginId, String service) {
-        System.out.println("---------- 自定义侦听器实现 doUntieDisable");
+        log.debug("Sa-Token untie disable event, loginId={}, service={}", loginId, service);
     }
 
     /** 每次二级认证时触发 */
     @Override
     public void doOpenSafe(String loginType, String tokenValue, String service, long safeTime) {
-        System.out.println("---------- 自定义侦听器实现 doOpenSafe");
+        log.debug("Sa-Token open safe event, service={}", service);
     }
 
     /** 每次退出二级认证时触发 */
     @Override
     public void doCloseSafe(String loginType, String tokenValue, String service) {
-        System.out.println("---------- 自定义侦听器实现 doCloseSafe");
+        log.debug("Sa-Token close safe event, service={}", service);
     }
 
     /** 每次创建Session时触发 */
     @Override
     public void doCreateSession(String id) {
-        System.out.println("---------- 自定义侦听器实现 doCreateSession");
+        log.debug("Sa-Token create session event, sessionId={}", id);
     }
 
     /** 每次注销Session时触发 */
     @Override
     public void doLogoutSession(String id) {
-        System.out.println("---------- 自定义侦听器实现 doLogoutSession");
+        log.debug("Sa-Token logout session event, sessionId={}", id);
     }
 
     /** 每次Token续期时触发 */
     @Override
     public void doRenewTimeout(String tokenValue, Object loginId, long timeout) {
-        System.out.println("---------- 自定义侦听器实现 doRenewTimeout");
+        log.debug("Sa-Token renew timeout event, loginId={}", loginId);
     }
 }
-

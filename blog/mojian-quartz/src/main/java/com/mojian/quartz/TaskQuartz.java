@@ -5,6 +5,7 @@ import com.mojian.entity.SysArticle;
 import com.mojian.mapper.SysArticleMapper;
 import com.mojian.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Array;
@@ -15,6 +16,7 @@ import java.util.Map;
 
 @Component("task")
 @RequiredArgsConstructor
+@Slf4j
 public class TaskQuartz {
 
     private final RedisUtil redisUtil;
@@ -26,11 +28,11 @@ public class TaskQuartz {
     }
 
     public void neatParams(String params) {
-        System.out.println("execute params method: " + params);
+        log.debug("execute params method: {}", params);
     }
 
     public void neatNoParams() {
-        System.out.println("execute no params method");
+        log.debug("execute no params method");
     }
 
     /**

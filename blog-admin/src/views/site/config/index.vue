@@ -246,7 +246,7 @@
 
       <!-- 底部按钮 -->
       <div class="bottom-buttons">
-        <el-button icon="Refresh" type="primary" v-permission="['sys:web:update']" @click="submitForm">保存配置</el-button>
+      <el-button :icon="Refresh" type="primary" v-permission="['sys:web:update']" @click="submitForm">保存配置</el-button>
       </div>
     </el-card>
   </div>
@@ -254,6 +254,7 @@
 
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import UploadImage from '@/components/Upload/Image.vue'
 import { getWebConfigApi, updateWebConfigApi } from '@/api/site/config'

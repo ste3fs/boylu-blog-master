@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <!-- 搜索表单 -->
-    <div class="search-wrapper">
+    <PageSearch>
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="标题" prop="title">
           <el-input v-model="queryParams.title" placeholder="请输入文章标题" clearable @keyup.enter="handleQuery" />
@@ -21,25 +21,26 @@
             <el-option v-for="item in statusOptions" :key="item.id" :value="item.value" :label="item.label" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-          <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+                <el-form-item>
+          <PageSearchActions @search="handleQuery" @reset="resetQuery" />
         </el-form-item>
       </el-form>
-    </div>
+    </PageSearch>
 
     <!-- 操作按钮区域 -->
     <el-card class="box-card">
       <template #header>
-        <div class="card-header">
-          <ButtonGroup>
-            <el-button type="primary" icon="Plus" @click="handleAdd" v-permission="['sys:article:add']">新增文章</el-button>
-            <el-button type="danger" icon="Delete" :disabled="selectedIds.length === 0"
-              v-permission="['sys:article:delete']" @click="handleBatchDelete">批量删除</el-button>
-            <el-button type="warning" icon="Setting" v-permission="['sys:article:reptile']"
+        <PageToolbar>
+          <PageToolbarGroup>
+              <el-button type="primary" :icon="Plus" @click="handleAdd" v-permission="['sys:article:add']">新增文章</el-button>
+              <el-button type="warning" plain :icon="Setting" v-permission="['sys:article:reptile']"
               @click="reptileDialog.visible = true">爬取文章</el-button>
-          </ButtonGroup>
-        </div>
+          </PageToolbarGroup>
+          <PageToolbarGroup kind="danger">
+              <el-button type="danger" plain :icon="Delete" :disabled="selectedIds.length === 0"
+              v-permission="['sys:article:delete']" @click="handleBatchDelete">批量删除</el-button>
+          </PageToolbarGroup>
+        </PageToolbar>
       </template>
 
       <!-- 数据表格 -->
@@ -91,23 +92,26 @@
         </el-table-column>
         <el-table-column label="阅读量" align="center" prop="quantity" />
         <el-table-column label="发布时间" align="center" prop="createTime" width="180" />
-        <el-table-column label="操作" align="center" width="200" fixed="right">
+        <el-table-column label="??" align="center" width="200" fixed="right">
           <template #default="scope">
-            <el-button type="primary" link icon="Edit" @click="handleUpdate(scope.row)"
-              v-permission="['sys:article:update']">修改</el-button>
-            <el-button type="danger" link icon="Delete" @click="handleDelete(scope.row)"
-              v-permission="['sys:article:delete']">删除</el-button>
+            <PageTableActions>
+              <PageTableAction type="primary" :icon="Edit" @click="handleUpdate(scope.row)"
+                v-permission="['sys:article:update']">??</PageTableAction>
+              <PageTableAction type="danger" :icon="Delete" @click="handleDelete(scope.row)"
+                v-permission="['sys:article:delete']">??</PageTableAction>
+            </PageTableActions>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 分页组件 -->
-      <div class="pagination-container">
-        <el-pagination v-model:current-page="queryParams.pageNum" v-model:page-size="queryParams.pageSize"
-          :page-sizes="[10, 20, 30, 50]" :total="total" :background="true"
-          layout="total, sizes, prev, pager, next, jumper" @size-change="handleSizeChange"
-          @current-change="handleCurrentChange" />
-      </div>
+      <PagePagination
+        v-model:current-page="queryParams.pageNum"
+        v-model:page-size="queryParams.pageSize"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
     </el-card>
 
     <!-- 添加或修改对话框 -->
@@ -355,6 +359,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox,ElLoading  } from 'element-plus'
+import { Delete, Edit, Plus, Refresh, Search, Setting } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import UploadImage from '@/components/Upload/Image.vue'
 import { getCategoryListApi } from '@/api/article/category'

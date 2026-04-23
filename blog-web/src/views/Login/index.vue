@@ -1158,10 +1158,6 @@ export default {
     handleClose() {
       const redirect = this.resolveRedirectTarget();
       removeCookie("redirectUrl");
-      if (/^https?:\/\//i.test(redirect)) {
-        window.location.href = redirect;
-        return;
-      }
       this.$router.replace(redirect || "/");
     },
     resolveRedirectTarget() {
@@ -1173,11 +1169,15 @@ export default {
         return "/";
       }
 
-      if (/^https?:\/\//i.test(redirect)) {
-        return redirect;
+      try {
+        const url = new URL(redirect, window.location.origin);
+        if (url.origin !== window.location.origin) {
+          return "/";
+        }
+        return `${url.pathname}${url.search}${url.hash}` || "/";
+      } catch (error) {
+        return "/";
       }
-
-      return redirect.startsWith("/") ? redirect : `/${redirect}`;
     },
     sendRegisterCode() {
       if (this.codeSending) return;

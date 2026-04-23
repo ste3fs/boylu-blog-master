@@ -1,12 +1,12 @@
 UPDATE sys_web_config
-SET web_url = 'http://101.43.1.187',
+SET web_url = 'http://111.229.123.234',
     logo = '/boylu-logo.png',
     author = 'boylu',
     author_avatar = '/boylu-avatar.jpg'
 WHERE id = 1;
 
 UPDATE sys_friend
-SET url = 'http://101.43.1.187',
+SET url = 'http://111.229.123.234',
     avatar = '/boylu-logo.png'
 WHERE id = 4;
 
@@ -16,7 +16,7 @@ SET avatar = '/boylu-avatar.jpg',
 WHERE username IN ('admin', 'boylu1107');
 
 UPDATE sys_file_oss
-SET domain = 'http://101.43.1.187/localFile/',
+SET domain = '/localFile/',
     storage_path = '/opt/boylu-blog/storage/',
     base_path = 'local-plus/',
     path_patterns = 'localFile/**',
@@ -25,5 +25,5 @@ SET domain = 'http://101.43.1.187/localFile/',
 WHERE id = 1;
 
 UPDATE sys_article
-SET content = REPLACE(content, 'http://127.0.0.1:8800/localFile/', 'http://101.43.1.187/localFile/'),
-    content_md = REPLACE(content_md, 'http://127.0.0.1:8800/localFile/', 'http://101.43.1.187/localFile/');
+SET content = REPLACE(content, 'http://127.0.0.1:8800/localFile/', '/localFile/'),
+    content_md = REPLACE(content_md, 'http://127.0.0.1:8800/localFile/', '/localFile/');

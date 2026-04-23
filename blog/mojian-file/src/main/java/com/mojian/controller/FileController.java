@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.dromara.x.file.storage.core.FileInfo;
 import org.dromara.x.file.storage.core.FileStorageService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,13 +41,16 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FileController {
 
-    private static final String PUBLIC_FILE_CONTENT_PREFIX = "/boylu/file/content/";
+    private static final String DEFAULT_PUBLIC_FILE_CONTENT_PREFIX = "/boylu/file/content/";
 
     private final FileDetailService fileDetailService;
 
     private final FileStorageService fileStorageService;
 
     private final RedisUtil redisUtil;
+
+    @Value("${app.file.public-prefix:" + DEFAULT_PUBLIC_FILE_CONTENT_PREFIX + "}")
+    private String publicFileContentPrefix;
 
     @SaCheckLogin
     @GetMapping("/list")
@@ -168,7 +172,7 @@ public class FileController {
             if (StringUtils.isNotBlank(targetUrl)) {
                 redisUtil.set(RedisConstants.FILE_VIEW_CACHE_KEY + fileId, targetUrl, RedisConstants.DAY_EXPIRE, TimeUnit.SECONDS);
             }
-            return PUBLIC_FILE_CONTENT_PREFIX + fileId;
+            return getPublicFileContentPrefix() + fileId;
         }
 
         return fileInfo.getUrl();
@@ -181,6 +185,7 @@ public class FileController {
 
         String normalized = url.trim();
         String[] prefixes = {
+                getPublicFileContentPrefix(),
                 "/boylu/file/content/",
                 "/boylu/file/view/",
                 "/mojian/file/content/",
@@ -235,7 +240,8 @@ public class FileController {
             }
             redisUtil.set(cacheKey, targetUrl, RedisConstants.DAY_EXPIRE, TimeUnit.SECONDS);
         }
-        response.setHeader("Cache-Control", "public, max-age=86400");
+        response.setHeader("Cache-Control", "public, max-age=2592000");
+        response.setHeader("X-Content-Type-Options", "nosniff");
         response.setStatus(HttpServletResponse.SC_FOUND);
         response.setHeader("Location", targetUrl);
     }
@@ -266,16 +272,27 @@ public class FileController {
         if (StringUtils.isBlank(url)) {
             return null;
         }
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            return url;
-        }
         if (url.contains("/localFile/")) {
             return url.substring(url.indexOf("/localFile/"));
+        }
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            return url;
         }
         if (url.startsWith("/localFile/")) {
             return url;
         }
         return null;
+    }
+
+    private String getPublicFileContentPrefix() {
+        String prefix = StringUtils.defaultIfBlank(publicFileContentPrefix, DEFAULT_PUBLIC_FILE_CONTENT_PREFIX).trim();
+        if (!prefix.startsWith("http://") && !prefix.startsWith("https://") && !prefix.startsWith("/")) {
+            prefix = "/" + prefix;
+        }
+        if (!prefix.endsWith("/")) {
+            prefix = prefix + "/";
+        }
+        return prefix;
     }
 
     private String buildLocalFileUrl(String basePath, String path, String filename) {

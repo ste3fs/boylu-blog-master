@@ -2,6 +2,7 @@ import axios from 'axios'
 import { ElMessage,ElMessageBox } from 'element-plus'
 import { getToken } from '@/utils/auth'
 import { useUserStore } from '@/store/modules/user'
+import { normalizeManagedFilePayload } from '@/utils/image'
 
 let isRelogin = { show: false }; // 是否显示弹框
 
@@ -48,6 +49,7 @@ service.interceptors.response.use(
       return Promise.reject(new Error(res.message || '请求错误'))
     }
     
+    res.data = normalizeManagedFilePayload(res.data)
     return res
   },
   (error) => {

@@ -91,7 +91,7 @@ public class IpUtil {
                         inet = InetAddress.getLocalHost();
                         ipAddress = inet.getHostAddress();
                     } catch (UnknownHostException e) {
-                        e.printStackTrace();
+                        logger.error("获取本机 IP 失败", e);
                     }
                 }
             }
@@ -155,9 +155,6 @@ public class IpUtil {
         }
     }
 
-    public static void main(String[] args) {
-        System.out.println(getIp2region("58.20.50.137"));
-    }
     /**
      * 获取访问设备
      *
@@ -231,7 +228,7 @@ public class IpUtil {
                     in.close();
                 }
             } catch (Exception e2) {
-                e2.printStackTrace();
+                logger.error("关闭 IP 查询响应流失败", e2);
             }
         }
         return result.toString();

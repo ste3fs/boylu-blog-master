@@ -2,16 +2,16 @@
   <div class="menu-container">
     <el-card class="box-card">
       <template #header>
-        <div class="card-header">
-          <ButtonGroup>
+        <PageToolbar>
+          <PageToolbarGroup>
             <el-button
               v-permission="['sys:menu:add']"
               type="primary"
-              icon="Plus"
+              :icon="Plus"
               @click="handleAdd(null)"
-            >新增</el-button>
-          </ButtonGroup>
-        </div>
+            >??</el-button>
+          </PageToolbarGroup>
+        </PageToolbar>
       </template>
       <!-- 表格区域 -->
       <el-table
@@ -24,7 +24,7 @@
         <el-table-column label="图标" align="center" width="60">
           <template #default="{ row }">
             <el-icon v-if="row.icon">
-              <component :is="row.icon" />
+              <DynamicIcon :name="row.icon" />
             </el-icon>
           </template>
         </el-table-column>
@@ -47,17 +47,19 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" align="center">
+        <el-table-column label="??" width="200" align="center">
           <template #default="{ row }">
-            <el-button type="success" link @click="handleAdd(row)" v-permission="['sys:menu:add']">
-              <el-icon><Plus /></el-icon>新增
-            </el-button>
-            <el-button type="primary" link @click="handleEdit(row)" v-permission="['sys:menu:update']">
-              <el-icon><Edit /></el-icon>修改
-            </el-button>
-            <el-button type="danger" link @click="handleDelete(row)" v-permission="['sys:menu:delete']">
-              <el-icon><Delete /></el-icon>删除
-            </el-button>
+            <PageTableActions>
+              <PageTableAction type="success" :icon="Plus" @click="handleAdd(row)" v-permission="['sys:menu:add']">
+                ??
+              </PageTableAction>
+              <PageTableAction type="primary" :icon="Edit" @click="handleEdit(row)" v-permission="['sys:menu:update']">
+                ??
+              </PageTableAction>
+              <PageTableAction type="danger" :icon="Delete" @click="handleDelete(row)" v-permission="['sys:menu:delete']">
+                ??
+              </PageTableAction>
+            </PageTableActions>
           </template>
         </el-table-column>
       </el-table>
@@ -119,7 +121,7 @@
               <el-input v-model="menuForm.icon" placeholder="点击选择图标" readonly>
                 <template #prefix>
                   <el-icon v-if="menuForm.icon">
-                    <component :is="menuForm.icon" />
+                    <DynamicIcon :name="menuForm.icon" />
                   </el-icon>
                 </template>
                 <template #append>
@@ -197,7 +199,9 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
+import { Delete, Edit, Plus, View } from '@element-plus/icons-vue'
 import IconSelect from '@/components/IconSelect/index.vue'
+import DynamicIcon from '@/components/DynamicIcon/index.vue'
 import {
   getMenuListApi,
   createMenuApi,

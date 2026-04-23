@@ -2,10 +2,11 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { setupStore } from '@/store'
-import ElementPlus from 'element-plus'
-import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
-import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
+import 'element-plus/theme-chalk/el-loading.css'
+import 'element-plus/theme-chalk/el-message-box.css'
+import 'element-plus/theme-chalk/el-message.css'
+import 'element-plus/theme-chalk/el-notification.css'
 import '@/styles/global.scss'
 
 
@@ -26,9 +27,6 @@ app.use(mavonEditor);
 setupStore(app)
 
 app.use(router)
-app.use(ElementPlus, {
-  locale: zhCn
-})
 
 app.component('ButtonGroup', ButtonGroup)
 
@@ -37,4 +35,4 @@ setupElIcons(app)
 
 app.directive('permission', permission)
 
-app.mount('#app') 
+app.mount('#app')

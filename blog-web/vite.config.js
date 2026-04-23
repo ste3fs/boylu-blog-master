@@ -40,15 +40,62 @@ export default defineConfig(({ command, mode }) => {
             '@': path.resolve(__dirname, './src')
           }
         },
+        build: {
+          rollupOptions: {
+            output: {
+              manualChunks(id) {
+                if (!id.includes('node_modules')) {
+                  return
+                }
+
+                if (id.includes('mavon-editor')) {
+                  return 'vendor-editor'
+                }
+
+                if (id.includes('element-ui')) {
+                  return 'vendor-element'
+                }
+
+                if (
+                  id.includes('/vue/') ||
+                  id.includes('/vue-router/') ||
+                  id.includes('/vuex/')
+                ) {
+                  return 'vendor-vue'
+                }
+
+                if (id.includes('marked') || id.includes('highlight.js')) {
+                  return 'vendor-markdown'
+                }
+
+                if (id.includes('gsap') || id.includes('animate.css')) {
+                  return 'vendor-motion'
+                }
+
+                if (
+                  id.includes('vue-cropper') ||
+                  id.includes('vue-danmaku') ||
+                  id.includes('vue-lazyload')
+                ) {
+                  return 'vendor-media'
+                }
+
+                if (id.includes('axios')) {
+                  return 'vendor-request'
+                }
+
+                return 'vendor'
+              }
+            }
+          }
+        },
         css: {
             preprocessorOptions: {
               scss: {
                 api: 'modern-compiler',
                 additionalData: `
-                  @import "@/styles/variables.scss";
-                  @import "@/styles/mixins.scss";
-                  @import "@/styles/global.scss";
-                  @import "@/styles/elmentui.scss";
+                  @use "@/styles/variables.scss" as *;
+                  @use "@/styles/mixins.scss" as *;
                 `
               }
             }

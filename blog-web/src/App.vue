@@ -64,10 +64,10 @@ export default {
     await this.getUserInfo();
 
     //跳转到缓存地址
-    let url = getCookie('redirectUrl')
+    const url = this.resolveRedirectTarget(getCookie('redirectUrl'))
     if (url) {
       removeCookie('redirectUrl')
-      window.location.href = url
+      this.$router.replace(url).catch(() => {})
     }
   },
   methods: {
@@ -77,10 +77,29 @@ export default {
      * 处理第三方登录用回调逻辑
      */
      async handleThirdPartyLogin() {
-      let flag = window.location.href.indexOf("token") != -1;
-      if (flag) {
-        let token = window.location.href.split("token=")[1];
-        this.$store.commit('SET_TOKEN', token);
+      const url = new URL(window.location.href)
+      const token = url.searchParams.get('token')
+      if (token) {
+        this.$store.commit('SET_TOKEN', token)
+        url.searchParams.delete('token')
+        window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`)
+      }
+    },
+
+    resolveRedirectTarget(redirect) {
+      const target = (redirect || '').toString().trim()
+      if (!target || target === '/login') {
+        return ''
+      }
+
+      try {
+        const url = new URL(target, window.location.origin)
+        if (url.origin !== window.location.origin) {
+          return ''
+        }
+        return `${url.pathname}${url.search}${url.hash}` || '/'
+      } catch (error) {
+        return ''
       }
     },
 

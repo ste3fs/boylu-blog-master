@@ -77,7 +77,6 @@ export default {
       tags:[],
       selectedTagPosts:[],
       total:0,
-      totatlCount:0,
       loading:false,
       params:{
         pageNum:1,
@@ -144,6 +143,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use 'sass:color';
+
 .tags-page {
   max-width: 1400px;
   margin: 0 auto;
@@ -160,7 +161,7 @@ export default {
     height: 100%;
     background: 
       radial-gradient(circle at 10% 20%, rgba($primary, 0.03) 0%, transparent 20%),
-      radial-gradient(circle at 90% 80%, rgba(adjust-hue($primary, 60deg), 0.03) 0%, transparent 20%);
+      radial-gradient(circle at 90% 80%, rgba(color.adjust($primary, $hue: 60deg), 0.03) 0%, transparent 20%);
     pointer-events: none;
     z-index: -1;
   }
@@ -194,7 +195,7 @@ export default {
   h3 {
     font-size: 1.6em;
     font-weight: 800;
-    background: linear-gradient(120deg, $primary, adjust-hue($primary, 60deg));
+    background: linear-gradient(120deg, $primary, color.adjust($primary, $hue: 60deg));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     margin-bottom: $spacing-sm;
@@ -299,7 +300,7 @@ export default {
     left: 0;
     width: 4px;
     height: 100%;
-    background: linear-gradient(to bottom, $primary, adjust-hue($primary, 40deg));
+    background: linear-gradient(to bottom, $primary, color.adjust($primary, $hue: 40deg));
     
     &::before,
     &::after {
@@ -340,7 +341,7 @@ export default {
       color: var(--text-secondary);
       margin-left: auto;
       padding: $spacing-xs $spacing-md;
-      background: linear-gradient(120deg, rgba($primary, 0.1), rgba(adjust-hue($primary, 60deg), 0.1));
+      background: linear-gradient(120deg, rgba($primary, 0.1), rgba(color.adjust($primary, $hue: 60deg), 0.1));
       backdrop-filter: blur(4px);
       border: 1px solid rgba($primary, 0.15);
       transition: all 0.3s ease;
@@ -460,4 +461,4 @@ export default {
 .wave {
   display: none;
 }
-</style> 
+</style>

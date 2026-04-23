@@ -1,7 +1,7 @@
 <template>
     <div class="app-container">
       <!-- 搜索表单 -->
-      <div class="search-wrapper">
+      <PageSearch>
         <el-form ref="queryFormRef" :model="queryParams" :inline="true">
           <el-form-item label="名称" prop="name">
             <el-input
@@ -11,33 +11,32 @@
               @keyup.enter="handleQuery"
             />
           </el-form-item>
-          <el-form-item>
-            <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
-            <el-button icon="Refresh" @click="resetQuery">重置</el-button>
+                    <el-form-item>
+            <PageSearchActions @search="handleQuery" @reset="resetQuery" />
           </el-form-item>
         </el-form>
-      </div>
+      </PageSearch>
   
       <!-- 操作按钮区域 -->
       <el-card class="box-card">
         <template #header>
-          <div class="card-header">
+          <PageToolbar>
             <ButtonGroup>
               <el-button
                 v-permission="['sys:category:add']"
                 type="primary"
-                icon="Plus"
+                :icon="Plus"
                 @click="handleAdd"
               >新增</el-button>
               <el-button
                 v-permission="['sys:category:delete']"
                 type="danger"
-                icon="Delete"
+                :icon="Delete"
                 :disabled="selectedIds.length === 0"
                 @click="handleBatchDelete"
               >批量删除</el-button>
             </ButtonGroup>
-          </div>
+          </PageToolbar>
         </template>
   
         <!-- 数据表格 -->
@@ -57,14 +56,14 @@
                 v-permission="['sys:category:update']"
                 type="primary"
                 link
-                icon="Edit"
+                :icon="Edit"
                 @click="handleUpdate(scope.row)"
               >修改</el-button>
               <el-button
                 v-permission="['sys:category:delete']"
                 type="danger"
                 link
-                icon="Delete"
+                :icon="Delete"
                 @click="handleDelete(scope.row)"
               >删除</el-button>
             </template>
@@ -72,18 +71,13 @@
         </el-table>
   
         <!-- 分页组件 -->
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="queryParams.pageNum"
-            v-model:page-size="queryParams.pageSize"
-            :page-sizes="[10, 20, 30, 50]"
-            :total="total"
-            :background="true"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
-          />
-        </div>
+        <PagePagination
+          v-model:current-page="queryParams.pageNum"
+          v-model:page-size="queryParams.pageSize"
+          :total="total"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
       </el-card>
   
       <!-- 添加或修改对话框 -->
@@ -131,6 +125,7 @@
   
   <script setup lang="ts">
   import { ElMessage, ElMessageBox } from 'element-plus'
+  import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue'
   import type { FormInstance, FormRules } from 'element-plus'
   import {
     getCategoryListApi,
@@ -315,4 +310,3 @@
     getList()
   })
   </script>
-  

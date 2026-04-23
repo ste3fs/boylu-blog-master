@@ -1,11 +1,14 @@
 <template>
-  <div :class="{ 'dark': settingsStore.theme === 'dark' }">
-    <router-view ></router-view>
-  </div>
+  <el-config-provider :locale="zhCn">
+    <div :class="{ 'dark': settingsStore.theme === 'dark' }">
+      <router-view></router-view>
+    </div>
+  </el-config-provider>
 </template>
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import { useSettingsStore } from '@/store/modules/settings'
 
 const settingsStore = useSettingsStore()
@@ -58,46 +61,45 @@ html, body {
 }
 
 /* 深色模式下的组件样式 */
-:root[data-theme='dark'] {
-  .el-container,
-  .el-main {
-    background-color: var(--el-bg-color-page);
-  }
+:root[data-theme='dark'] .el-container,
+:root[data-theme='dark'] .el-main {
+  background-color: var(--el-bg-color-page);
+}
 
-  .el-header,
-  .el-aside,
-  .el-menu,
-  .el-card,
-  .el-dialog,
-  .el-drawer {
-    background-color: var(--el-bg-color-container);
-    border-color: var(--el-border-color);
-  }
+:root[data-theme='dark'] .el-header,
+:root[data-theme='dark'] .el-aside,
+:root[data-theme='dark'] .el-menu,
+:root[data-theme='dark'] .el-card,
+:root[data-theme='dark'] .el-dialog,
+:root[data-theme='dark'] .el-drawer {
+  background-color: var(--el-bg-color-container);
+  border-color: var(--el-border-color);
+}
 
-  .el-table {
-    --el-table-bg-color: var(--el-bg-color-container);
-    --el-table-tr-bg-color: var(--el-bg-color-container);
-    --el-table-border-color: var(--el-border-color);
-    --el-table-header-bg-color: var(--el-bg-color-container);
-    --el-table-row-hover-bg-color: var(--el-fill-color-light);
+:root[data-theme='dark'] .el-table {
+  --el-table-bg-color: var(--el-bg-color-container);
+  --el-table-tr-bg-color: var(--el-bg-color-container);
+  --el-table-border-color: var(--el-border-color);
+  --el-table-header-bg-color: var(--el-bg-color-container);
+  --el-table-row-hover-bg-color: var(--el-fill-color-light);
+}
 
-    th, td {
-      background-color: var(--el-bg-color-container);
-      border-bottom-color: var(--el-border-color);
-    }
-  }
+:root[data-theme='dark'] .el-table th,
+:root[data-theme='dark'] .el-table td {
+  background-color: var(--el-bg-color-container);
+  border-bottom-color: var(--el-border-color);
+}
 
-  .el-input__inner,
-  .el-textarea__inner {
-    background-color: var(--el-bg-color-container);
-    border-color: var(--el-border-color);
-    color: var(--el-text-color-primary);
-  }
+:root[data-theme='dark'] .el-input__inner,
+:root[data-theme='dark'] .el-textarea__inner {
+  background-color: var(--el-bg-color-container);
+  border-color: var(--el-border-color);
+  color: var(--el-text-color-primary);
+}
 
-  .el-dropdown-menu {
-    background-color: var(--el-bg-color-container);
-    border-color: var(--el-border-color);
-  }
+:root[data-theme='dark'] .el-dropdown-menu {
+  background-color: var(--el-bg-color-container);
+  border-color: var(--el-border-color);
 }
 
 /* 字体大小设置 */
@@ -161,33 +163,6 @@ body {
   font-size: var(--el-font-size-base);
 }
 
-/* Element Plus 组件字体大小 */
-.el-button,
-.el-input,
-.el-select,
-.el-menu-item,
-.el-sub-menu__title,
-.el-dropdown-menu__item,
-.el-form-item__label,
-.el-form-item__content,
-.el-table,
-.el-dialog__title,
-.el-card__header,
-.el-tabs__item,
-.el-breadcrumb__item,
-.el-radio__label,
-.el-checkbox__label,
-.el-tag,
-.el-pagination,
-.el-alert__title,
-.el-notification__title,
-.el-message-box__title,
-.el-drawer__title,
-.el-tooltip__trigger,
-.el-popover__title {
-  font-size: var(--el-font-size-base) !important;
-}
-
 /* 标题和特殊文本 */
 h1 { font-size: calc(var(--el-font-size-base) * 2); }
 h2 { font-size: calc(var(--el-font-size-base) * 1.75); }
@@ -203,22 +178,18 @@ h6 { font-size: var(--el-font-size-base); }
 }
 
 /* 表单项 */
-.el-form {
-  .el-form-item__label,
-  .el-form-item__content,
-  .el-input__inner,
-  .el-select__input,
-  .el-textarea__inner {
-    font-size: var(--el-font-size-base);
-  }
+.el-form .el-form-item__label,
+.el-form .el-form-item__content,
+.el-form .el-input__inner,
+.el-form .el-select__input,
+.el-form .el-textarea__inner {
+  font-size: var(--el-font-size-base);
 }
 
 /* 菜单项 */
-.el-menu {
-  .el-menu-item,
-  .el-sub-menu__title {
-    font-size: var(--el-font-size-base);
-  }
+.el-menu .el-menu-item,
+.el-menu .el-sub-menu__title {
+  font-size: var(--el-font-size-base);
 }
 
 /* 确保所有组件使用手写体字体 */

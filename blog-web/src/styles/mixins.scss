@@ -1,3 +1,6 @@
+@use 'sass:color';
+@use './variables.scss' as *;
+
 @mixin flex-center {
   display: flex;
   justify-content: center;
@@ -32,5 +35,5 @@
 }
 
 @function darken($color, $amount) {
-  @return mix(black, $color, $amount);
-} 
+  @return color.mix(black, $color, $amount);
+}

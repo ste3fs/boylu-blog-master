@@ -1,6 +1,5 @@
 import request from '@/utils/request'
 
-
 // 获取文件列表
 export function getFileListApi(params: any) {
   return request({
@@ -15,23 +14,23 @@ export function uploadApi(data: any, source: string) {
   return request({
     url: '/file/upload',
     method: 'post',
-    headers: { "Content-Type": "multipart/form-data" },
+    headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60000,
     data,
-    params: { source: source }
+    params: { source }
   })
 }
 
-// 删除文件
+// 删除文件，支持 /boylu/file/content/{id}、/file/view/{id} 和旧 URL。
 export function deleteFileApi(url: string) {
   return request({
-    url: `/file/delete`,
+    url: '/file/delete',
     method: 'get',
-    params: { url:url }
+    params: { url }
   })
 }
 
-// 获取云存储配置
+// 获取存储配置
 export function getOssConfigApi() {
   return request({
     url: '/file/getOssConfig',
@@ -39,22 +38,20 @@ export function getOssConfigApi() {
   })
 }
 
-// 添加云存储配置
+// 添加存储配置
 export function addOssApi(data: any) {
   return request({
     url: '/file/addOss',
-    method: 'post', 
+    method: 'post',
     data
   })
 }
-// 更新云存储配置
+
+// 更新存储配置
 export function updateOssApi(data: any) {
   return request({
     url: '/file/updateOss',
-    method: 'put', 
+    method: 'put',
     data
   })
 }
-
-
-

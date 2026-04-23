@@ -65,8 +65,17 @@
 </template>
 
 <script setup lang="ts">
-import * as echarts from 'echarts'
-import type { EChartsOption } from 'echarts'
+import { init, use, type ComposeOption, type EChartsType } from 'echarts/core'
+import { LineChart, PieChart, type LineSeriesOption, type PieSeriesOption } from 'echarts/charts'
+import {
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  type GridComponentOption,
+  type LegendComponentOption,
+  type TooltipComponentOption
+} from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 import { 
   CaretTop, 
   CaretBottom,
@@ -78,6 +87,16 @@ import {
 import CountTo from '@/views/dashboard/components/CountTo.vue'
 import ContributionGraph from './components/ContributionGraph.vue'
 import { getDashboardDataApi, getBottomDataApi } from '@/api/system'
+
+use([LineChart, PieChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
+
+type ChartOption = ComposeOption<
+  | LineSeriesOption
+  | PieSeriesOption
+  | GridComponentOption
+  | LegendComponentOption
+  | TooltipComponentOption
+>
 
 const icons = {
   Document: markRaw(Document),
@@ -128,11 +147,11 @@ const visitTrendData = ref<VisitTrendItem[]>([])
 // 图表相关
 const lineChartRef = ref<HTMLElement>()
 const pieChartRef = ref<HTMLElement>()
-const lineChart = shallowRef<echarts.ECharts | null>(null)
-const pieChart = shallowRef<echarts.ECharts | null>(null)
+const lineChart = shallowRef<EChartsType | null>(null)
+const pieChart = shallowRef<EChartsType | null>(null)
 
 // 折线图配置
-const getLineChartOption = (): EChartsOption => {
+const getLineChartOption = (): ChartOption => {
   const labels = visitTrendData.value.map(item => item.label || item.date)
   const visitorData = visitTrendData.value.map(item => Number(item.visitCount || 0))
   const viewData = visitTrendData.value.map(item => Number(item.viewCount || 0))
@@ -186,7 +205,7 @@ const getLineChartOption = (): EChartsOption => {
 }
 
 // 饼图配置
-const getPieChartOption = (): EChartsOption => ({
+const getPieChartOption = (): ChartOption => ({
   tooltip: {
     trigger: 'item'
   },
@@ -225,13 +244,13 @@ const getPieChartOption = (): EChartsOption => ({
 // 初始化图表
 const initCharts = () => {
   if (lineChartRef.value) {
-    lineChart.value = echarts.init(lineChartRef.value)
+    lineChart.value = init(lineChartRef.value)
     lineChart.value.setOption(getLineChartOption())
   }
 
   getBottomDataApi().then(res => {
     if (pieChartRef.value) {
-      pieChart.value = echarts.init(pieChartRef.value)
+      pieChart.value = init(pieChartRef.value)
         const option = getPieChartOption()
         if (option.series && Array.isArray(option.series)) {
           option.series[0].data = res.data

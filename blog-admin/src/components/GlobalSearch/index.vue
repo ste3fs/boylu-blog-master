@@ -38,7 +38,7 @@
         <el-scrollbar height="400px">
           <template v-for="group in searchResults" :key="group.title">
             <div class="menu-group-title">
-              <el-icon><component :is="group.icon" /></el-icon>
+              <el-icon><DynamicIcon :name="group.icon" /></el-icon>
               <span>{{ group.title }}</span>
               <span class="item-count">{{ group.children.length }}个结果</span>
             </div>
@@ -50,7 +50,7 @@
               @click="handleSelectMenu(item)"
               @mouseenter="currentIndex = getItemIndex(group, idx)"
             >
-              <el-icon class="item-icon"><component :is="item.icon" /></el-icon>
+              <el-icon class="item-icon"><DynamicIcon :name="item.icon" /></el-icon>
               <div class="item-content">
                 <span class="item-title">{{ item.title }}</span>
                 <span class="item-path">{{ item.path }}</span>
@@ -85,6 +85,7 @@
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, ArrowRight } from '@element-plus/icons-vue'
+import DynamicIcon from '@/components/DynamicIcon/index.vue'
 import { useSettingsStore } from '@/store/modules/settings'
 import { usePermissionStore } from '@/store/modules/permission'
 
@@ -520,4 +521,4 @@ const getItemIndex = (group: any, idx: number) => {
 }
 
 
-</style> 
+</style>
