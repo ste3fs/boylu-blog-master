@@ -51,6 +51,9 @@ import {
   getAllCategoriesApi,
 } from "@/api/article";
 
+const ARTICLE_LIST_STATE_KEY = "boylu:article-list-state";
+const ARTICLE_LIST_STATE_MAX_AGE = 30 * 60 * 1000;
+
 export default {
   name: "Home",
   components: {
@@ -70,6 +73,7 @@ export default {
       carouselSlides: [],
       loading: false,
       activeName: "all",
+      restoreListState: null,
       categories: [
         {
           id: "all",
@@ -95,7 +99,53 @@ export default {
      * @param {number} id 文章id
      */
     goToPost(id) {
+      this.saveArticleListState(id);
       this.$router.push(`/post/${id}`);
+    },
+    saveArticleListState(articleId) {
+      const state = {
+        articleId,
+        activeName: this.activeName,
+        params: { ...this.params },
+        scrollY: window.pageYOffset || document.documentElement.scrollTop || 0,
+        savedAt: Date.now(),
+      };
+      sessionStorage.setItem(ARTICLE_LIST_STATE_KEY, JSON.stringify(state));
+    },
+    consumeArticleListState() {
+      const raw = sessionStorage.getItem(ARTICLE_LIST_STATE_KEY);
+      if (!raw) {
+        return null;
+      }
+
+      try {
+        const state = JSON.parse(raw);
+        if (!state.savedAt || Date.now() - state.savedAt > ARTICLE_LIST_STATE_MAX_AGE) {
+          sessionStorage.removeItem(ARTICLE_LIST_STATE_KEY);
+          return null;
+        }
+        return state;
+      } catch (error) {
+        sessionStorage.removeItem(ARTICLE_LIST_STATE_KEY);
+        return null;
+      }
+    },
+    restoreArticleListPosition() {
+      if (!this.restoreListState) {
+        return;
+      }
+
+      const scrollY = Number(this.restoreListState.scrollY || 0);
+      this.$nextTick(() => {
+        setTimeout(() => {
+          window.scrollTo({
+            top: scrollY,
+            behavior: "auto",
+          });
+          this.restoreListState = null;
+          sessionStorage.removeItem(ARTICLE_LIST_STATE_KEY);
+        }, 120);
+      });
     },
     /**
      * 切换页码
@@ -114,7 +164,7 @@ export default {
      */
     getArticleList() {
       this.loading = true;
-      getArticlesApi(this.params)
+      return getArticlesApi(this.params)
         .then((res) => {
           this.articleList = res.data.records;
           this.total = res.data.total;
@@ -156,7 +206,19 @@ export default {
     },
   },
   created() {
-    this.getArticleList();
+    const savedState = this.consumeArticleListState();
+    if (savedState) {
+      this.restoreListState = savedState;
+      this.activeName = savedState.activeName || this.activeName;
+      this.params = {
+        ...this.params,
+        ...(savedState.params || {}),
+      };
+    }
+
+    this.getArticleList().then(() => {
+      this.restoreArticleListPosition();
+    });
     this.getCarouselArticles();
     this.getAllCategories();
   },

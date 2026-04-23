@@ -6,7 +6,7 @@
     <router-view :class="{ 'main-container': showShellUi }" />
     <TheFooter v-if="showShellUi" />
     <FloatingButtons v-if="showShellUi" />
-    <AiFloatingAssistant v-if="showShellUi" />
+    <AiFloatingAssistant v-if="showShellUi && showAiFloatingAssistant" />
     <Lantern v-if="showShellUi" />
     <RandomVideo v-if="showShellUi" />
     <div class="cursor-container"></div>
@@ -46,6 +46,9 @@ export default {
   computed: {
     showShellUi() {
       return !(this.$route && this.$route.meta && this.$route.meta.fullscreen)
+    },
+    showAiFloatingAssistant() {
+      return this.$route && this.$route.name === 'Home'
     }
   },
 

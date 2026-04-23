@@ -1,22 +1,44 @@
 <template>
   <div class="photos-container">
-    <div class="photos-header">
-      <div class="header-content">
+    <section class="photos-hero">
+      <div class="hero-copy">
         <div class="title-group">
+          <span class="eyebrow">Photo Sphere</span>
           <h1>相册</h1>
           <div class="decorative-line"></div>
         </div>
-        <p class="subtitle">每一张照片都是生活中美好的一次记忆</p>
+        <p class="subtitle">每一张照片，都是生活中美好的一次记忆。</p>
+        <p class="hero-note">拖动图片星球浏览相册，点击任意封面进入对应相册。</p>
       </div>
+
+      <SphereImageGrid
+        v-if="sphereImages.length"
+        class="album-sphere"
+        :images="sphereImages"
+        :container-size="sphereSize"
+        :sphere-radius="sphereRadius"
+        :min-items="sphereMinItems"
+        :base-image-scale="0.13"
+        :auto-rotate="true"
+        :auto-rotate-speed="0.13"
+        @select="openAlbumFromSphere"
+      />
+
+      <div v-else class="sphere-empty">
+        <i class="fas fa-images"></i>
+        <span>相册图片添加后，这里会自动生成图片星球</span>
+      </div>
+
       <div class="header-background">
         <div class="circle circle-1"></div>
         <div class="circle circle-2"></div>
       </div>
-    </div>
+    </section>
+
     <div class="photos-grid">
       <div v-for="(album, index) in albums" :key="index" class="album-card" @click="openAlbum(album)">
         <div class="album-cover">
-          <img v-lazy="album.cover" :key="album.cover" :alt="album.name">
+          <img v-lazy="resolveAlbumCover(album.cover)" :key="album.cover" :alt="album.name">
           <div v-if="album.isLock === 1" class="lock-icon">
             <i class="fas fa-lock"></i>
           </div>
@@ -33,16 +55,63 @@
 
 <script>
 import { getAlbumListApi } from '@/api/album'
+import SphereImageGrid from '@/components/common/SphereImageGrid.vue'
+import { resolveImageUrl } from '@/utils/image'
 
 export default {
   name: 'Photos',
+  components: {
+    SphereImageGrid
+  },
   data() {
     return {
       albums: [],
+      viewportWidth: typeof window === 'undefined' ? 1200 : window.innerWidth
+    }
+  },
+  computed: {
+    sphereSize() {
+      if (this.viewportWidth <= 480) {
+        return 360
+      }
+      if (this.viewportWidth <= 768) {
+        return 430
+      }
+      return 540
+    },
+    sphereRadius() {
+      return Math.round(this.sphereSize * 0.38)
+    },
+    sphereMinItems() {
+      if (this.viewportWidth <= 480) {
+        return 20
+      }
+      if (this.viewportWidth <= 768) {
+        return 26
+      }
+      return 32
+    },
+    sphereImages() {
+      return this.albums
+        .filter(album => album && album.cover)
+        .map(album => ({
+          id: `album-${album.id}`,
+          src: this.resolveAlbumCover(album.cover),
+          alt: album.name || '相册封面',
+          title: album.name,
+          description: album.description,
+          album
+        }))
     }
   },
   created() {
     this.getAlbumList()
+  },
+  mounted() {
+    window.addEventListener('resize', this.handleResize)
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.handleResize)
   },
   methods: {
     /**
@@ -62,39 +131,71 @@ export default {
         params: { id: album.id }
       })
     },
+    openAlbumFromSphere(image) {
+      if (image && image.album) {
+        this.openAlbum(image.album)
+      }
+    },
+    resolveAlbumCover(url) {
+      return resolveImageUrl(url, this.$store.state.defaultImage)
+    },
+    handleResize() {
+      this.viewportWidth = window.innerWidth
+    }
   }
 }
 </script>
 
 <style lang="scss" scoped>
 .photos-container {
-  padding: 20px;
-  max-width: 1200px;
+  padding: 20px 20px 80px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
-.photos-header {
+.photos-hero {
   position: relative;
-  text-align: center;
-  margin-bottom: 60px;
-  padding: 40px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  align-items: center;
+  gap: 40px;
+  min-height: 590px;
+  margin-bottom: 44px;
+  padding: 42px 36px 34px;
   overflow: hidden;
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 82% 16%, rgba(236, 72, 153, 0.12), transparent 30%),
+    radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.12), transparent 28%),
+    linear-gradient(135deg, rgba(248, 250, 252, 0.74), rgba(255, 247, 250, 0.74));
 
-  .header-content {
+  .hero-copy,
+  .album-sphere,
+  .sphere-empty {
     position: relative;
     z-index: 2;
   }
 
   .title-group {
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 20px;
   }
 
-  h1 {
-    font-size: 3em;
+  .eyebrow {
+    margin-bottom: 12px;
+    color: #8b5cf6;
+    font-size: 0.82em;
     font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-size: clamp(3em, 7vw, 6em);
+    line-height: 0.95;
+    font-weight: 800;
     margin-bottom: 15px;
     background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
     -webkit-background-clip: text;
@@ -111,19 +212,42 @@ export default {
   }
 
   .subtitle {
-    font-size: 1.2em;
+    max-width: 430px;
+    font-size: 1.24em;
     color: var(--text-secondary);
     font-weight: 500;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     opacity: 0.8;
+    line-height: 1.8;
+  }
+
+  .hero-note {
+    margin-top: 22px;
+    color: #64748b;
+    font-size: 0.95em;
+    line-height: 1.7;
+  }
+
+  .sphere-empty {
+    height: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: #94a3b8;
+    border: 1px dashed rgba(148, 163, 184, 0.36);
+    border-radius: 50%;
+
+    i {
+      font-size: 2.6em;
+      color: #a78bfa;
+    }
   }
 
   .header-background {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     z-index: 1;
     overflow: hidden;
   }
@@ -135,16 +259,16 @@ export default {
   }
 
   .circle-1 {
-    width: 200px;
-    height: 200px;
+    width: 220px;
+    height: 220px;
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
     top: -100px;
     left: -50px;
   }
 
   .circle-2 {
-    width: 150px;
-    height: 150px;
+    width: 170px;
+    height: 170px;
     background: linear-gradient(135deg, #8b5cf6, #ec4899);
     bottom: -50px;
     right: -30px;
@@ -230,20 +354,27 @@ export default {
   }
 }
 
-@media (max-width: 768px) {
-  .photos-header {
-    padding: 30px 15px;
+@media (max-width: 900px) {
+  .photos-hero {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding: 32px 18px;
     margin-bottom: 40px;
+    text-align: center;
 
-    h1 {
-      font-size: 2.5em;
+    .title-group {
+      align-items: center;
     }
 
-    .subtitle {
-      font-size: 1.1em;
+    .subtitle,
+    .hero-note {
+      margin-left: auto;
+      margin-right: auto;
     }
   }
+}
 
+@media (max-width: 768px) {
   .photos-grid {
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 15px;
@@ -251,12 +382,16 @@ export default {
 }
 
 @media (max-width: 480px) {
-  .photos-header {
+  .photos-container {
+    padding: 14px 12px 60px;
+  }
+
+  .photos-hero {
     padding: 25px 10px;
-    margin-bottom: 30px;
+    border-radius: 24px;
 
     h1 {
-      font-size: 2em;
+      font-size: 2.6em;
     }
 
     .subtitle {
@@ -278,4 +413,4 @@ export default {
     grid-template-columns: 1fr;
   }
 }
-</style> 
+</style>

@@ -40,13 +40,15 @@ export default {
   },
   computed: {
     visible() {
-      const path = this.$route?.path || ''
-      return !this.shouldHideForPath(path) && !this.isMobileViewport
+      return this.isHomeRoute && !this.isMobileViewport
+    },
+    isHomeRoute() {
+      return this.$route && this.$route.name === 'Home'
     }
   },
   watch: {
-    '$route.path'(value) {
-      if (this.shouldHideForPath(value)) {
+    '$route.name'(value) {
+      if (value !== 'Home') {
         this.open = false
       }
     }
@@ -64,9 +66,6 @@ export default {
       if (this.isMobileViewport) {
         this.open = false
       }
-    },
-    shouldHideForPath(path) {
-      return ['/', '/ai', '/login'].includes(path)
     },
     toggle() {
       this.open = !this.open

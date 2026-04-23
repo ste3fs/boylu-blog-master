@@ -103,14 +103,6 @@
             <button class="icon-btn" type="button" @click="handleClose">
               <i class="el-icon-back"></i>
             </button>
-            <button
-              class="mode-btn"
-              type="button"
-              @click="switchForm(currentForm === 'login' ? 'account' : 'login')"
-            >
-              <i :class="currentForm === 'login' ? 'el-icon-user' : 'fas fa-qrcode'"></i>
-              <span>{{ currentForm === 'login' ? '账号登录' : '扫码登录' }}</span>
-            </button>
           </div>
 
           <div class="panel-header">
@@ -127,14 +119,6 @@
               @click="switchForm('account')"
             >
               账号登录
-            </button>
-            <button
-              type="button"
-              class="entry-chip"
-              :class="{ active: currentForm === 'login' }"
-              @click="switchForm('login')"
-            >
-              扫码登录
             </button>
           </div>
 
@@ -214,66 +198,6 @@
             <div class="surface-footer">
               <span>还没有账号？</span>
               <a href="javascript:void(0)" @click="switchForm('register')">立即注册</a>
-              <span class="footer-dot">路</span>
-              <a href="javascript:void(0)" @click="switchForm('login')">微信扫码</a>
-            </div>
-          </div>
-
-          <div v-show="currentForm === 'login'" class="form-surface form-surface--wechat">
-            <div class="wechat-panel">
-              <div class="wechat-qr-box">
-                <img
-                  v-lazy="wechatQrUrl"
-                  :key="wechatQrUrl"
-                  alt="公众号二维码"
-                  @error="handleWechatQrError"
-                />
-              </div>
-              <p class="wechat-code-line">
-                登录验证码：
-                <span class="wechat-code">{{ wechatForm.code }}</span>
-                <i
-                  v-if="wechatForm.code === '验证码已失效'"
-                  class="fas fa-sync-alt code-refresh"
-                  @click="getWechatLoginCode"
-                ></i>
-              </p>
-              <ol class="wechat-guide">
-                <li>微信扫码并关注你的公众号。</li>
-                <li>向公众号发送页面上的 DL 登录码。</li>
-                <li>页面会自动轮询完成登录，不需要手动刷新。</li>
-              </ol>
-              <div class="wechat-helper">
-                <span>公众号微信号：{{ $store.state.webSiteInfo.wechat || '待配置' }}</span>
-                <button type="button" class="helper-btn" @click="copyWechatHandle">
-                  复制微信号
-                </button>
-              </div>
-            </div>
-
-            <div class="panel-divider">
-              <span>其他登录方式</span>
-            </div>
-
-            <div class="third-party-grid">
-              <button
-                v-for="(item, type) in loginTypes"
-                :key="type"
-                v-if="type !== 'wechat'"
-                type="button"
-                class="social-login-btn"
-                @click="handleThirdPartyLogin(type)"
-              >
-                <i :class="item.icon"></i>
-                <span>{{ item.title }}</span>
-              </button>
-            </div>
-
-            <div class="surface-footer">
-              <span>想使用账号密码？</span>
-              <a href="javascript:void(0)" @click="switchForm('account')">切换登录</a>
-              <span class="footer-dot">路</span>
-              <a href="javascript:void(0)" @click="switchForm('register')">注册账号</a>
             </div>
           </div>
 
@@ -464,10 +388,6 @@ export default {
           title: "QQ账号登录",
           icon: "fab fa-qq",
         },
-        wechat: {
-          title: "微信扫码登录",
-          icon: "fab fa-weixin",
-        },
         gitee: {
           title: "码云账号登录",
           icon: "fab fa-git-alt",
@@ -554,7 +474,6 @@ export default {
     panelKicker() {
       const map = {
         account: "ACCOUNT LOGIN",
-        login: "WECHAT LOGIN",
         register: "REGISTER",
         forgot: "RESET PASSWORD",
       };
@@ -563,7 +482,6 @@ export default {
     panelTitle() {
       const map = {
         account: "账号密码登录",
-        login: "微信扫码登录",
         register: "创建你的账号",
         forgot: "找回账号密码",
       };
@@ -572,7 +490,6 @@ export default {
     panelSubtitle() {
       const map = {
         account: "继续进入站点，处理你的文章、评论和 AI 对话。",
-        login: "扫码关注公众号并发送登录码完成登录。",
         register: "注册后即可解锁站点完整能力。",
         forgot: "通过邮箱验证码快速重置密码。",
       };

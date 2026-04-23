@@ -236,8 +236,6 @@ export default {
 @use 'sass:math';
 
 .sidebar {
-  position: sticky;
-  top: 80px;
   width: 100%;
   max-width: 320px;
 
