@@ -25,6 +25,7 @@ const groupClass = computed(() => [
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .page-toolbar-group--danger {
@@ -33,5 +34,15 @@ const groupClass = computed(() => [
 
 .page-toolbar-group--utility {
   justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .page-toolbar-group {
+    flex-wrap: nowrap;
+  }
+
+  .page-toolbar-group--danger {
+    margin-left: 0;
+  }
 }
 </style>

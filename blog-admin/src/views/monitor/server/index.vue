@@ -1,176 +1,160 @@
 <template>
-  <div class="app-container">
-     <!-- CPU信息 -->
-     <el-row :gutter="20" class="server-info">
-        <el-col :span="12">
-          <el-card>
-            <template #header>
-              <div class="card-header">
-                <span>CPU使用率</span>
-              </div>
-            </template>
-            <div class="chart-wrapper">
-              <el-progress
-                type="dashboard"
-                :percentage="serverInfo.cpu?.used"
-                :color="customColors"
-              />
+  <div v-loading="loading" class="app-container server-page">
+    <el-row :gutter="16" class="server-overview">
+      <el-col :xs="24" :sm="24" :md="12">
+        <el-card class="server-metric-card">
+          <template #header>
+            <div class="card-header">
+              <span>CPU 使用率</span>
             </div>
-            <div class="detail-list">
-              <div class="detail-item">
-                <span>核心数</span>
-                <span>{{ serverInfo.cpu?.cpuNum }}</span>
-              </div>
-              <div class="detail-item">
-                <span>用户使用率</span>
-                <span>{{ serverInfo.cpu?.used }}%</span>
-              </div>
-              <div class="detail-item">
-                <span>系统使用率</span>
-                <span>{{ serverInfo.cpu?.sys }}%</span>
-              </div>
-              <div class="detail-item">
-                <span>当前空闲率</span>
-                <span>{{ serverInfo.cpu?.free }}%</span>
-              </div>
+          </template>
+          <div class="chart-wrapper">
+            <el-progress type="dashboard" :percentage="serverInfo.cpu?.used || 0" :color="customColors" />
+          </div>
+          <div class="detail-list">
+            <div class="detail-item">
+              <span>核心数</span>
+              <strong>{{ serverInfo.cpu?.cpuNum || 0 }}</strong>
             </div>
-          </el-card>
-        </el-col>
-        
-        <!-- 内存信息 -->
-        <el-col :span="12">
-          <el-card>
-            <template #header>
-              <div class="card-header">
-                <span>内存使用率</span>
-              </div>
-            </template>
-            <div class="chart-wrapper">
-              <el-progress
-                type="dashboard"
-                :percentage="serverInfo.mem?.usage"
-                :color="customColors"
-              />
+            <div class="detail-item">
+              <span>用户占用</span>
+              <strong>{{ serverInfo.cpu?.used || 0 }}%</strong>
             </div>
-            <div class="detail-list">
-              <div class="detail-item">
-                <span>总内存</span>
-                <span>{{ formatBytes(serverInfo.mem?.total) }}</span>
-              </div>
-              <div class="detail-item">
-                <span>已用内存</span>
-                <span>{{ formatBytes(serverInfo.mem?.used) }}</span>
-              </div>
-              <div class="detail-item">
-                <span>剩余内存</span>
-                <span>{{ formatBytes(serverInfo.mem?.free) }}</span>
-              </div>
-              <div class="detail-item">
-                <span>使用率</span>
-                <span>{{ serverInfo.mem?.usage }}%</span>
-              </div>
+            <div class="detail-item">
+              <span>系统占用</span>
+              <strong>{{ serverInfo.cpu?.sys || 0 }}%</strong>
             </div>
-          </el-card>
-        </el-col>
-      </el-row>
+            <div class="detail-item">
+              <span>空闲率</span>
+              <strong>{{ serverInfo.cpu?.free || 0 }}%</strong>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
 
-      <!-- 服务器信息 -->
-      <el-card class="mt-4">
-        <template #header>
-          <div class="card-header">
-            <span>服务器信息</span>
+      <el-col :xs="24" :sm="24" :md="12">
+        <el-card class="server-metric-card">
+          <template #header>
+            <div class="card-header">
+              <span>内存使用率</span>
+            </div>
+          </template>
+          <div class="chart-wrapper">
+            <el-progress type="dashboard" :percentage="serverInfo.mem?.usage || 0" :color="customColors" />
           </div>
-        </template>
-        <div class="detail-list">
-          <div class="detail-item">
-            <span>服务器名称</span>
-            <span>{{ serverInfo.sys?.computerName }}</span>
+          <div class="detail-list">
+            <div class="detail-item">
+              <span>总内存</span>
+              <strong>{{ formatBytes(serverInfo.mem?.total) }}</strong>
+            </div>
+            <div class="detail-item">
+              <span>已用内存</span>
+              <strong>{{ formatBytes(serverInfo.mem?.used) }}</strong>
+            </div>
+            <div class="detail-item">
+              <span>剩余内存</span>
+              <strong>{{ formatBytes(serverInfo.mem?.free) }}</strong>
+            </div>
+            <div class="detail-item">
+              <span>使用率</span>
+              <strong>{{ serverInfo.mem?.usage || 0 }}%</strong>
+            </div>
           </div>
-          <div class="detail-item">
-            <span>操作系统</span>
-            <span>{{ serverInfo.sys?.osName }}</span>
-          </div>
-          <div class="detail-item">
-            <span>服务器IP</span>
-            <span>{{ serverInfo.sys?.computerIp }}</span>
-          </div>
-          <div class="detail-item">
-            <span>系统架构</span>
-            <span>{{ serverInfo.sys?.osArch }}</span>
-          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-card class="server-detail-card">
+      <template #header>
+        <div class="card-header">
+          <span>服务器信息</span>
         </div>
-      </el-card>
-
-      <!-- JVM信息 -->
-      <el-card class="mt-4">
-        <template #header>
-          <div class="card-header">
-            <span>JVM信息</span>
-          </div>
-        </template>
-        <div class="detail-list">
-          <div class="detail-item">
-            <span>JVM名称</span>
-            <span>{{ serverInfo.jvm?.name }}</span>
-          </div>
-          <div class="detail-item">
-            <span>JVM版本</span>
-            <span>{{ serverInfo.jvm?.version }}</span>
-          </div>
-          <div class="detail-item">
-            <span>启动时间</span>
-            <span>{{ serverInfo.jvm?.startTime }}</span>
-          </div>
-          <div class="detail-item">
-            <span>运行时长</span>
-            <span>{{ serverInfo.jvm?.runTime }}</span>
-          </div>
-          <div class="detail-item">
-            <span>安装路径</span>
-            <span>{{ serverInfo.jvm?.home }}</span>
-          </div>
-          <div class="detail-item">
-            <span>项目路径</span>
-            <span>{{ serverInfo.sys?.userDir }}</span>
-          </div>
+      </template>
+      <div class="detail-list detail-list--wide">
+        <div class="detail-item">
+          <span>服务器名称</span>
+          <strong>{{ serverInfo.sys?.computerName || '-' }}</strong>
         </div>
-      </el-card>
+        <div class="detail-item">
+          <span>操作系统</span>
+          <strong>{{ serverInfo.sys?.osName || '-' }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>服务器 IP</span>
+          <strong>{{ serverInfo.sys?.computerIp || '-' }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>系统架构</span>
+          <strong>{{ serverInfo.sys?.osArch || '-' }}</strong>
+        </div>
+      </div>
+    </el-card>
 
-      <!-- 磁盘信息 -->
-      <el-card class="mt-4">
-        <template #header>
-          <div class="card-header">
-            <span>磁盘信息</span>
-          </div>
-        </template>
-        <el-table :data="serverInfo.sysFiles" border style="width: 100%">
-          <el-table-column prop="dirName" label="盘符路径" />
-          <el-table-column prop="typeName" label="文件系统" />
-          <el-table-column label="总大小">
-            <template #default="{ row }">
-              {{ formatToGB(row.total) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="可用大小">
-            <template #default="{ row }">
-              {{ formatToGB(row.free) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="已用大小">
-            <template #default="{ row }">
-              {{ formatToGB(row.used) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="usage" label="使用率">
-            <template #default="{ row }">
-              <el-progress
-                :percentage="row.usage"
-                :color="customColors"
-              />
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
+    <el-card class="server-detail-card">
+      <template #header>
+        <div class="card-header">
+          <span>JVM 信息</span>
+        </div>
+      </template>
+      <div class="detail-list detail-list--wide">
+        <div class="detail-item">
+          <span>JVM 名称</span>
+          <strong>{{ serverInfo.jvm?.name || '-' }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>JVM 版本</span>
+          <strong>{{ serverInfo.jvm?.version || '-' }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>启动时间</span>
+          <strong>{{ serverInfo.jvm?.startTime || '-' }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>运行时长</span>
+          <strong>{{ serverInfo.jvm?.runTime || '-' }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>安装路径</span>
+          <strong>{{ serverInfo.jvm?.home || '-' }}</strong>
+        </div>
+        <div class="detail-item">
+          <span>项目路径</span>
+          <strong>{{ serverInfo.sys?.userDir || '-' }}</strong>
+        </div>
+      </div>
+    </el-card>
+
+    <el-card class="server-detail-card">
+      <template #header>
+        <div class="card-header">
+          <span>磁盘信息</span>
+        </div>
+      </template>
+      <el-table :data="serverInfo.sysFiles || []" border>
+        <el-table-column prop="dirName" label="盘符路径" min-width="120" />
+        <el-table-column prop="typeName" label="文件系统" min-width="120" />
+        <el-table-column label="总大小" min-width="110">
+          <template #default="{ row }">
+            {{ formatToGB(row.total) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="可用大小" min-width="110">
+          <template #default="{ row }">
+            {{ formatToGB(row.free) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="已用大小" min-width="110">
+          <template #default="{ row }">
+            {{ formatToGB(row.used) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="usage" label="使用率" min-width="140">
+          <template #default="{ row }">
+            <el-progress :percentage="row.usage || 0" :color="customColors" />
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -181,46 +165,39 @@ const loading = ref(false)
 const serverInfo = ref<any>({})
 let timer: number | undefined
 
-// 自定义进度条颜色
 const customColors = [
   { color: '#67C23A', percentage: 60 },
   { color: '#E6A23C', percentage: 80 },
   { color: '#F56C6C', percentage: 100 }
 ]
 
-// 格式化字节大小
 const formatBytes = (bytes?: number) => {
   if (!bytes) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
+  const index = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${(bytes / Math.pow(k, index)).toFixed(2)} ${sizes[index]}`
 }
 
-// 添加格式化为GB的方法
 const formatToGB = (bytes?: number) => {
   if (!bytes) return '0 GB'
-  const gb = bytes / (1024 * 1024 * 1024)
-  return `${gb.toFixed(2)} GB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
-// 获取服务器信息
 const getList = async () => {
   loading.value = true
   try {
     const { data } = await getServerInfoApi()
-    serverInfo.value = data
-  } catch (error) {
-    console.error('获取服务器信息失败:', error)
+    serverInfo.value = data || {}
+  } finally {
+    loading.value = false
   }
-  loading.value = false
 }
 
-// 定时刷新
 const startTimer = () => {
   timer = window.setInterval(() => {
     getList()
-  }, 30000) // 每30秒刷新一次
+  }, 30000)
 }
 
 onMounted(() => {
@@ -235,7 +212,11 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+.server-overview,
+.server-detail-card {
+  margin-bottom: 16px;
+}
 
 .chart-wrapper {
   display: flex;
@@ -245,27 +226,37 @@ onUnmounted(() => {
 
 .detail-list {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detail-list--wide {
+  gap: 16px 20px;
 }
 
 .detail-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--el-fill-color-extra-light);
 }
 
-.detail-item span:first-child {
+.detail-item span {
   color: var(--el-text-color-secondary);
 }
 
-.mt-4 {
-  margin-top: 16px;
+.detail-item strong {
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+@media (max-width: 768px) {
+  .detail-list {
+    grid-template-columns: 1fr;
+  }
 }
-</style> 
+</style>

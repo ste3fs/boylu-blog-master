@@ -1,330 +1,526 @@
 <template>
-    <div class="app-container">
-        <!-- 搜索表单 -->
-        <PageSearch>
-            <el-form :model="queryParams" ref="queryFormRef" inline>
-                <el-form-item label="公告内容" prop="content">
-                    <el-input v-model="queryParams.content"  placeholder="请输入公告内容" clearable
-                        @keyup.enter="handleQuery" />
-                </el-form-item>
-                <el-form-item label="是否展示" prop="isShow">
-                    <el-select v-model="queryParams.isShow" placeholder="请选择是否展示"  style="width: 240px">
-                        <el-option label="否" :value="0" />
-                        <el-option label="是" :value="1" />
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="显示位置" prop="position">
-                    <el-select v-model="queryParams.position" placeholder="请选择显示位置" style="width: 240px">
-                        <el-option v-for="item in positionOptions" :key="item.value" :label="item.label"
-                            :value="item.value" />
-                    </el-select>
-                </el-form-item>
-                                <el-form-item>
-                    <PageSearchActions @search="handleQuery" @reset="resetQuery" />
-                </el-form-item>
-            </el-form>
-
-        </PageSearch>
-        <el-card class="box-card">
-            <!-- 操作工具栏 -->
-            <template #header>
-                <PageToolbar>
-                    <PageToolbarGroup>
-                        <el-button type="primary" v-permission="['sys:notice:add']" :icon="Plus" @click="handleAdd">??
-                        </el-button>
-                    </PageToolbarGroup>
-                    <PageToolbarGroup kind="danger">
-                        <el-button type="danger" v-permission="['sys:notice:delete']" plain :icon="Delete" :disabled="selectedIds.length === 0"
-                            @click="handleBatchDelete">批量删除
-                        </el-button>
-                    </PageToolbarGroup>
-                </PageToolbar>
-            </template>
-
-            <!-- 数据表格 -->
-            <el-table v-loading="loading" :data="dataList" @selection-change="handleSelectionChange">
-                <el-table-column type="selection" width="55" align="center" />
-                <el-table-column label="内容" align="left" width="800" prop="content" show-overflow-tooltip>
-                    <template #default="scope">
-                        <div v-html="scope.row.content"></div>
-                    </template>
-                </el-table-column>
-                <el-table-column label="是否展示" align="center" prop="isShow">
-                    <template #default="scope">
-                        <el-switch v-model="scope.row.isShow" @change="handleChange(scope.row)"
-                            style="--el-switch-on-color: #13ce66; --el-switch-off-color: #ff4949" :active-value="1"
-                            :inactive-value="0" />
-                    </template>
-                </el-table-column>
-                <el-table-column label="显示位置" align="center" prop="position">
-                    <template #default="scope">
-                        <span v-for="item in positionOptions">
-                            <el-tag :type="item.style" v-if="scope.row.position === item.value">
-                                {{ item.label }}
-                            </el-tag>
-                        </span>
-                    </template>
-                </el-table-column>
-                <el-table-column label="发布时间" align="center" prop="createTime" width="180"/>
-                <el-table-column label="??" align="center" width="150">
-                    <template #default="scope">
-                        <PageTableActions>
-                            <PageTableAction type="primary" :icon="Edit" v-permission="['sys:notice:update']" @click="handleUpdate(scope.row)">??</PageTableAction>
-                            <PageTableAction type="danger" :icon="Delete" v-permission="['sys:notice:delete']" @click="handleDelete(scope.row)">??</PageTableAction>
-                        </PageTableActions>
-                    </template>
-                </el-table-column>
-            </el-table>
-
-            <!-- 分页工具栏 -->
-            <PagePagination
-                v-model:current-page="queryParams.pageNum"
-                v-model:page-size="queryParams.pageSize"
-                :total="total"
-                @size-change="handleSizeChange"
-                @current-change="handleCurrentChange"
+  <div class="app-container notice-page">
+    <PageSearch>
+      <el-form ref="queryFormRef" :model="queryParams" :inline="!isMobile">
+        <el-form-item label="公告内容" prop="content">
+          <el-input
+            v-model="queryParams.content"
+            placeholder="请输入公告内容"
+            clearable
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
+        <el-form-item label="是否展示" prop="isShow">
+          <el-select v-model="queryParams.isShow" placeholder="请选择展示状态" clearable>
+            <el-option label="是" :value="1" />
+            <el-option label="否" :value="0" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="显示位置" prop="position">
+          <el-select v-model="queryParams.position" placeholder="请选择显示位置" clearable>
+            <el-option
+              v-for="item in positionOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
             />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <PageSearchActions @search="handleQuery" @reset="resetQuery" />
+        </el-form-item>
+      </el-form>
+    </PageSearch>
 
-            <!-- 添加或修改对话框 -->
-            <el-dialog v-model="open" :title="title" width="500px" append-to-body>
-                <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
-                    <el-form-item label="公告内容" prop="content">
-                        <div style="border: 1px solid #ccc">
-                            <Toolbar style="border-bottom: 1px solid #ccc" :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode" />
-                            <Editor style="height: 300px; overflow-y: hidden;" v-model="form.content" :defaultConfig="editorConfig" :mode="mode"
-                            @onCreated="handleCreated"/>
-                        </div>
+    <el-card class="box-card">
+      <template #header>
+        <PageToolbar>
+          <PageToolbarGroup>
+            <el-button
+              type="primary"
+              :icon="Plus"
+              v-permission="['sys:notice:add']"
+              @click="handleAdd"
+            >
+              新增公告
+            </el-button>
+          </PageToolbarGroup>
+          <PageToolbarGroup kind="danger">
+            <el-button
+              type="danger"
+              plain
+              :icon="Delete"
+              v-permission="['sys:notice:delete']"
+              :disabled="selectedIds.length === 0"
+              @click="handleBatchDelete"
+            >
+              批量删除
+            </el-button>
+          </PageToolbarGroup>
+        </PageToolbar>
+      </template>
 
-                    </el-form-item>
-                    <el-form-item label="是否展示" prop="isShow">
-                        <el-switch v-model="form.isShow"
-                            style="--el-switch-on-color: #13ce66; --el-switch-off-color: #ff4949" :active-value="1"
-                            :inactive-value="0" />
-                    </el-form-item>
-                    <el-form-item label="显示位置" prop="position">
-                        <el-radio-group v-model="form.position">
-                            <el-radio v-for="dict in positionOptions" :value="dict.value">{{ dict.label }}</el-radio>
-                        </el-radio-group>
-                    </el-form-item>
-                </el-form>
-                <template #footer>
-                    <div class="dialog-footer">
-                        <el-button type="primary" @click="submitForm">确 定</el-button>
-                        <el-button @click="cancel">取 消</el-button>
-                    </div>
-                </template>
-            </el-dialog>
-        </el-card>
-    </div>
+      <el-table
+        v-loading="loading"
+        :data="dataList"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column label="公告内容" prop="content" min-width="320" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div class="notice-content" v-html="row.content" />
+          </template>
+        </el-table-column>
+        <el-table-column label="是否展示" prop="isShow" align="center" width="110">
+          <template #default="{ row }">
+            <el-switch
+              v-model="row.isShow"
+              :active-value="1"
+              :inactive-value="0"
+              style="--el-switch-on-color: #13ce66; --el-switch-off-color: #ff4949"
+              @change="handleChange(row)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="显示位置" prop="position" align="center" width="120">
+          <template #default="{ row }">
+            <el-tag :type="resolvePositionMeta(row.position).style || 'info'">
+              {{ resolvePositionMeta(row.position).label }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="发布时间" prop="createTime" align="center" width="170" />
+        <el-table-column label="操作" align="center" width="160" fixed="right">
+          <template #default="{ row }">
+            <PageTableActions>
+              <PageTableAction
+                type="primary"
+                :icon="Edit"
+                v-permission="['sys:notice:update']"
+                @click="handleUpdate(row)"
+              >
+                编辑
+              </PageTableAction>
+              <PageTableAction
+                type="danger"
+                :icon="Delete"
+                v-permission="['sys:notice:delete']"
+                @click="handleDelete(row)"
+              >
+                删除
+              </PageTableAction>
+            </PageTableActions>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <PagePagination
+        v-model:current-page="queryParams.pageNum"
+        v-model:page-size="queryParams.pageSize"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </el-card>
+
+    <el-dialog
+      v-model="open"
+      :title="title"
+      :width="isMobile ? '100vw' : '640px'"
+      :top="isMobile ? '0' : '6vh'"
+      :fullscreen="isMobile"
+      append-to-body
+      destroy-on-close
+      class="notice-dialog"
+    >
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        :label-position="isMobile ? 'top' : 'right'"
+        label-width="88px"
+        class="notice-form"
+      >
+        <el-form-item label="公告内容" prop="content">
+          <div class="notice-editor">
+            <Toolbar
+              class="notice-editor__toolbar"
+              :editor="editorRef"
+              :defaultConfig="toolbarConfig"
+              :mode="mode"
+            />
+            <Editor
+              class="notice-editor__body"
+              v-model="form.content"
+              :defaultConfig="editorConfig"
+              :mode="mode"
+              @onCreated="handleCreated"
+            />
+          </div>
+          <div v-if="isMobile" class="notice-editor__hint">
+            手机端已精简工具栏，保留常用格式和撤销重做；电脑端仍显示完整工具栏。
+          </div>
+        </el-form-item>
+
+        <el-form-item label="是否展示" prop="isShow">
+          <el-switch
+            v-model="form.isShow"
+            :active-value="1"
+            :inactive-value="0"
+            style="--el-switch-on-color: #13ce66; --el-switch-off-color: #ff4949"
+          />
+        </el-form-item>
+
+        <el-form-item label="显示位置" prop="position">
+          <el-radio-group v-model="form.position" class="notice-position-group">
+            <el-radio
+              v-for="item in positionOptions"
+              :key="item.value"
+              :value="item.value"
+            >
+              {{ item.label }}
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="submitForm">确定</el-button>
+          <el-button @click="cancel">取消</el-button>
+        </div>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Delete, Edit, Plus } from '@element-plus/icons-vue'
 import {
-    listSysNoticeApi,
-    deleteSysNoticeApi,
-    addSysNoticeApi,
-    updateSysNoticeApi
+  addSysNoticeApi,
+  deleteSysNoticeApi,
+  listSysNoticeApi,
+  updateSysNoticeApi
 } from '@/api/site/notice'
-
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 import '@wangeditor/editor/dist/css/style.css'
 
+const MOBILE_TOOLBAR_KEYS = [
+  'headerSelect',
+  'bold',
+  'italic',
+  'underline',
+  'color',
+  'bgColor',
+  '|',
+  'bulletedList',
+  'numberedList',
+  'blockquote',
+  '|',
+  'insertLink',
+  'emotion',
+  'insertImage',
+  '|',
+  'undo',
+  'redo'
+]
+
 const editorRef = shallowRef()
 const mode = 'default'
-const toolbarConfig = {}
-const editorConfig = { placeholder: '请输入内容...' }
-
-
-// 遮罩层
-const loading = ref(true)
-// 选中数组
-const selectedIds = ref<any[]>([])
-// 总条数
+const isMobile = ref(false)
+const loading = ref(false)
 const total = ref(0)
-// 表格数据
-const dataList = ref([])
-// 弹出层标题
-const title = ref('')
-// 是否显示弹出层
 const open = ref(false)
-// 查询参数
-const queryParams = reactive({
-    pageNum: 1,
-    pageSize: 10,
-    id: undefined,
-    content: undefined,
-    isShow: undefined,
-    position: undefined,
-    createTime: undefined,
-})
-
-// 表单参数
-const form = reactive<any>({})
-// 表单校验
-const rules = reactive({
-    content: [
-        { required: true, message: "内容不能为空", trigger: "blur" }
-    ],
-    isShow: [
-        { required: true, message: "是否展示不能为空", trigger: "blur" }
-    ],
-    position: [
-        { required: true, message: "显示位置不能为空", trigger: "blur" }
-    ],
-})
+const title = ref('')
+const dataList = ref<any[]>([])
+const selectedIds = ref<number[]>([])
+const positionOptions = ref<any[]>([])
 
 const queryFormRef = ref()
 const formRef = ref()
 
-// 字典数据
-const positionOptions = ref<any[]>([])
+const queryParams = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  content: undefined as string | undefined,
+  isShow: undefined as number | undefined,
+  position: undefined as string | undefined
+})
 
-/** 查询列表 */
-const getList = () => {
-    loading.value = true
-    listSysNoticeApi(queryParams).then(response => {
-        dataList.value = response.data.records
-        total.value = response.data.total
-        loading.value = false
-    })
+const form = reactive<any>({
+  id: undefined,
+  content: '',
+  isShow: 1,
+  position: 'right'
+})
+
+const toolbarConfig = computed(() => (
+  isMobile.value
+    ? { toolbarKeys: MOBILE_TOOLBAR_KEYS }
+    : {}
+))
+
+const editorConfig = computed(() => ({
+  placeholder: '请输入公告内容...'
+}))
+
+const rules = reactive({
+  content: [
+    { required: true, message: '请输入公告内容', trigger: 'blur' }
+  ],
+  isShow: [
+    { required: true, message: '请选择是否展示', trigger: 'change' }
+  ],
+  position: [
+    { required: true, message: '请选择显示位置', trigger: 'change' }
+  ]
+})
+
+const syncMobile = () => {
+  isMobile.value = window.innerWidth <= 768
 }
 
-/** 取消按钮 */
-const cancel = () => {
-    open.value = false
-    reset()
+const resolvePositionMeta = (value: string) => {
+  return positionOptions.value.find(item => item.value === value) || {
+    label: value || '未设置',
+    style: 'info'
+  }
 }
 
-/** 表单重置 */
 const reset = () => {
-    form.id = undefined
-    form.isShow = 1
-    form.position = 'right'
-    form.content = ''
+  form.id = undefined
+  form.content = ''
+  form.isShow = 1
+  form.position = positionOptions.value[0]?.value || 'right'
 }
 
-/** 搜索按钮操作 */
-const handleQuery = () => {
-    queryParams.pageNum = 1
-    getList()
-}
-
-/** 重置按钮操作 */
-const resetQuery = () => {
-    queryFormRef.value?.resetFields()
-    handleQuery()
-}
-
-/** 多选框选中数据 */
-const handleSelectionChange = (selection: { id: any }[]) => {
-    selectedIds.value = selection.map(item => item.id)
-}
-
-/** 新增按钮操作 */
-const handleAdd = () => {
-    reset()
-    open.value = true
-    title.value = "添加公告"
-}
-
-/** 修改按钮操作 */
-const handleUpdate = (row: any) => {
-    reset()
-    Object.assign(form, row)
-    open.value = true
-    title.value = "修改公告"
-
-}
-
-/** 提交按钮 */
-const submitForm = () => {
-    formRef.value?.validate((valid: any) => {
-        if (valid) {
-            if (form.id !== undefined) {
-                updateSysNoticeApi(form).then(response => {
-                    ElMessage.success("修改成功")
-                    open.value = false
-                    getList()
-                })
-            } else {
-                addSysNoticeApi(form).then(response => {
-                    ElMessage.success("新增成功")
-                    open.value = false
-                    getList()
-                })
-            }
-        }
-    })
-}
-
-/** 批量删除按钮操作 */
-const handleBatchDelete = () => {
-    if (!selectedIds.value.length) {
-        return
-    }
-    ElMessageBox.confirm('是否确认删除"' + selectedIds.value.length + '"条数据项?', "警告", {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        type: "warning"
-    }).then(() => {
-        deleteSysNoticeApi(selectedIds.value)
-    }).then(() => {
-        getList()
-        ElMessage.success("删除成功")
-    })
-}
-
-/** 删除按钮操作 */
-const handleDelete = (row: any) => {
-    ElMessageBox.confirm('是否确认删除编号为"' + row.id + '"的数据项?', "警告", {
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        type: "warning"
-    }).then(() => {
-        deleteSysNoticeApi(row.id)
-    }).then(() => {
-        getList()
-        ElMessage.success("删除成功")
-    })
-}
-
-
-// 添加分页方法
-const handleSizeChange = (val: any) => {
-    queryParams.pageSize = val
-    getList()
-}
-
-const handleCurrentChange = (val: any) => {
-    queryParams.pageNum = val
-    getList()
-}
-// 切换状态
-const handleChange = (row: any) => {
-    updateSysNoticeApi({ id: row.id, isShow: row.isShow,position:row.position }).then(response => {
-        ElMessage.success("修改成功")
-    }).catch(error => {
-        row.isShow = !row.isShow
-    })
+const getList = async () => {
+  loading.value = true
+  try {
+    const { data } = await listSysNoticeApi(queryParams)
+    dataList.value = data.records || []
+    total.value = data.total || 0
+    selectedIds.value = []
+  } finally {
+    loading.value = false
+  }
 }
 
 const getDicts = async () => {
-    try {
-        const { data } = await getDictDataByDictTypesApi(['notice_position'])
-        positionOptions.value = data.notice_position.list
-    } catch (error) {
+  const { data } = await getDictDataByDictTypesApi(['notice_position'])
+  positionOptions.value = data.notice_position?.list || []
+  if (!form.position && positionOptions.value.length) {
+    form.position = positionOptions.value[0].value
+  }
+}
+
+const handleQuery = () => {
+  queryParams.pageNum = 1
+  getList()
+}
+
+const resetQuery = () => {
+  queryFormRef.value?.resetFields()
+  handleQuery()
+}
+
+const handleSelectionChange = (selection: Array<{ id: number }>) => {
+  selectedIds.value = selection.map(item => item.id)
+}
+
+const handleAdd = () => {
+  reset()
+  title.value = '新增公告'
+  open.value = true
+}
+
+const handleUpdate = (row: any) => {
+  reset()
+  Object.assign(form, {
+    id: row.id,
+    content: row.content,
+    isShow: row.isShow,
+    position: row.position
+  })
+  title.value = '编辑公告'
+  open.value = true
+}
+
+const submitForm = () => {
+  formRef.value?.validate(async (valid: boolean) => {
+    if (!valid) return
+
+    if (form.id !== undefined) {
+      await updateSysNoticeApi(form)
+      ElMessage.success('公告修改成功')
+    } else {
+      await addSysNoticeApi(form)
+      ElMessage.success('公告新增成功')
     }
-}
-
-const handleCreated = (editor:any) => {
-  editorRef.value = editor // 记录 editor 实例，重要！
-}
-
-onMounted(() => {
+    open.value = false
     getList()
-    getDicts()
+  })
+}
+
+const cancel = () => {
+  open.value = false
+  reset()
+  formRef.value?.resetFields()
+}
+
+const handleBatchDelete = async () => {
+  if (!selectedIds.value.length) return
+
+  await ElMessageBox.confirm(
+    `确定要删除选中的 ${selectedIds.value.length} 条公告吗？`,
+    '提示',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  )
+  await deleteSysNoticeApi(selectedIds.value)
+  ElMessage.success('删除成功')
+  getList()
+}
+
+const handleDelete = async (row: any) => {
+  await ElMessageBox.confirm(
+    `确定要删除这条公告吗？`,
+    '提示',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  )
+  await deleteSysNoticeApi(row.id)
+  ElMessage.success('删除成功')
+  getList()
+}
+
+const handleChange = async (row: any) => {
+  const previous = row.isShow === 1 ? 0 : 1
+  try {
+    await updateSysNoticeApi({
+      id: row.id,
+      isShow: row.isShow,
+      position: row.position,
+      content: row.content
+    })
+    ElMessage.success('展示状态已更新')
+  } catch (error) {
+    row.isShow = previous
+  }
+}
+
+const handleSizeChange = (val: number) => {
+  queryParams.pageSize = val
+  getList()
+}
+
+const handleCurrentChange = (val: number) => {
+  queryParams.pageNum = val
+  getList()
+}
+
+const handleCreated = (editor: any) => {
+  editorRef.value = editor
+}
+
+onMounted(async () => {
+  syncMobile()
+  window.addEventListener('resize', syncMobile)
+  await getDicts()
+  reset()
+  getList()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', syncMobile)
+  editorRef.value?.destroy?.()
 })
 </script>
+
+<style scoped lang="scss">
+.notice-content {
+  line-height: 1.7;
+  color: var(--el-text-color-primary);
+
+  :deep(p) {
+    margin: 0;
+  }
+}
+
+.notice-editor {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--el-border-color);
+  border-radius: 12px;
+  background: var(--el-bg-color);
+}
+
+.notice-editor__toolbar {
+  border-bottom: 1px solid var(--el-border-color);
+}
+
+.notice-editor__body {
+  min-height: 320px;
+  overflow-y: hidden;
+}
+
+.notice-editor__hint {
+  margin-top: 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.notice-position-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .notice-page {
+    :deep(.notice-dialog) {
+      border-radius: 0 !important;
+    }
+
+    :deep(.notice-form .el-form-item) {
+      display: block;
+      margin-bottom: 16px !important;
+    }
+
+    :deep(.notice-form .el-form-item__label) {
+      display: block;
+      width: 100% !important;
+      padding: 0 0 8px !important;
+      text-align: left !important;
+      font-weight: 600;
+    }
+
+    :deep(.notice-form .el-form-item__content) {
+      margin-left: 0 !important;
+      width: 100%;
+    }
+
+    .notice-editor__toolbar {
+      overflow-x: auto;
+      scrollbar-width: none;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+
+    .notice-editor__body {
+      min-height: 48dvh;
+    }
+  }
+}
+</style>

@@ -7,6 +7,10 @@
       </el-icon>
 
       <Breadcrumb v-if="!isMobile" />
+      <div v-else class="mobile-page-meta">
+        <div class="mobile-page-label">管理后台</div>
+        <div class="mobile-page-title">{{ currentTitle }}</div>
+      </div>
     </div>
 
     <div class="navbar-right">
@@ -23,7 +27,7 @@
         <notification />
       </el-tooltip>
 
-      <user-tool @lock="handleLock" />
+      <user-tool :is-mobile="isMobile" @lock="handleLock" />
     </div>
 
     <lock-screen ref="lockScreenRef" />
@@ -32,6 +36,7 @@
 
 <script setup lang="ts">
 import screenfull from "screenfull";
+import { useRoute } from "vue-router";
 import Breadcrumb from "./Breadcrumb/index.vue";
 import GlobalSearch from "@/components/GlobalSearch/index.vue";
 import UserTool from "./UserTool/index.vue";
@@ -54,6 +59,12 @@ const emit = defineEmits(["toggle-collapse"]);
 
 const lockScreenRef = ref();
 const isFullscreen = ref(false);
+const route = useRoute();
+
+const currentTitle = computed(() => {
+  const matched = [...route.matched].reverse().find((item) => item.meta?.title);
+  return String(matched?.meta?.title || "工作台");
+});
 
 const toggleCollapse = () => {
   emit("toggle-collapse");
@@ -84,6 +95,7 @@ const toggleFullscreen = () => {
 .navbar-left {
   display: flex;
   align-items: center;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -107,6 +119,30 @@ const toggleFullscreen = () => {
   min-width: 0;
 }
 
+.mobile-page-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-page-label {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--el-text-color-secondary);
+}
+
+.mobile-page-title {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .setting-icon {
   font-size: 20px !important;
   cursor: pointer;
@@ -128,10 +164,15 @@ const toggleFullscreen = () => {
 
   .collapse-btn {
     margin-right: 0;
+    font-size: 19px;
   }
 
   .navbar-right {
     gap: 4px;
+  }
+
+  .mobile-page-title {
+    max-width: 180px;
   }
 }
 </style>

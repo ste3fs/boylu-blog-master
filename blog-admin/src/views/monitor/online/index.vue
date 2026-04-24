@@ -1,139 +1,132 @@
 <template>
-    <div class="app-container">
-      <!-- 搜索表单 -->
-      <PageSearch>
-        <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-          <el-form-item label="用户名" prop="username">
-            <el-input
-              v-model="queryParams.username"
-              placeholder="请输入用户名"
-              clearable
-              @keyup.enter="handleQuery"
-            />
-          </el-form-item>
-                    <el-form-item>
-            <PageSearchActions @search="handleQuery" @reset="resetQuery" />
-          </el-form-item>
-        </el-form>
-      </PageSearch>
-  
-      <!-- 操作按钮区域 -->
-      <el-card class="box-card">
-        <!-- 数据表格 -->
-        <el-table
-          v-loading="loading"
-          :data="tableData"
-          style="width: 100%"
-        >
-          <el-table-column type="selection"  width="55" align="center" />
-          <el-table-column label="会话凭证" align="center" width="180" prop="tokenValue" show-overflow-tooltip />
-          <el-table-column label="账号" align="center" prop="username" show-overflow-tooltip />
-          <el-table-column label="登录IP" align="center" prop="ip" width="180" />
-          <el-table-column label="登录地点" align="center" prop="ipLocation" width="180" />
-          <el-table-column label="浏览器" align="center" prop="browser" width="180" />
-          <el-table-column label="操作系统" align="center" prop="os" width="180" />
-          <el-table-column label="登录时间" align="center" prop="lastLoginTime" width="180" />
-          <el-table-column label="操作" align="center" width="280" fixed="right">
-            <template #default="scope">
-              <el-button
+  <div class="app-container">
+    <PageSearch>
+      <el-form ref="queryFormRef" :model="queryParams" :inline="!isMobile">
+        <el-form-item label="用户名" prop="username">
+          <el-input
+            v-model="queryParams.username"
+            placeholder="请输入用户名"
+            clearable
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
+        <el-form-item>
+          <PageSearchActions @search="handleQuery" @reset="resetQuery" />
+        </el-form-item>
+      </el-form>
+    </PageSearch>
+
+    <el-card class="box-card">
+      <el-table v-loading="loading" :data="tableData">
+        <el-table-column label="会话凭证" prop="tokenValue" min-width="220" show-overflow-tooltip />
+        <el-table-column label="账号" prop="username" min-width="120" show-overflow-tooltip />
+        <el-table-column label="登录 IP" prop="ip" min-width="140" />
+        <el-table-column label="登录地点" prop="ipLocation" min-width="140" show-overflow-tooltip />
+        <el-table-column label="浏览器" prop="browser" min-width="130" show-overflow-tooltip />
+        <el-table-column label="操作系统" prop="os" min-width="130" show-overflow-tooltip />
+        <el-table-column label="登录时间" prop="lastLoginTime" min-width="170" align="center" />
+        <el-table-column label="操作" align="center" width="120" fixed="right">
+          <template #default="{ row }">
+            <PageTableActions>
+              <PageTableAction
                 v-permission="['monitor:online:forceLogout']"
                 type="danger"
-                link
-              :icon="Delete"
-                @click="handleDelete(scope.row)"
-              >强退</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-  
-        <!-- 分页组件 -->
-        <PagePagination
-          v-model:current-page="queryParams.pageNum"
-          v-model:page-size="queryParams.pageSize"
-          :total="total"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </el-card>
-    </div>
-  </template>
-  
-  <script setup lang="ts">
+                :icon="Delete"
+                @click="handleDelete(row)"
+              >
+                强退
+              </PageTableAction>
+            </PageTableActions>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <PagePagination
+        v-model:current-page="queryParams.pageNum"
+        v-model:page-size="queryParams.pageSize"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </el-card>
+  </div>
+</template>
+
+<script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Refresh, Search } from '@element-plus/icons-vue'
-  import type { FormInstance } from 'element-plus'
-  import {
-    getOnlineUserApi,
-    forceLogoutApi
-  } from '@/api/system/user'
-  
-  // 查询参数
-  const queryParams = reactive({
-    pageNum: 1,
-    pageSize: 10,
-    username: null
-  })
-  
-  const loading = ref(false)
-  const total = ref(0)
-  const tableData = ref([])
-  const queryFormRef = ref<FormInstance>()
-  
-  
-  // 获取标签列表
-  const getList = async () => {
-    loading.value = true
-    try {
-      const { data } = await getOnlineUserApi(queryParams)
-      tableData.value = data.records
-      total.value = data.total
-    } catch (error) {
-    }
+import { Delete } from '@element-plus/icons-vue'
+import type { FormInstance } from 'element-plus'
+import { forceLogoutApi, getOnlineUserApi } from '@/api/system/user'
+
+const isMobile = ref(false)
+const loading = ref(false)
+const total = ref(0)
+const tableData = ref<any[]>([])
+const queryFormRef = ref<FormInstance>()
+
+const queryParams = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  username: null as string | null
+})
+
+const syncMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
+
+const getList = async () => {
+  loading.value = true
+  try {
+    const { data } = await getOnlineUserApi(queryParams)
+    tableData.value = data.records || []
+    total.value = data.total || 0
+  } finally {
     loading.value = false
   }
-  
-  // 删除
-  const handleDelete = (row: any) => {
-    ElMessageBox.confirm(`是否确认强退 ${row.tokenValue} 这个用户?`, '警告', {
+}
+
+const handleDelete = async (row: any) => {
+  await ElMessageBox.confirm(
+    `确定要强制下线账号“${row.username}”吗？`,
+    '提示',
+    {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
-    }).then(async () => {
-      try {
-        await forceLogoutApi(row.tokenValue)
-        ElMessage.success('强制下线成功')
-        getList()
-      } catch (error) {
-      }
-    })
-  }
+    }
+  )
+  await forceLogoutApi(row.tokenValue)
+  ElMessage.success('用户已强制下线')
+  getList()
+}
 
-  // 搜索
-  const handleQuery = () => {
-    queryParams.pageNum = 1
-    getList()
-  }
-  
-  // 重置查询
-  const resetQuery = () => {
-    queryFormRef.value?.resetFields()
-    handleQuery()
-  }
-  
-  // 分页大小改变
-  const handleSizeChange = (val: number) => {
-    queryParams.pageSize = val
-    getList()
-  }
-  
-  // 页码改变
-  const handleCurrentChange = (val: number) => {
-    queryParams.pageNum = val
-    getList()
-  }
-  
-  // 初始化
-  onMounted(() => {
-    getList()
-  })
-  </script>
+const handleQuery = () => {
+  queryParams.pageNum = 1
+  getList()
+}
+
+const resetQuery = () => {
+  queryFormRef.value?.resetFields()
+  handleQuery()
+}
+
+const handleSizeChange = (val: number) => {
+  queryParams.pageSize = val
+  getList()
+}
+
+const handleCurrentChange = (val: number) => {
+  queryParams.pageNum = val
+  getList()
+}
+
+onMounted(() => {
+  syncMobile()
+  getList()
+  window.addEventListener('resize', syncMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', syncMobile)
+})
+</script>

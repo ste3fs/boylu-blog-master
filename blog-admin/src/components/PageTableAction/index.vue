@@ -24,3 +24,12 @@ const emit = defineEmits<{
   click: [event: MouseEvent]
 }>()
 </script>
+
+<style scoped>
+@media (max-width: 768px) {
+  :deep(.el-button) {
+    min-height: 30px;
+    padding-inline: 4px;
+  }
+}
+</style>

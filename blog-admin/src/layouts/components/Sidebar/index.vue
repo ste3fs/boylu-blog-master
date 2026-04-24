@@ -215,4 +215,42 @@
       }
     }
   }
+
+  @media (max-width: 768px) {
+    .logo-container {
+      height: 52px;
+      padding: 0 16px;
+
+      .logo-text {
+        font-size: 16px;
+        margin-left: 10px;
+      }
+    }
+
+    :deep(.el-scrollbar) {
+      flex: 1;
+    }
+
+    :deep(.el-menu) {
+      .el-menu-item,
+      .el-sub-menu__title {
+        height: 48px;
+        line-height: 48px;
+        font-size: 14px;
+
+        .el-icon {
+          width: 20px;
+          margin-right: 10px;
+          font-size: 16px;
+        }
+      }
+    }
+
+    :deep(.el-menu .el-menu) {
+      .el-menu-item {
+        height: 44px;
+        line-height: 44px;
+      }
+    }
+  }
   </style>

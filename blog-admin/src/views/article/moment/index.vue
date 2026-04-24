@@ -1,43 +1,120 @@
-﻿<template>
-  <div class="app-container">
-
-    <!-- 鎿嶄綔鎸夐挳鍖哄煙 -->
+<template>
+  <div class="app-container moment-page">
     <el-card class="box-card">
       <template #header>
         <PageToolbar>
           <PageToolbarGroup>
-            <el-button v-permission="['sys:moment:add']" type="primary" :icon="Plus" @click="handleAdd">鏂板</el-button>
+            <el-button
+              v-permission="['sys:moment:add']"
+              type="primary"
+              :icon="Plus"
+              @click="handleAdd"
+            >
+              新增说说
+            </el-button>
           </PageToolbarGroup>
           <PageToolbarGroup kind="danger">
-            <el-button v-permission="['sys:moment:delete']" type="danger" :icon="Delete"
-              :disabled="selectedIds.length === 0" @click="handleBatchDelete">鎵归噺鍒犻櫎</el-button>
+            <el-button
+              v-permission="['sys:moment:delete']"
+              type="danger"
+              :icon="Delete"
+              :disabled="selectedIds.length === 0"
+              @click="handleBatchDelete"
+            >
+              批量删除
+            </el-button>
           </PageToolbarGroup>
         </PageToolbar>
       </template>
 
-      <!-- 鏁版嵁琛ㄦ牸 -->
-      <el-table v-loading="loading" :data="momentList" style="width: 100%" @selection-change="handleSelectionChange">
+      <el-table
+        v-if="!isMobile"
+        v-loading="loading"
+        :data="momentList"
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="鍐呭" align="center" prop="content" show-overflow-tooltip />
-        <el-table-column label="鍥剧墖" align="center" prop="content">
+        <el-table-column label="内容" align="center" prop="content" show-overflow-tooltip />
+        <el-table-column label="图片" align="center" width="180">
           <template #default="scope">
-            <el-image v-for="item in parseImage(scope.row.images)" :src="item" style="width: 50px; height: 50px" />
+            <div class="moment-images">
+              <el-image
+                v-for="item in parseImages(scope.row.images)"
+                :key="item"
+                :src="item"
+                fit="cover"
+                class="moment-thumb"
+              />
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="鍒涘缓鏃堕棿" align="center" prop="createTime" width="180" />
-        <el-table-column label="鎿嶄綔" align="center" width="280" fixed="right">
+        <el-table-column label="创建时间" align="center" prop="createTime" width="180" />
+        <el-table-column label="操作" align="center" width="180" fixed="right">
           <template #default="scope">
             <PageTableActions>
-              <PageTableAction v-permission="['sys:moment:update']" type="primary" :icon="Edit"
-                @click="handleUpdate(scope.row)">淇敼</PageTableAction>
-              <PageTableAction v-permission="['sys:moment:delete']" type="danger" :icon="Delete"
-                @click="handleDelete(scope.row)">鍒犻櫎</PageTableAction>
+              <PageTableAction
+                v-permission="['sys:moment:update']"
+                type="primary"
+                :icon="Edit"
+                @click="handleUpdate(scope.row)"
+              >
+                编辑
+              </PageTableAction>
+              <PageTableAction
+                v-permission="['sys:moment:delete']"
+                type="danger"
+                :icon="Delete"
+                @click="handleDelete(scope.row)"
+              >
+                删除
+              </PageTableAction>
             </PageTableActions>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 鍒嗛〉缁勪欢 -->
+      <div v-else v-loading="loading" class="moment-mobile-list">
+        <div v-if="selectedIds.length" class="moment-selection-bar">
+          <span>已选 {{ selectedIds.length }} 条说说</span>
+          <el-button link type="primary" @click="selectedIds = []">清空</el-button>
+        </div>
+
+        <template v-if="momentList.length">
+          <article v-for="row in momentList" :key="row.id" class="moment-card">
+            <div class="moment-card__header">
+              <el-checkbox
+                :model-value="isMomentSelected(row.id)"
+                @change="(checked) => toggleMomentSelection(row.id, Boolean(checked))"
+              />
+              <div class="moment-card__content" v-html="row.content || '暂无内容'" />
+            </div>
+
+            <div v-if="parseImages(row.images).length" class="moment-card__images">
+              <el-image
+                v-for="item in parseImages(row.images).slice(0, 4)"
+                :key="item"
+                :src="item"
+                fit="cover"
+                class="moment-card__image"
+              />
+            </div>
+
+            <div class="moment-card__meta">
+              <span>发布时间</span>
+              <strong>{{ row.createTime || '未记录' }}</strong>
+            </div>
+
+            <div class="moment-card__actions">
+              <el-button type="primary" plain :icon="Edit" @click="handleUpdate(row)">编辑</el-button>
+              <el-button type="danger" plain :icon="Delete" @click="handleDelete(row)">删除</el-button>
+            </div>
+          </article>
+        </template>
+
+        <el-empty v-else description="暂无说说数据" />
+      </div>
+
       <PagePagination
         v-model:current-page="queryParams.pageNum"
         v-model:page-size="queryParams.pageSize"
@@ -47,26 +124,53 @@
       />
     </el-card>
 
-    <!-- 娣诲姞鎴栦慨鏀瑰璇濇 -->
-    <el-dialog :title="dialog.title" v-model="dialog.visible" width="600px" append-to-body destroy-on-close
-      class="custom-dialog">
-      <el-form ref="momentFormRef" :model="momentForm" :rules="rules" label-width="80px" class="custom-form">
-        <el-form-item label="鍐呭" prop="content">
-            <div style="border: 1px solid #ccc;">
-                <Toolbar style="border-bottom: 1px solid #ccc;" :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode" />
-                <Editor style=" overflow-y: hidden;min-height: 300px;" v-model="momentForm.content" :defaultConfig="editorConfig" :mode="mode"
-                @onCreated="handleCreated"/>
-            </div>
+    <el-dialog
+      v-model="dialog.visible"
+      :title="dialog.title"
+      :width="isMobile ? '100vw' : '600px'"
+      :top="isMobile ? '0' : '8vh'"
+      :fullscreen="isMobile"
+      append-to-body
+      destroy-on-close
+      class="custom-dialog moment-dialog"
+    >
+      <el-form
+        ref="momentFormRef"
+        :model="momentForm"
+        :rules="rules"
+        :label-width="isMobile ? '100%' : '80px'"
+        :label-position="isMobile ? 'top' : 'right'"
+        class="custom-form"
+      >
+        <el-form-item label="内容" prop="content">
+          <div class="moment-editor">
+            <Toolbar
+              class="moment-editor__toolbar"
+              :editor="editorRef"
+              :defaultConfig="toolbarConfig"
+              :mode="mode"
+            />
+            <Editor
+              class="moment-editor__body"
+              v-model="momentForm.content"
+              :defaultConfig="editorConfig"
+              :mode="mode"
+              @onCreated="handleCreated"
+            />
+          </div>
+          <div v-if="isMobile" class="moment-editor__hint">
+            手机端已精简工具栏，保留常用格式、链接、表情和图片。
+          </div>
         </el-form-item>
-        <el-form-item label="鍥剧墖" prop="images">
+        <el-form-item label="图片" prop="images">
           <UploadImage v-model="momentForm.images" :source="'moment'" :limit="9" :multiple="true" />
         </el-form-item>
       </el-form>
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="cancel">鍙?娑?</el-button>
-          <el-button type="primary" :loading="submitLoading" @click="submitForm">纭?瀹?</el-button>
+          <el-button @click="cancel">取消</el-button>
+          <el-button type="primary" :loading="submitLoading" @click="submitForm">确定</el-button>
         </div>
       </template>
     </el-dialog>
@@ -84,193 +188,389 @@ import {
   deleteSysMomentApi
 } from '@/api/article/moment'
 import UploadImage from '@/components/Upload/Image.vue'
-
-
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 import '@wangeditor/editor/dist/css/style.css'
+
+const MOBILE_TOOLBAR_KEYS = [
+  'headerSelect',
+  'bold',
+  'italic',
+  'underline',
+  'color',
+  'bulletedList',
+  'numberedList',
+  'blockquote',
+  'insertLink',
+  'emotion',
+  'insertImage',
+  'undo',
+  'redo',
+  'fullScreen'
+]
+
 const editorRef = shallowRef()
 const mode = 'default'
-const toolbarConfig = {}
+const toolbarConfig = computed(() => (
+  isMobile.value
+    ? { toolbarKeys: MOBILE_TOOLBAR_KEYS }
+    : {}
+))
 const editorConfig = {
-  placeholder: "璇疯緭鍏ュ唴瀹?..",
+  placeholder: '请输入说说内容...',
   MENU_CONF: {
     codeSelectLang: {
-      // 浠ｇ爜璇█
       codeLangs: [
-        { text: "CSS", value: "css" },
-        { text: "HTML", value: "html" },
-        { text: "XML", value: "xml" },
-        { text: "Java", value: "java" },
-      ],
-    },
-  },
+        { text: 'CSS', value: 'css' },
+        { text: 'HTML', value: 'html' },
+        { text: 'XML', value: 'xml' },
+        { text: 'Java', value: 'java' }
+      ]
+    }
+  }
 }
 
-// 鏌ヨ鍙傛暟
 const queryParams = reactive({
   pageNum: 1,
-  pageSize: 10,
+  pageSize: 10
 })
 
 const loading = ref(false)
 const total = ref(0)
-const momentList = ref([])
+const momentList = ref<any[]>([])
 const momentFormRef = ref<FormInstance>()
 const submitLoading = ref(false)
-
-// 閫変腑椤规暟缁?
 const selectedIds = ref<number[]>([])
+const isMobile = ref(false)
 
-// 寮圭獥鎺у埗
 const dialog = reactive({
   title: '',
   visible: false,
   type: 'add'
 })
 
-// 琛ㄥ崟鏁版嵁
 const momentForm = reactive<any>({
   id: undefined,
   content: '',
-  images: '',
+  images: ''
 })
 
-// 琛ㄥ崟鏍￠獙瑙勫垯
 const rules = reactive<FormRules>({
   content: [
     { required: true, message: '请输入内容', trigger: 'blur' }
-  ],
+  ]
 })
 
-const parseImage = (images: string) => {
-  return images.split(',')
+const syncMobile = () => {
+  isMobile.value = window.innerWidth <= 768
 }
 
-// 鑾峰彇鏍囩鍒楄〃
+const parseImages = (images?: string | string[]) => {
+  if (Array.isArray(images)) {
+    return images.filter(Boolean)
+  }
+  return String(images || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+const isMomentSelected = (id: number) => selectedIds.value.includes(id)
+
+const toggleMomentSelection = (id: number, checked: boolean) => {
+  if (checked) {
+    if (!selectedIds.value.includes(id)) {
+      selectedIds.value.push(id)
+    }
+    return
+  }
+  selectedIds.value = selectedIds.value.filter(item => item !== id)
+}
+
 const getList = async () => {
   loading.value = true
   try {
     const { data } = await getSysMomentListApi(queryParams)
     momentList.value = data.records
     total.value = data.total
-  } catch (error) {
+    selectedIds.value = []
+  } finally {
+    loading.value = false
   }
-  loading.value = false
 }
 
-// 琛ㄦ牸閫夋嫨椤瑰彉鍖?
 const handleSelectionChange = (selection: any[]) => {
   selectedIds.value = selection.map(item => item.id)
 }
 
-// 鎵归噺鍒犻櫎
 const handleBatchDelete = () => {
   if (selectedIds.value.length === 0) return
 
-  ElMessageBox.confirm(`鏄惁纭鍒犻櫎 ${selectedIds.value.length} 涓璇?`, '璀﹀憡', {
-    confirmButtonText: '纭畾',
-    cancelButtonText: '鍙栨秷',
+  ElMessageBox.confirm(`是否确认删除 ${selectedIds.value.length} 条说说？`, '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
     type: 'warning'
   }).then(async () => {
-    try {
-      await deleteSysMomentApi(selectedIds.value)
-      ElMessage.success('鎵归噺鍒犻櫎鎴愬姛')
-      getList()
-      selectedIds.value = []
-    } catch (error) {
-    }
+    await deleteSysMomentApi(selectedIds.value)
+    ElMessage.success('批量删除成功')
+    getList()
   })
 }
 
-// 鍒犻櫎
 const handleDelete = (row: any) => {
-  ElMessageBox.confirm(`鏄惁纭鍒犻櫎 ${row.content} 杩欎釜璇磋?`, '璀﹀憡', {
-    confirmButtonText: '纭畾',
-    cancelButtonText: '鍙栨秷',
+  ElMessageBox.confirm('是否确认删除这条说说？', '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
     type: 'warning'
   }).then(async () => {
-    try {
-      await deleteSysMomentApi(row.id)
-      ElMessage.success('鍒犻櫎鎴愬姛')
-      getList()
-    } catch (error) {
-    }
+    await deleteSysMomentApi(row.id)
+    ElMessage.success('删除成功')
+    getList()
   })
 }
 
-
-// 鏂板璇磋
 const handleAdd = () => {
   dialog.type = 'add'
-  dialog.title = '鏂板璇磋'
+  dialog.title = '新增说说'
   dialog.visible = true
   momentForm.id = undefined
   momentForm.content = ''
   momentForm.images = ''
 }
 
-// 淇敼璇磋
 const handleUpdate = (row: any) => {
   dialog.type = 'edit'
-  dialog.title = '淇敼璇磋'
+  dialog.title = '编辑说说'
   dialog.visible = true
   Object.assign(momentForm, row)
-  momentForm.images = momentForm.images.split(',')
+  momentForm.images = parseImages(momentForm.images)
 }
 
-// 瀵屾枃鏈紪杈戝櫒鍒涘缓瀹屾垚
-const handleCreated = (editor:any) => {
-  editorRef.value = editor // 璁板綍 editor 瀹炰緥锛岄噸瑕侊紒
+const handleCreated = (editor: any) => {
+  editorRef.value = editor
 }
 
-// 鎻愪氦琛ㄥ崟
 const submitForm = async () => {
   if (!momentFormRef.value) return
 
   await momentFormRef.value.validate(async (valid) => {
-    if (valid) {
-      submitLoading.value = true
-      try {
-        if (momentForm.images && momentForm.images.length > 0) {
-          momentForm.images = momentForm.images.join(',')
-        }
-        if (dialog.type === 'add') {
-          await addSysMomentApi(momentForm)
-          ElMessage.success('鏂板鎴愬姛')
-        } else {
-          await updateSysMomentApi(momentForm)
-          ElMessage.success('淇敼鎴愬姛')
-        }
-        getList()
-        dialog.visible = false
-      } catch (error) {
-      } finally {
-        submitLoading.value = false
+    if (!valid) return
+
+    submitLoading.value = true
+    try {
+      const payload = {
+        ...momentForm,
+        images: Array.isArray(momentForm.images) ? momentForm.images.join(',') : momentForm.images
       }
+      if (dialog.type === 'add') {
+        await addSysMomentApi(payload)
+        ElMessage.success('新增成功')
+      } else {
+        await updateSysMomentApi(payload)
+        ElMessage.success('编辑成功')
+      }
+      dialog.visible = false
+      getList()
+    } finally {
+      submitLoading.value = false
     }
   })
 }
 
-// 鍙栨秷鎸夐挳
 const cancel = () => {
   dialog.visible = false
   momentFormRef.value?.resetFields()
 }
 
-// 鍒嗛〉澶у皬鏀瑰彉
 const handleSizeChange = (val: number) => {
   queryParams.pageSize = val
   getList()
 }
 
-// 椤电爜鏀瑰彉
 const handleCurrentChange = (val: number) => {
   queryParams.pageNum = val
   getList()
 }
 
-// 鍒濆鍖?
 onMounted(() => {
+  syncMobile()
   getList()
+  window.addEventListener('resize', syncMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', syncMobile)
 })
 </script>
+
+<style scoped lang="scss">
+.moment-images {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.moment-thumb {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+}
+
+.moment-editor {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--el-border-color);
+  border-radius: 12px;
+}
+
+.moment-editor__toolbar {
+  border-bottom: 1px solid var(--el-border-color);
+}
+
+.moment-editor__body {
+  min-height: 300px;
+  overflow-y: hidden;
+}
+
+.moment-editor__hint {
+  margin-top: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (max-width: 768px) {
+  .moment-page {
+    .moment-mobile-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .moment-selection-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 2px 0;
+      color: var(--el-text-color-secondary);
+      font-size: 13px;
+    }
+
+    .moment-card {
+      padding: 14px;
+      border-radius: 16px;
+      background: var(--el-fill-color-extra-light);
+      border: 1px solid var(--el-border-color-lighter);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .moment-card__header {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .moment-card__content {
+      flex: 1;
+      min-width: 0;
+      color: var(--el-text-color-primary);
+      font-size: 14px;
+      line-height: 1.7;
+      word-break: break-word;
+
+      :deep(p) {
+        margin: 0;
+      }
+    }
+
+    .moment-card__images {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .moment-card__image {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--el-fill-color);
+    }
+
+    .moment-card__meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--el-border-color-lighter);
+      color: var(--el-text-color-secondary);
+      font-size: 12px;
+
+      strong {
+        color: var(--el-text-color-primary);
+        font-weight: 500;
+      }
+    }
+
+    .moment-card__actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+
+      .el-button {
+        flex: 1;
+        min-height: 38px;
+        margin: 0;
+      }
+    }
+
+    :deep(.moment-dialog) {
+      border-radius: 0 !important;
+    }
+
+    :deep(.el-dialog__body) {
+      padding: 14px !important;
+    }
+
+    :deep(.el-dialog__footer) {
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      background: var(--el-bg-color);
+      border-top: 1px solid var(--el-border-color-lighter);
+    }
+
+    :deep(.el-form-item) {
+      display: block;
+      margin-bottom: 16px !important;
+    }
+
+    :deep(.el-form-item__label) {
+      display: block;
+      width: 100% !important;
+      padding: 0 0 8px !important;
+      text-align: left !important;
+      font-weight: 600;
+    }
+
+    :deep(.el-form-item__content) {
+      margin-left: 0 !important;
+      width: 100%;
+    }
+
+    .moment-editor__toolbar {
+      overflow-x: auto;
+      scrollbar-width: none;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+
+    .moment-editor__body {
+      min-height: 48dvh;
+    }
+  }
+}
+</style>

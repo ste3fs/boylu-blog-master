@@ -1,10 +1,8 @@
-﻿<template>
+<template>
   <div class="dict-container">
-    <!-- 鎼滅储琛ㄥ崟 -->
     <PageSearch>
-      <!-- 鎼滅储鍖哄煙 -->
       <el-form :inline="true" :model="queryParams" class="search-form">
-        <el-form-item label="瀛楀吀鍚嶇О">
+        <el-form-item label="字典名称">
           <el-input
             v-model="queryParams.name"
             placeholder="请输入字典名称"
@@ -14,11 +12,11 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-            <el-option label="鍚敤" value="1" />
-            <el-option label="绂佺敤" value="0" />
+            <el-option label="启用" value="1" />
+            <el-option label="禁用" value="0" />
           </el-select>
         </el-form-item>
-                <el-form-item>
+        <el-form-item>
           <PageSearchActions @search="handleQuery" @reset="resetQuery" />
         </el-form-item>
       </el-form>
@@ -33,7 +31,9 @@
               type="primary"
               :icon="Plus"
               @click="handleAdd"
-            >鏂板</el-button>
+            >
+              新增
+            </el-button>
           </PageToolbarGroup>
           <PageToolbarGroup kind="danger">
             <el-button
@@ -43,12 +43,13 @@
               :icon="Delete"
               :disabled="selectedIds.length === 0"
               @click="handleBatchDelete"
-            >鎵归噺鍒犻櫎</el-button>
+            >
+              批量删除
+            </el-button>
           </PageToolbarGroup>
         </PageToolbar>
       </template>
 
-      <!-- 琛ㄦ牸鍖哄煙 -->
       <el-table
         v-loading="loading"
         :data="dictList"
@@ -56,8 +57,8 @@
         style="width: 100%"
       >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="瀛楀吀鍚嶇О" prop="name" align="center"/>
-        <el-table-column label="瀛楀吀绫诲瀷" prop="type" align="center">
+        <el-table-column label="字典名称" prop="name" align="center" />
+        <el-table-column label="字典类型" prop="type" align="center">
           <template #default="{ row }">
             <el-tag type="warning">
               {{ row.type }}
@@ -67,17 +68,17 @@
         <el-table-column label="状态" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-              {{ row.status === 1 ? '鍚敤' : '绂佺敤' }}
+              {{ row.status === 1 ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="澶囨敞" align="center" prop="remark" show-overflow-tooltip />
-        <el-table-column label="鍒涘缓鏃堕棿" align="center" prop="createTime" width="200" />
+        <el-table-column label="备注" align="center" prop="remark" show-overflow-tooltip />
+        <el-table-column label="创建时间" align="center" prop="createTime" width="200" />
         <el-table-column label="操作" width="250" align="center">
           <template #default="{ row }">
             <PageTableActions>
               <PageTableAction :icon="List" type="success" @click="handleData(row)">
-                瀛楀吀鏁版嵁
+                字典数据
               </PageTableAction>
               <PageTableAction
                 v-permission="['sys:dict:update']"
@@ -100,7 +101,6 @@
         </el-table-column>
       </el-table>
 
-      <!-- 鍒嗛〉鍖哄煙 -->
       <PagePagination
         v-model:current-page="queryParams.pageNum"
         v-model:page-size="queryParams.pageSize"
@@ -110,10 +110,9 @@
       />
     </el-card>
 
-    <!-- 瀛楀吀绫诲瀷瀵硅瘽妗?-->
     <el-dialog
       v-model="dialogVisible"
-      :title="dialogType === 'add' ? '鏂板瀛楀吀' : '淇敼瀛楀吀'"
+      :title="dialogType === 'add' ? '新增字典' : '修改字典'"
       width="500px"
       append-to-body
     >
@@ -123,19 +122,23 @@
         :rules="rules"
         label-width="100px"
       >
-        <el-form-item label="瀛楀吀鍚嶇О" prop="name">
+        <el-form-item label="字典名称" prop="name">
           <el-input v-model="dictForm.name" placeholder="请输入字典名称" />
         </el-form-item>
-        <el-form-item label="瀛楀吀绫诲瀷" prop="type">
-          <el-input :disabled="dialogType === 'edit'" v-model="dictForm.type" placeholder="请输入字典类型" />
+        <el-form-item label="字典类型" prop="type">
+          <el-input
+            v-model="dictForm.type"
+            :disabled="dialogType === 'edit'"
+            placeholder="请输入字典类型"
+          />
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="dictForm.status">
-            <el-radio :value="1">鍚敤</el-radio>
-            <el-radio :value="0">绂佺敤</el-radio>
+            <el-radio :value="1">启用</el-radio>
+            <el-radio :value="0">禁用</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="澶囨敞" prop="remark">
+        <el-form-item label="备注" prop="remark">
           <el-input
             v-model="dictForm.remark"
             type="textarea"
@@ -145,24 +148,20 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">鍙栨秷</el-button>
-          <el-button type="primary" :loading="submitLoading" @click="submitForm">纭畾</el-button>
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="submitLoading" @click="submitForm">确定</el-button>
         </div>
       </template>
     </el-dialog>
 
-    <!-- 瀛楀吀鏁版嵁瀵硅瘽妗?-->
     <el-dialog
       v-model="dataDialogVisible"
-      :title="`瀛楀吀鏁版嵁 - ${currentDict?.name}`"
+      :title="`字典数据 - ${currentDict?.name}`"
       width="800px"
       append-to-body
       :close-on-click-modal="false"
     >
-      <dict-data
-        :dict-id="currentDict?.id"
-        :dict-type="currentDict?.type"
-      />
+      <dict-data :dict-id="currentDict?.id" :dict-type="currentDict?.type" />
     </el-dialog>
   </div>
 </template>
@@ -172,10 +171,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Edit, List, Plus } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import {
-  getDictListApi,
   addDictApi,
-  updateDictApi,
-  deleteDictApi
+  deleteDictApi,
+  getDictListApi,
+  updateDictApi
 } from '@/api/system/dict'
 import DictData from './components/DictData.vue'
 
@@ -186,8 +185,10 @@ const dialogVisible = ref(false)
 const dialogType = ref<'add' | 'edit'>('add')
 const submitLoading = ref(false)
 const dictFormRef = ref<FormInstance>()
+const selectedIds = ref<number[]>([])
+const dataDialogVisible = ref(false)
+const currentDict = ref<any>()
 
-// 鏌ヨ鍙傛暟
 const queryParams = reactive<any>({
   pageNum: 1,
   pageSize: 10,
@@ -196,15 +197,13 @@ const queryParams = reactive<any>({
   status: ''
 })
 
-// 瀛楀吀琛ㄥ崟瀵硅薄
 const dictForm = reactive<Partial<any>>({
   name: '',
   type: '',
-  status: '1',
+  status: 1,
   remark: ''
 })
 
-// 琛ㄥ崟鏍￠獙瑙勫垯
 const rules = {
   name: [
     { required: true, message: '请输入字典名称', trigger: 'blur' }
@@ -217,7 +216,6 @@ const rules = {
   ]
 }
 
-// 鑾峰彇瀛楀吀鍒楄〃
 const getList = async () => {
   loading.value = true
   try {
@@ -229,20 +227,17 @@ const getList = async () => {
   loading.value = false
 }
 
-// 鎼滅储
 const handleQuery = () => {
   queryParams.pageNum = 1
   getList()
 }
 
-// 閲嶇疆鏌ヨ
 const resetQuery = () => {
   queryParams.name = ''
   queryParams.status = ''
   handleQuery()
 }
 
-// 閲嶇疆琛ㄥ崟
 const resetForm = () => {
   dictForm.id = undefined
   dictForm.name = ''
@@ -251,14 +246,12 @@ const resetForm = () => {
   dictForm.remark = ''
 }
 
-// 鏂板瀛楀吀
 const handleAdd = () => {
   resetForm()
   dialogType.value = 'add'
   dialogVisible.value = true
 }
 
-// 淇敼瀛楀吀
 const handleEdit = (row: any) => {
   resetForm()
   dialogType.value = 'edit'
@@ -266,62 +259,52 @@ const handleEdit = (row: any) => {
   Object.assign(dictForm, row)
 }
 
-// 鎻愪氦琛ㄥ崟
 const submitForm = async () => {
   if (!dictFormRef.value) return
 
   await dictFormRef.value.validate(async (valid) => {
-    if (valid) {
-      submitLoading.value = true
-      try {
-        if (dialogType.value === 'add') {
-          await addDictApi(dictForm)
-          ElMessage.success('鏂板鎴愬姛')
-        } else {
-          await updateDictApi(dictForm)
-          ElMessage.success('淇敼鎴愬姛')
-        }
-        dialogVisible.value = false
-        getList()
-      } catch (error) {
-      } finally {
-        submitLoading.value = false
+    if (!valid) {
+      return
+    }
+
+    submitLoading.value = true
+    try {
+      if (dialogType.value === 'add') {
+        await addDictApi(dictForm)
+        ElMessage.success('新增成功')
+      } else {
+        await updateDictApi(dictForm)
+        ElMessage.success('修改成功')
       }
+      dialogVisible.value = false
+      getList()
+    } catch (error) {
+    } finally {
+      submitLoading.value = false
     }
   })
 }
 
-// 鍒犻櫎瀛楀吀
 const handleDelete = (row: any) => {
-  ElMessageBox.confirm(
-    `确定要删除字典“${row.name}”吗？`,
-    '璀﹀憡',
-    {
-      confirmButtonText: '纭畾',
-      cancelButtonText: '鍙栨秷',
-      type: 'warning'
-    }
-  ).then(async () => {
+  ElMessageBox.confirm(`确定要删除字典“${row.name}”吗？`, '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
     try {
       await deleteDictApi(row.id)
-      ElMessage.success('鍒犻櫎鎴愬姛')
+      ElMessage.success('删除成功')
       getList()
     } catch (error) {
     }
   })
 }
 
-// 瀛楀吀鏁版嵁鐩稿叧
-const dataDialogVisible = ref(false)
-const currentDict = ref<any>()
-
-// 娣诲姞 handleData 鏂规硶
 const handleData = (row: any) => {
   currentDict.value = row
   dataDialogVisible.value = true
 }
 
-// 鍒嗛〉鏂规硶
 const handleSizeChange = (val: number) => {
   queryParams.pageSize = val
   getList()
@@ -332,47 +315,39 @@ const handleCurrentChange = (val: number) => {
   getList()
 }
 
-// 娣诲姞閫変腑椤规暟缁?
-const selectedIds = ref<number[]>([])
-
-// 閫夋嫨鍙樺寲
 const handleSelectionChange = (selection: any[]) => {
   selectedIds.value = selection.map(item => item.id)
 }
 
-// 鎵归噺鍒犻櫎
 const handleBatchDelete = () => {
   if (selectedIds.value.length === 0) {
-    ElMessage.warning('璇烽€夋嫨瑕佸垹闄ょ殑璁板綍')
+    ElMessage.warning('请选择要删除的记录')
     return
   }
 
   ElMessageBox.confirm(
     `确定要删除选中的 ${selectedIds.value.length} 条记录吗？`,
-    '璀﹀憡',
+    '警告',
     {
-      confirmButtonText: '纭畾',
-      cancelButtonText: '鍙栨秷',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
       type: 'warning'
     }
   ).then(async () => {
     try {
       await deleteDictApi(selectedIds.value)
-      ElMessage.success('鍒犻櫎鎴愬姛')
+      ElMessage.success('删除成功')
       getList()
     } catch (error) {
     }
   })
 }
 
-// 鍒濆鍖?
 getList()
 </script>
 
 <style scoped>
-
 .search-form {
   margin-bottom: 20px;
 }
-
 </style>

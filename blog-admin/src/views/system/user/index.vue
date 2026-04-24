@@ -1,25 +1,25 @@
 ﻿<template>
   <div class="app-container">
-    <!-- 鎼滅储琛ㄥ崟 -->
+    <!-- 搜索表单 -->
     <PageSearch>
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="用户名" prop="nickname">
           <el-input
             v-model="queryParams.nickname"
-            placeholder="璇疯緭鍏ョ敤鎴峰悕"
+            placeholder="请输入用户名"
             clearable
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item label="鐧诲綍鏂瑰紡" prop="loginType">
-          <el-select v-model="queryParams.loginType" placeholder="璇烽€夋嫨鐧诲綍鏂瑰紡" clearable>
+        <el-form-item label="登录方式" prop="loginType">
+          <el-select v-model="queryParams.loginType" placeholder="请选择登录方式" clearable>
             <el-option v-for="item in loginTypes" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
-            <el-option label="鍚敤" value="1" />
-            <el-option label="绂佺敤" value="0" />
+            <el-option label="启用" value="1" />
+            <el-option label="禁用" value="0" />
           </el-select>
         </el-form-item>
                 <el-form-item>
@@ -28,7 +28,7 @@
       </el-form>
     </PageSearch>
 
-    <!-- 鎿嶄綔鎸夐挳鍖哄煙 -->
+    <!-- 操作按钮区域 -->
     <el-card class="box-card">
       <template #header>
         <PageToolbar>
@@ -38,7 +38,7 @@
               type="primary"
               :icon="Plus"
               @click="handleAdd"
-            >鏂板</el-button>
+            >新增</el-button>
           </PageToolbarGroup>
           <PageToolbarGroup kind="danger">
             <el-button
@@ -48,12 +48,12 @@
               :icon="Delete"
               :disabled="selectedIds.length === 0"
               @click="handleBatchDelete"
-            >鎵归噺鍒犻櫎</el-button>
+            >批量删除</el-button>
           </PageToolbarGroup>
         </PageToolbar>
       </template>
 
-      <!-- 鏁版嵁琛ㄦ牸 -->
+      <!-- 数据表格 -->
       <el-table
         v-loading="loading"
         :data="userList"
@@ -61,13 +61,13 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection"  width="55" align="center" />
-        <el-table-column label="澶村儚"  prop="avatar" align="center">
+        <el-table-column label="头像"  prop="avatar" align="center">
           <template #default="{ row }">
             <el-image :src="row.avatar" style="width: 40px; height: 40px; border-radius: 5px;" />
           </template>
         </el-table-column>
-        <el-table-column label="鏄电О" align="center" prop="nickname" show-overflow-tooltip />
-        <el-table-column label="鐧诲綍鏂瑰紡" align="center" prop="ipLocation" >
+        <el-table-column label="昵称" align="center" prop="nickname" show-overflow-tooltip />
+        <el-table-column label="登录方式" align="center" prop="ipLocation" >
           <template #default="{ row }">
             <span v-for="item in loginTypes">
                 <el-tag :type="item.style" v-if="row.loginType === item.value">
@@ -76,18 +76,18 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="鐧诲綍IP" align="center" prop="ip" show-overflow-tooltip />
-        <el-table-column label="鐧诲綍鍦板潃" align="center" prop="ipLocation" show-overflow-tooltip />
+        <el-table-column label="登录 IP" align="center" prop="ip" show-overflow-tooltip />
+        <el-table-column label="登录地区" align="center" prop="ipLocation" show-overflow-tooltip />
         <el-table-column label="状态" align="center" width="80">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-              {{ row.status === 1 ? '鍚敤' : '绂佺敤' }}
+              {{ row.status === 1 ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="最后登录时间" align="center" prop="lastLoginTime" width="160" />
-        <el-table-column label="鍒涘缓鏃堕棿" align="center" prop="createTime" width="160" />
-        <el-table-column label="鎿嶄綔" align="center" width="280" fixed="right">
+        <el-table-column label="创建时间" align="center" prop="createTime" width="160" />
+        <el-table-column label="操作" align="center" width="280" fixed="right">
           <template #default="scope">
             <PageTableActions>
               <PageTableAction
@@ -95,25 +95,25 @@
                 type="primary"
                 :icon="Edit"
                 @click="handleUpdate(scope.row)"
-              >淇敼</PageTableAction>
+              >修改</PageTableAction>
               <PageTableAction
                 v-permission="['sys:user:reset']"
                 type="info"
                 :icon="Key"
                 @click="handleResetPwd(scope.row)"
-              >閲嶇疆瀵嗙爜</PageTableAction>
+              >重置密码</PageTableAction>
               <PageTableAction
                 v-permission="['sys:user:delete']"
                 type="danger"
                 :icon="Delete"
                 @click="handleDelete(scope.row)"
-              >鍒犻櫎</PageTableAction>
+              >删除</PageTableAction>
             </PageTableActions>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 鍒嗛〉缁勪欢 -->
+      <!-- 分页组件 -->
       <PagePagination
         v-model:current-page="queryParams.pageNum"
         v-model:page-size="queryParams.pageSize"
@@ -123,7 +123,7 @@
       />
     </el-card>
 
-    <!-- 娣诲姞鎴栦慨鏀圭敤鎴峰璇濇 -->
+    <!-- 新增或修改用户对话框 -->
     <el-dialog
       :title="dialog.title"
       v-model="dialog.visible"
@@ -151,7 +151,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="鏄电О" prop="nickname">
+            <el-form-item label="昵称" prop="nickname">
               <el-input
                 v-model="userForm.nickname"
                 placeholder="请输入昵称"
@@ -172,7 +172,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="閭" prop="email">
+            <el-form-item label="邮箱" prop="email">
               <el-input
                 v-model="userForm.email"
                 placeholder="请输入邮箱"
@@ -184,16 +184,16 @@
 
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="鎬у埆" prop="sex">
+            <el-form-item label="性别" prop="sex">
               <el-radio-group v-model="userForm.sex">
                 <el-radio :value="1">男</el-radio>
                 <el-radio :value="2">女</el-radio>
-                <el-radio :value="0">淇濆瘑</el-radio>
+                <el-radio :value="0">保密</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="瀵嗙爜" prop="password" v-if="dialog.type === 'add'">
+            <el-form-item label="密码" prop="password" v-if="dialog.type === 'add'">
               <el-input
                 v-model="userForm.password"
                 type="password"
@@ -205,11 +205,11 @@
           </el-col>
         </el-row>
 
-        <el-form-item label="瑙掕壊" prop="roleIds">
+        <el-form-item label="角色" prop="roleIds">
           <el-select
             v-model="userForm.roleIds"
             multiple
-            placeholder="璇烽€夋嫨瑙掕壊"
+            placeholder="请选择角色"
             style="width: 100%"
             :disabled="userForm.username === 'admin'"
             clearable
@@ -226,8 +226,8 @@
 
         <el-form-item label="状态">
           <el-radio-group v-model="userForm.status">
-            <el-radio :value="1">鍚敤</el-radio>
-            <el-radio :value="0">绂佺敤</el-radio>
+            <el-radio :value="1">启用</el-radio>
+            <el-radio :value="0">禁用</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -240,9 +240,9 @@
       </template>
     </el-dialog>
 
-    <!-- 娣诲姞閲嶇疆瀵嗙爜寮圭獥 -->
+    <!-- 重置密码弹窗 -->
     <el-dialog
-      title="閲嶇疆瀵嗙爜"
+      title="重置密码"
       v-model="resetPwdDialog.visible"
       width="500px"
       append-to-body
@@ -259,16 +259,16 @@
           <el-input
             v-model="resetPwdForm.password"
             type="password"
-            placeholder="璇疯緭鍏ユ柊瀵嗙爜"
+            placeholder="请输入新密码"
             show-password
             clearable
           />
         </el-form-item>
-        <el-form-item label="纭瀵嗙爜" prop="confirmPassword">
+        <el-form-item label="确认密码" prop="confirmPassword">
           <el-input
             v-model="resetPwdForm.confirmPassword"
             type="password"
-            placeholder="璇峰啀娆¤緭鍏ユ柊瀵嗙爜"
+            placeholder="请再次输入新密码"
             show-password
             clearable
           />
@@ -298,7 +298,7 @@ import {
 import { getAllRoleList } from '@/api/system/role'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
 
-// 鏌ヨ鍙傛暟
+// 查询参数
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
@@ -314,20 +314,20 @@ const queryFormRef = ref<FormInstance>()
 const userFormRef = ref<FormInstance>()
 const submitLoading = ref(false)
 
-// 閫変腑椤规暟缁?
+// 选中项
 const selectedIds = ref<string[]>([])
 
-// 寮圭獥鎺у埗
+// 弹窗控制
 const dialog = reactive({
   title: '',
   visible: false,
   type: 'add'
 })
 
-// 瑙掕壊閫夐」
+// 角色选项
 const roleOptions = ref<any[]>([])
 
-// 琛ㄥ崟鏁版嵁
+// 表单数据
 const userForm = reactive({
   id: undefined,
   username: '',
@@ -344,10 +344,10 @@ const userForm = reactive({
   roleIds: [] as number[]
 })
 
-// 琛ㄥ崟鏍￠獙瑙勫垯
+// 表单校验规则
 const rules = reactive<FormRules>({
   username: [
-    { required: true, message: '璇疯緭鍏ョ敤鎴峰悕', trigger: 'blur' },
+    { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 3, max: 20, message: '长度应在 3 到 20 个字符之间', trigger: 'blur' }
   ],
   nickname: [
@@ -361,37 +361,37 @@ const rules = reactive<FormRules>({
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
   ],
   email: [
-    { type: 'email', message: '璇疯緭鍏ユ纭殑閭鍦板潃', trigger: 'blur' }
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
   ],
   roleIds: [
-    { required: true, message: '璇烽€夋嫨瑙掕壊', trigger: 'change' }
+    { required: true, message: '请选择角色', trigger: 'change' }
   ],
   sex: [
-    { required: true, message: '璇烽€夋嫨鎬у埆', trigger: 'change' }
+    { required: true, message: '请选择性别', trigger: 'change' }
   ]
 })
 
-// 閲嶇疆瀵嗙爜寮圭獥鎺у埗
+// 重置密码弹窗控制
 const resetPwdDialog = reactive({
   id: undefined,
   visible: false,
   userId: undefined
 })
 
-// 閲嶇疆瀵嗙爜琛ㄥ崟
+// 重置密码表单
 const resetPwdForm = reactive({
   password: '',
   confirmPassword: ''
 })
 
-// 閲嶇疆瀵嗙爜琛ㄥ崟鏍￠獙瑙勫垯
+// 重置密码表单校验规则
 const resetPwdRules = reactive<FormRules>({
   password: [
-    { required: true, message: '璇疯緭鍏ユ柊瀵嗙爜', trigger: 'blur' },
+    { required: true, message: '请输入新密码', trigger: 'blur' },
     { min: 6, max: 20, message: '长度应在 6 到 20 个字符之间', trigger: 'blur' }
   ],
   confirmPassword: [
-    { required: true, message: '璇峰啀娆¤緭鍏ユ柊瀵嗙爜', trigger: 'blur' },
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
     {
       validator: (rule, value, callback) => {
         if (value !== resetPwdForm.password) {
@@ -409,7 +409,7 @@ const resetPwdFormRef = ref<FormInstance>()
 
 const loginTypes = ref<any>([])
 
-// 鑾峰彇鐢ㄦ埛鍒楄〃
+// 获取用户列表
 const getList = async () => {
   loading.value = true
   try {
@@ -421,23 +421,23 @@ const getList = async () => {
   loading.value = false
 }
 
-// 琛ㄦ牸閫夋嫨椤瑰彉鍖?
+// 表格选择变化
 const handleSelectionChange = (selection: any[]) => {
   selectedIds.value = selection.map(item => item.id)
 }
 
-// 鎵归噺鍒犻櫎
+// 批量删除
 const handleBatchDelete = () => {
   if (selectedIds.value.length === 0) return
 
-  ElMessageBox.confirm('鏄惁纭鎵归噺鍒犻櫎閫変腑鐨勭敤鎴?', '璀﹀憡', {
-    confirmButtonText: '纭畾',
-    cancelButtonText: '鍙栨秷',
+  ElMessageBox.confirm('是否确认批量删除选中的用户？', '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
     type: 'warning'
   }).then(async () => {
     try {
       await deleteUserApi(selectedIds.value)
-      ElMessage.success('鎵归噺鍒犻櫎鎴愬姛')
+      ElMessage.success('批量删除成功')
       getList()
       selectedIds.value = []
     } catch (error) {
@@ -445,22 +445,22 @@ const handleBatchDelete = () => {
   })
 }
 
-// 鎼滅储
+// 搜索
 const handleQuery = () => {
   queryParams.pageNum = 1
   getList()
 }
 
-// 閲嶇疆鏌ヨ
+// 重置查询
 const resetQuery = () => {
   queryFormRef.value?.resetFields()
   handleQuery()
 }
 
-// 鏂板鐢ㄦ埛
+// 新增用户
 const handleAdd = () => {
   dialog.type = 'add'
-  dialog.title = '鏂板鐢ㄦ埛'
+  dialog.title = '新增用户'
   dialog.visible = true
   userForm.id = undefined
   userForm.username = ''
@@ -477,16 +477,16 @@ const handleAdd = () => {
   userForm.roleIds = []
 }
 
-// 淇敼鐢ㄦ埛
+// 修改用户
 const handleUpdate = (row: any) => {
   dialog.type = 'edit'
-  dialog.title = '淇敼鐢ㄦ埛'
+  dialog.title = '修改用户'
   dialog.visible = true
   Object.assign(userForm, row)
   userForm.password = null
 }
 
-// 鎻愪氦琛ㄥ崟
+// 提交表单
 const submitForm = async () => {
   if (!userFormRef.value) return
 
@@ -497,10 +497,10 @@ const submitForm = async () => {
         const data = {user: userForm, roleIds: userForm.roleIds}
         if (dialog.type === 'add') {
           await createUserApi(data)
-          ElMessage.success('鏂板鎴愬姛')
+          ElMessage.success('新增成功')
         } else {
           await updateUserApi(data)
-          ElMessage.success('淇敼鎴愬姛')
+          ElMessage.success('修改成功')
         }
         dialog.visible = false
         getList()
@@ -512,23 +512,23 @@ const submitForm = async () => {
   })
 }
 
-// 鍒犻櫎鐢ㄦ埛
+// 删除用户
 const handleDelete = (row: any) => {
-  ElMessageBox.confirm(`鏄惁纭鍒犻櫎鐢ㄦ埛"${row.username}"?`, '璀﹀憡', {
-    confirmButtonText: '纭畾',
-    cancelButtonText: '鍙栨秷',
+  ElMessageBox.confirm(`是否确认删除用户“${row.username}”？`, '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
     type: 'warning'
   }).then(async () => {
     try {
       await deleteUserApi(row.id)
-      ElMessage.success('鍒犻櫎鎴愬姛')
+      ElMessage.success('删除成功')
       getList()
     } catch (error) {
     }
   })
 }
 
-// 淇敼閲嶇疆瀵嗙爜鏂规硶
+// 打开重置密码弹窗
 const handleResetPwd = (row: any) => {
   resetPwdDialog.id = row.id
   resetPwdDialog.visible = true
@@ -536,7 +536,7 @@ const handleResetPwd = (row: any) => {
   resetPwdForm.confirmPassword = ''
 }
 
-// 鎻愪氦閲嶇疆瀵嗙爜
+// 提交重置密码
 const submitResetPwd = async () => {
   if (!resetPwdFormRef.value) return
 
@@ -548,7 +548,7 @@ const submitResetPwd = async () => {
           id: resetPwdDialog.id,
           password: resetPwdForm.password
         })
-        ElMessage.success('閲嶇疆瀵嗙爜鎴愬姛')
+        ElMessage.success('重置密码成功')
         resetPwdDialog.visible = false
       } catch (error) {
       } finally {
@@ -558,25 +558,25 @@ const submitResetPwd = async () => {
   })
 }
 
-// 鍙栨秷鎸夐挳
+// 取消
 const cancel = () => {
   dialog.visible = false
   userFormRef.value?.resetFields()
 }
 
-// 鍒嗛〉澶у皬鏀瑰彉
+// 分页大小变化
 const handleSizeChange = (val: number) => {
   queryParams.pageSize = val
   getList()
 }
 
-// 椤电爜鏀瑰彉
+// 当前页变化
 const handleCurrentChange = (val: number) => {
   queryParams.pageNum = val
   getList()
 }
 
-// 鑾峰彇瑙掕壊鍒楄〃
+// 获取角色列表
 const getRoleOptions = async () => {
   try {
     const { data } = await getAllRoleList()
@@ -594,7 +594,7 @@ const getDicts = async () => {
 }
 
 
-// 鍒濆鍖?
+// 初始化
 onMounted(() => {
   getList()
   getRoleOptions()

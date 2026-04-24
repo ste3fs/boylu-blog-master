@@ -1,9 +1,9 @@
 ﻿<template>
   <div class="app-container">
-    <!-- 鎼滅储琛ㄥ崟 -->
+    <!-- 搜索表单 -->
     <PageSearch>
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-        <el-form-item label="瑙掕壊鍚嶇О" prop="name">
+        <el-form-item label="角色名称" prop="name">
           <el-input
             v-model="queryParams.name"
             placeholder="请输入角色名称"
@@ -17,7 +17,7 @@
       </el-form>
     </PageSearch>
 
-    <!-- 鎿嶄綔鎸夐挳鍖哄煙 -->
+    <!-- 操作按钮区域 -->
     <el-card class="box-card">
       <template #header>
         <PageToolbar>
@@ -27,7 +27,7 @@
               type="primary"
               :icon="Plus"
               @click="handleAdd"
-            >鏂板</el-button>
+            >新增</el-button>
           </PageToolbarGroup>
           <PageToolbarGroup kind="danger">
             <el-button
@@ -37,12 +37,12 @@
               :icon="Delete"
               :disabled="selectedIds.length === 0"
               @click="handleBatchDelete"
-            >鎵归噺鍒犻櫎</el-button>
+            >批量删除</el-button>
           </PageToolbarGroup>
         </PageToolbar>
       </template>
 
-      <!-- 鏁版嵁琛ㄦ牸 -->
+      <!-- 数据表格 -->
       <el-table
         v-loading="loading"
         :data="roleList"
@@ -50,11 +50,11 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="瑙掕壊鍚嶇О" align="center" prop="name" show-overflow-tooltip />
-        <el-table-column label="瑙掕壊缂栫爜" align="center" prop="code" show-overflow-tooltip />
-        <el-table-column label="澶囨敞" prop="remarks"  align="center" width="400" show-overflow-tooltip />
-        <el-table-column label="鍒涘缓鏃堕棿" align="center" prop="createTime" width="180" show-overflow-tooltip />
-        <el-table-column label="??" align="center" width="250" fixed="right">
+        <el-table-column label="角色名称" align="center" prop="name" show-overflow-tooltip />
+        <el-table-column label="角色编码" align="center" prop="code" show-overflow-tooltip />
+        <el-table-column label="备注" prop="remarks"  align="center" width="400" show-overflow-tooltip />
+        <el-table-column label="创建时间" align="center" prop="createTime" width="180" show-overflow-tooltip />
+        <el-table-column label="操作" align="center" width="250" fixed="right">
           <template #default="scope">
             <PageTableActions>
               <PageTableAction
@@ -62,25 +62,25 @@
                 type="primary"
                 :icon="Edit"
                 @click="handleUpdate(scope.row)"
-              >??</PageTableAction>
+              >修改</PageTableAction>
               <PageTableAction
                 v-permission="['sys:role:menus']"
                 type="primary"
                 :icon="Setting"
                 @click="handlePermission(scope.row)"
-              >??</PageTableAction>
+              >权限设置</PageTableAction>
               <PageTableAction
                 v-permission="['sys:role:delete']"
                 type="danger"
                 :icon="Delete"
                 @click="handleDelete(scope.row)"
-              >??</PageTableAction>
+              >删除</PageTableAction>
             </PageTableActions>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 鍒嗛〉缁勪欢 -->
+      <!-- 分页组件 -->
       <PagePagination
         v-model:current-page="queryParams.pageNum"
         v-model:page-size="queryParams.pageSize"
@@ -90,7 +90,7 @@
       />
     </el-card>
 
-    <!-- 娣诲姞鎴栦慨鏀硅鑹插璇濇 -->
+    <!-- 新增或修改角色对话框 -->
     <el-dialog
       :title="dialog.title"
       v-model="dialog.visible"
@@ -104,13 +104,13 @@
         :rules="rules"
         label-width="100px"
       >
-        <el-form-item label="瑙掕壊鍚嶇О" prop="name">
+        <el-form-item label="角色名称" prop="name">
           <el-input v-model="roleForm.name" placeholder="请输入角色名称" />
         </el-form-item>
-        <el-form-item label="瑙掕壊缂栫爜" prop="code">
+        <el-form-item label="角色编码" prop="code">
           <el-input v-model="roleForm.code" placeholder="请输入角色编码" />
         </el-form-item>
-        <el-form-item label="澶囨敞">
+        <el-form-item label="备注">
           <el-input v-model="roleForm.remarks" type="textarea" :rows="3" placeholder="请输入备注信息" />
         </el-form-item>
       </el-form>
@@ -123,9 +123,9 @@
       </template>
     </el-dialog>
 
-    <!-- 鍒嗛厤鏉冮檺瀵硅瘽妗?-->
+    <!-- 权限设置对话框 -->
     <el-dialog
-      title="鍒嗛厤鏉冮檺"
+      title="权限设置"
       v-model="permissionDialog.visible"
       width="600px"
       append-to-body
@@ -133,10 +133,10 @@
       top="5vh"
     >
       <el-form label-width="80px">
-        <el-form-item label="瑙掕壊鍚嶇О">
+        <el-form-item label="角色名称">
           <el-input v-model="permissionDialog.roleInfo.name" disabled />
         </el-form-item>
-          <el-form-item label="鏉冮檺璁剧疆">
+          <el-form-item label="权限配置">
             <el-scrollbar height="400px">
               <el-tree
                 ref="menuTreeRef"
@@ -175,7 +175,7 @@ import {
   getMenuListApi
 } from '@/api/system/menu'
 
-// 鏌ヨ鍙傛暟
+// 查询参数
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
@@ -189,13 +189,13 @@ const queryFormRef = ref<FormInstance>()
 const roleFormRef = ref<FormInstance>()
 const menuTreeRef = ref<any>()
 
-// 寮圭獥鎺у埗
+// 弹窗控制
 const dialog = reactive({
   title: '',
   visible: false
 })
 
-// 琛ㄥ崟鏁版嵁
+// 表单数据
 const roleForm = reactive({
   id: undefined,
   name: '',
@@ -205,17 +205,17 @@ const roleForm = reactive({
   remarks: ''
 })
 
-// 琛ㄥ崟鏍￠獙瑙勫垯
+// 表单校验规则
 const rules = reactive<FormRules>({
   name: [
-    { required: true, message: '瑙掕壊鍚嶇О涓嶈兘涓虹┖', trigger: 'blur' }
+    { required: true, message: '角色名称不能为空', trigger: 'blur' }
   ],
   code: [
-    { required: true, message: '瑙掕壊缂栫爜涓嶈兘涓虹┖', trigger: 'blur' }
+    { required: true, message: '角色编码不能为空', trigger: 'blur' }
   ]
 })
 
-// 鏉冮檺璁剧疆寮圭獥
+// 权限设置弹窗
 const permissionDialog = reactive<any>({
   visible: false,
   roleInfo: {
@@ -226,38 +226,38 @@ const permissionDialog = reactive<any>({
 
 const menuOptions = ref<any>([])
 
-// 娣诲姞閫変腑椤规暟缁?
+// 选中项
 const selectedIds = ref<number[]>([])
 
-// 琛ㄦ牸閫夋嫨椤瑰彉鍖栧鐞?
+// 表格选择变化
 const handleSelectionChange = (selection: any[]) => {
   selectedIds.value = selection.map(item => item.id)
 }
 
-// 鎵归噺鍒犻櫎澶勭悊
+// 批量删除
 const handleBatchDelete = () => {
   if (selectedIds.value.length === 0) {
     return
   }
 
-  ElMessageBox.confirm('鏄惁纭鎵归噺鍒犻櫎閫変腑鐨勮鑹?', '璀﹀憡', {
-    confirmButtonText: '纭畾',
-    cancelButtonText: '鍙栨秷',
+  ElMessageBox.confirm('是否确认批量删除选中的角色？', '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
     type: 'warning'
   }).then(async () => {
     try {
       await deleteRoleApi(selectedIds.value)
-      ElMessage.success('鎵归噺鍒犻櫎鎴愬姛')
-      // 閲嶆柊鍔犺浇鍒楄〃
+      ElMessage.success('批量删除成功')
+      // 重新加载列表
       getList()
-      // 娓呯┖閫変腑
+      // 清空选中
       selectedIds.value = []
     } catch (error) {
     }
   })
 }
 
-// 鑾峰彇瑙掕壊鍒楄〃
+// 获取角色列表
 const getList = async () => {
   loading.value = true
   try {
@@ -270,21 +270,21 @@ const getList = async () => {
   loading.value = false
 }
 
-// 鎼滅储
+// 搜索
 const handleQuery = () => {
   queryParams.pageNum = 1
   getList()
 }
 
-// 閲嶇疆
+// 重置
 const resetQuery = () => {
   queryFormRef.value?.resetFields()
   handleQuery()
 }
 
-// 鏂板瑙掕壊
+// 新增角色
 const handleAdd = () => {
-  dialog.title = '娣诲姞瑙掕壊'
+  dialog.title = '新增角色'
   dialog.visible = true
   Object.assign(roleForm, {
     id: undefined,
@@ -296,14 +296,14 @@ const handleAdd = () => {
   })
 }
 
-// 淇敼瑙掕壊
+// 修改角色
 const handleUpdate = (row: any) => {
-  dialog.title = '淇敼瑙掕壊'
+  dialog.title = '修改角色'
   dialog.visible = true
   Object.assign(roleForm, row)
 }
 
-// 鎻愪氦琛ㄥ崟
+// 提交表单
 const submitForm = async () => {
   if (!roleFormRef.value) return
 
@@ -312,10 +312,10 @@ const submitForm = async () => {
       try {
         if (roleForm.id) {
           await updateRoleApi(roleForm)
-          ElMessage.success('淇敼鎴愬姛')
+          ElMessage.success('修改成功')
         } else {
           await createRoleApi(roleForm)
-          ElMessage.success('鏂板鎴愬姛')
+          ElMessage.success('新增成功')
         }
         dialog.visible = false
         getList()
@@ -325,26 +325,26 @@ const submitForm = async () => {
   })
 }
 
-// 鍒犻櫎瑙掕壊
+// 删除角色
 const handleDelete = (row: any) => {
-  ElMessageBox.confirm(`鏄惁纭鍒犻櫎瑙掕壊鍚嶇О涓?${row.name}"鐨勬暟鎹」?`, '璀﹀憡', {
-    confirmButtonText: '纭畾',
-    cancelButtonText: '鍙栨秷',
+  ElMessageBox.confirm(`是否确认删除角色“${row.name}”？`, '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
     type: 'warning'
   }).then(async () => {
     await deleteRoleApi(row.id)
-    ElMessage.success('鍒犻櫎鎴愬姛')
+    ElMessage.success('删除成功')
     getList()
   })
 }
 
 
-// 鎵撳紑鏉冮檺璁剧疆
+// 打开权限设置
 const handlePermission = async (row: any) => {
   permissionDialog.roleInfo = { ...row }
   permissionDialog.visible = true
 
-  // 鑾峰彇瑙掕壊鐨勮彍鍗曟潈闄?
+  // 获取角色对应的菜单权限
   const { data } = await getRoleMenusApi(row.id)
   const checkedMenuIds = data;
   checkedMenuIds.forEach((menuId: number) =>
@@ -352,23 +352,23 @@ const handlePermission = async (row: any) => {
   );
 }
 
-// 鎻愪氦鏉冮檺璁剧疆
+// 提交权限设置
 const submitPermission = async () => {
   const checkedMenuIds: number[] = menuTreeRef.value
       .getCheckedNodes(false, true)
       .map((node: any) => node.id);
   await updateRoleMenusApi(permissionDialog.roleInfo.id, checkedMenuIds)
-  ElMessage.success('璁剧疆鎴愬姛')
+  ElMessage.success('设置成功')
   permissionDialog.visible = false
 }
 
-// 鍙栨秷鎸夐挳
+// 取消
 const cancel = () => {
   dialog.visible = false
   roleFormRef.value?.resetFields()
 }
 
-// 娣诲姞鍒嗛〉澶勭悊鍑芥暟
+// 分页处理
 const handleSizeChange = (val: number) => {
   queryParams.pageSize = val
   getList()

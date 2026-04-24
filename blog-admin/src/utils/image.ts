@@ -64,11 +64,18 @@ export function normalizeImageUrl(url = '') {
     return ''
   }
 
+  const isRelativeAsset = !rawUrl.startsWith('/')
+    && !rawUrl.startsWith('//')
+    && !/^https?:\/\//i.test(rawUrl)
+    && !rawUrl.startsWith('data:')
+    && !rawUrl.startsWith('blob:')
+    && /\.[a-z0-9]{2,8}([?#].*)?$/i.test(rawUrl)
+
   const isManagedUrl = rawUrl.includes(LOCAL_FILE_SEGMENT)
     || FILE_PREFIXES.some(prefix => rawUrl.includes(prefix))
 
   if (!isManagedUrl) {
-    return rawUrl
+    return isRelativeAsset ? `/${rawUrl}` : rawUrl
   }
 
   let normalized = stripOrigin(rawUrl)

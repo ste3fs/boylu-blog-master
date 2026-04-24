@@ -2,7 +2,7 @@
   <div class="dashboard-container">
     <!-- 数据卡片 -->
     <el-row :gutter="20">
-      <el-col :span="6" v-for="(item, index) in statistics" :key="item.title">
+      <el-col :xs="12" :sm="12" :md="6" v-for="(item, index) in statistics" :key="item.title">
         <el-card 
           shadow="hover" 
           :body-style="{ padding: '20px' }"
@@ -29,7 +29,7 @@
 
     
     <el-row :gutter="20" class="chart-row">
-      <el-col :span="24">
+      <el-col :xs="24" :sm="24" :md="24">
         <el-card shadow="hover" class="chart-card">
           <template #header>
             <span>文章贡献图</span>
@@ -41,7 +41,7 @@
 
     <!-- 图表区域 -->
     <el-row :gutter="20" class="chart-row">
-      <el-col :span="16">
+      <el-col :xs="24" :sm="24" :md="16">
         <el-card shadow="hover" class="chart-card">
           <template #header>
               <span>访问趋势</span>
@@ -49,7 +49,7 @@
           <div ref="lineChartRef" class="chart"></div>
         </el-card>
       </el-col>
-      <el-col :span="8">
+      <el-col :xs="24" :sm="24" :md="8">
         <el-card shadow="hover" class="chart-card">
           <template #header>
             <div class="card-header">

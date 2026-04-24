@@ -49,3 +49,18 @@ const handleCurrentChange = (value: number) => {
   emit('currentChange', value)
 }
 </script>
+
+<style scoped>
+@media (max-width: 768px) {
+  .pagination-container {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .pagination-container::-webkit-scrollbar {
+    display: none;
+  }
+}
+</style>

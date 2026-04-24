@@ -1,127 +1,213 @@
 <template>
-    <el-dialog title="相册照片" :model-value="props.openPhotos" width="80%" top="5vh" append-to-body destroy-on-close 
-    :close-on-click-modal="false" @update:model-value="handleDialogClose">
+  <el-dialog
+    title="相册照片"
+    :model-value="props.openPhotos"
+    :width="isMobile ? '100vw' : '88%'"
+    :top="isMobile ? '0' : '5vh'"
+    :fullscreen="isMobile"
+    append-to-body
+    destroy-on-close
+    :close-on-click-modal="false"
+    class="photos-dialog"
+    @update:model-value="handleDialogClose"
+  >
+    <el-card class="box-card">
+      <template #header>
+        <PageToolbar>
+          <PageToolbarGroup>
+            <el-button
+              v-permission="['sys:photo:add']"
+              type="primary"
+              :icon="Plus"
+              @click="handleAdd"
+            >
+              新增照片
+            </el-button>
+            <el-button
+              v-permission="['sys:photo:move']"
+              type="info"
+              plain
+              :icon="Notification"
+              :disabled="selectedIds.length === 0"
+              @click="handleBatchMove"
+            >
+              批量移动
+            </el-button>
+          </PageToolbarGroup>
+          <PageToolbarGroup kind="danger">
+            <el-button
+              v-permission="['sys:photo:delete']"
+              type="danger"
+              plain
+              :icon="Delete"
+              :disabled="selectedIds.length === 0"
+              @click="handleBatchDelete"
+            >
+              批量删除
+            </el-button>
+          </PageToolbarGroup>
+          <template #right>
+            <PageToolbarGroup kind="utility">
+              <el-button type="success" plain :icon="Check" @click="handleAllSelect">
+                {{ selectedIds.length === photoList.length && photoList.length ? '清空选择' : '全选当前页' }}
+              </el-button>
+            </PageToolbarGroup>
+          </template>
+        </PageToolbar>
+      </template>
 
-        <!-- 操作按钮区域 -->
-        <el-card class="box-card">
-            <template #header>
-                <PageToolbar>
-                    <PageToolbarGroup>
-                        <el-button v-permission="['sys:photo:add']" type="primary" :icon="Plus"
-                            @click="handleAdd">新增</el-button>
-                        <el-button v-permission="['sys:photo:move']" type="info" plain :icon="Notification"
-                            :disabled="selectedIds.length === 0" @click="handleBatchMove">批量移动</el-button>
-                    </PageToolbarGroup>
-                    <PageToolbarGroup kind="danger">
-                        <el-button v-permission="['sys:photo:delete']" type="danger" plain :icon="Delete"
-                            :disabled="selectedIds.length === 0" @click="handleBatchDelete">批量删除</el-button>
-                    </PageToolbarGroup>
-                    <template #right>
-                        <PageToolbarGroup kind="utility">
-                            <el-button type="success" plain :icon="Check" @click="handleAllSelect">全选/反选</el-button>
-                        </PageToolbarGroup>
-                    </template>
-                </PageToolbar>
-            </template>
-
-            <!-- 数据表格 -->
-            <div class="photo-list" v-loading="loading">
-                <el-checkbox-group v-model="selectedIds" v-for="item in photoList" :key="item.id">
-                    <div class="photo-card" >
-                        <span class="photo-select">
-                            <el-checkbox :value="item.id" />
-                        </span>
-                        <el-image class="photo-image" :src="item.url" />
-                        <div class="photo-overlay">
-                            <div class="photo-content">
-                                <div class="photo-time">
-                                    <i class="el-icon-time" />
-                                    <span class="time-text">{{ item.recordTime }}</span>
-                                </div>
-                                <div class="photo-desc">{{ item.description }}</div>
-                            </div>
-                            <PageTableActions class="photo-actions">
-  <PageTableAction type="success" size="small" :icon="View" @click="handlePreviewPhotos(item)">??</PageTableAction>
-  <PageTableAction v-permission="['sys:photo:update']" type="primary" size="small" :icon="Edit" @click="handleUpdate(item)">??</PageTableAction>
-  <PageTableAction v-permission="['sys:photo:delete']" type="danger" size="small" :icon="Delete" @click="handleDelete(item)">??</PageTableAction>
-</PageTableActions>
-                        </div>
-                    </div>
-                </el-checkbox-group>
+      <div v-loading="loading" class="photo-list">
+        <template v-if="photoList.length">
+          <article v-for="item in photoList" :key="item.id" class="photo-card">
+            <div class="photo-card__media">
+              <el-checkbox
+                class="photo-card__check"
+                :model-value="selectedIds.includes(item.id)"
+                @change="(checked) => toggleSelect(item.id, Boolean(checked))"
+              />
+              <el-image class="photo-card__image" :src="item.url" fit="cover" />
             </div>
-            <!-- 分页组件 -->
-            <PagePagination
-                v-model:current-page="queryParams.pageNum"
-                v-model:page-size="queryParams.pageSize"
-                :total="total"
-                @size-change="handleSizeChange"
-                @current-change="handleCurrentChange"
-            />
-        </el-card>
+            <div class="photo-card__body">
+              <div class="photo-card__meta">
+                <span>记录时间</span>
+                <strong>{{ item.recordTime || '未填写' }}</strong>
+              </div>
+              <div class="photo-card__desc">{{ item.description || '暂无描述' }}</div>
+              <PageTableActions class="photo-card__actions">
+                <PageTableAction type="success" size="small" :icon="View" @click="handlePreviewPhotos(item)">
+                  预览
+                </PageTableAction>
+                <PageTableAction
+                  v-permission="['sys:photo:update']"
+                  type="primary"
+                  size="small"
+                  :icon="Edit"
+                  @click="handleUpdate(item)"
+                >
+                  编辑
+                </PageTableAction>
+                <PageTableAction
+                  v-permission="['sys:photo:delete']"
+                  type="danger"
+                  size="small"
+                  :icon="Delete"
+                  @click="handleDelete(item)"
+                >
+                  删除
+                </PageTableAction>
+              </PageTableActions>
+            </div>
+          </article>
+        </template>
 
-        <!-- 添加或修改对话框 -->
-        <el-dialog :title="dialog.title" v-model="dialog.visible" width="600px" append-to-body destroy-on-close
-            class="custom-dialog">
-            <el-form ref="photoFormRef" :model="photoForm" :rules="rules" label-width="80px" class="custom-form">
-                <el-form-item label="封面" prop="url">
-                    <UploadImage v-model="photoForm.url" :source="'photo'" :limit="1" />
-                </el-form-item>
-                <el-form-item label="描述" prop="description">
-                    <el-input v-model="photoForm.description" type="textarea" :rows="4" show-word-limit placeholder="请输入描述"
-                        clearable />
-                </el-form-item>
-                <el-form-item label="记录时间" prop="recordTime">
-                    <el-date-picker
-                        v-model="photoForm.recordTime"
-                        type="date"
-                        value-format="YYYY-MM-DD"
-                        placeholder="请选择记录的日期..."
-                    />
-                </el-form-item>
-                <el-form-item label="排序" prop="sort">
-                    <el-input-number v-model="photoForm.sort" :min="1" />
-                </el-form-item>
-            </el-form>
+        <el-empty v-else description="当前相册还没有照片" />
+      </div>
 
-            <template #footer>
-                <div class="dialog-footer">
-                    <el-button @click="cancel">取 消</el-button>
-                    <el-button type="primary" :loading="submitLoading" @click="submitForm">确 定</el-button>
-                </div>
+      <PagePagination
+        v-model:current-page="queryParams.pageNum"
+        v-model:page-size="queryParams.pageSize"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </el-card>
+
+    <el-dialog
+      v-model="dialog.visible"
+      :title="dialog.title"
+      :width="isMobile ? '100vw' : '640px'"
+      :top="isMobile ? '0' : '6vh'"
+      :fullscreen="isMobile"
+      append-to-body
+      destroy-on-close
+      class="photo-edit-dialog"
+    >
+      <el-form
+        ref="photoFormRef"
+        :model="photoForm"
+        :rules="rules"
+        :label-position="isMobile ? 'top' : 'right'"
+        label-width="88px"
+        class="photo-form"
+      >
+        <el-form-item label="照片" prop="url">
+          <UploadImage
+            v-model="photoForm.url"
+            :source="'photo'"
+            :limit="dialog.type === 'add' ? 20 : 1"
+            :multiple="dialog.type === 'add'"
+          />
+          <div class="photo-upload-hint">
+            <template v-if="dialog.type === 'add'">
+              可一次上传多张图片，当前最多 20 张，会按顺序自动创建照片记录。
             </template>
-        </el-dialog>
-
-        <!-- 批量移动对话框 -->
-        <el-dialog
-            title="移动照片"
-            v-model="moveDialog.visible"
-            width="400px"
-            append-to-body
-            destroy-on-close
-        >
-            <el-form label-width="80px">
-                <el-form-item label="目标相册">
-                    <el-select v-model="moveDialog.targetAlbumId" placeholder="请选择目标相册" style="width: 100%">
-                        <el-option
-                            v-for="album in albumList"
-                            :key="album.id"
-                            :label="album.name"
-                            :value="album.id"
-                            :disabled="album.id === props.albumId"
-                        />
-                    </el-select>
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <div class="dialog-footer">
-                    <el-button @click="cancelMove">取 消</el-button>
-                    <el-button type="primary" @click="confirmMove">确 定</el-button>
-                </div>
+            <template v-else>
+              编辑时只修改当前这一张照片。
             </template>
-        </el-dialog>
+          </div>
+        </el-form-item>
+        <el-form-item label="描述" prop="description">
+          <el-input
+            v-model="photoForm.description"
+            type="textarea"
+            :rows="4"
+            show-word-limit
+            placeholder="可选，批量上传时会写入到所有选中的图片"
+          />
+        </el-form-item>
+        <el-form-item label="记录时间" prop="recordTime">
+          <el-date-picker
+            v-model="photoForm.recordTime"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择记录时间"
+          />
+        </el-form-item>
+        <el-form-item label="排序" prop="sort">
+          <el-input-number v-model="photoForm.sort" :min="1" />
+        </el-form-item>
+      </el-form>
 
-        <el-image-viewer v-if="openPreview" @close="closeViewer" :url-list="previewList" />
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancel">取消</el-button>
+          <el-button type="primary" :loading="submitLoading" @click="submitForm">确定</el-button>
+        </div>
+      </template>
     </el-dialog>
+
+    <el-dialog
+      title="移动照片"
+      v-model="moveDialog.visible"
+      :width="isMobile ? '100vw' : '420px'"
+      :top="isMobile ? '0' : '10vh'"
+      :fullscreen="isMobile"
+      append-to-body
+      destroy-on-close
+    >
+      <el-form label-width="88px" class="photo-form">
+        <el-form-item label="目标相册">
+          <el-select v-model="moveDialog.targetAlbumId" placeholder="请选择目标相册" style="width: 100%">
+            <el-option
+              v-for="album in albumList"
+              :key="album.id"
+              :label="album.name"
+              :value="album.id"
+              :disabled="album.id === props.albumId"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelMove">取消</el-button>
+          <el-button type="primary" @click="confirmMove">确定</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-image-viewer v-if="openPreview" :url-list="previewList" @close="closeViewer" />
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -129,390 +215,402 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Delete, Edit, Notification, Plus, View } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import UploadImage from '@/components/Upload/Image.vue'
-import { listPhotoApi, addPhotoApi, updatePhotoApi, deletePhotoApi, movePhotoApi } from '@/api/site/photo'
 import { listAlbumAllApi } from '@/api/site/album'
-
-// 查询参数
-const queryParams = reactive({
-    pageNum: 1,
-    pageSize: 10,
-    albumId: 0
-})
-
-const loading = ref(false)
-const total = ref(0)
-const photoList = ref<any[]>([])
-const previewList = ref<string[]>([])
-const openPreview = ref(false)
-const photoFormRef = ref<FormInstance>()
-const submitLoading = ref(false)
-
-// 所有相册
-const albumList = ref<any[]>([])
+import {
+  addPhotoApi,
+  deletePhotoApi,
+  listPhotoApi,
+  movePhotoApi,
+  updatePhotoApi
+} from '@/api/site/photo'
+import { normalizeImageList } from '@/utils/image'
 
 const props = defineProps({
-    openPhotos: {
-        type: Boolean,
-        default: false
-    },
-    albumId: {
-        type: Number,
-        default: 0
-    }
+  openPhotos: {
+    type: Boolean,
+    default: false
+  },
+  albumId: {
+    type: Number,
+    default: 0
+  }
 })
 
 const emit = defineEmits(['update:openPhotos', 'close'])
 
-// 选中项数组
+const isMobile = ref(false)
+const loading = ref(false)
+const total = ref(0)
+const photoList = ref<any[]>([])
+const albumList = ref<any[]>([])
 const selectedIds = ref<number[]>([])
+const previewList = ref<string[]>([])
+const openPreview = ref(false)
+const submitLoading = ref(false)
+const photoFormRef = ref<FormInstance>()
 
-// 弹窗控制
+const queryParams = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  albumId: 0
+})
+
 const dialog = reactive({
-    title: '',
-    visible: false,
-    type: 'add'
+  title: '',
+  visible: false,
+  type: 'add' as 'add' | 'edit'
 })
 
-// 表单数据
-const photoForm = reactive<any>({
-    id: undefined,
-    name: '',
-    description: '',
-    url: '',
-    recordTime: '',
-    sort: 1,
-})
-
-// 表单校验规则
-const rules = reactive<FormRules>({
-    url: [
-        { required: true, message: '请上传封面', trigger: 'blur' }
-    ],
-    description: [
-        { required: true, message: '请输入描述', trigger: 'blur' }
-    ],
-    recordTime: [
-        { required: false, message: '请选择记录的日期', trigger: 'blur' }
-    ],
-    sort: [
-        { required: false, message: '请输入排序', trigger: 'blur' }
-    ],
-
-})
-
-watch(() => props.openPhotos, (newVal) => {
-    if (newVal) {
-        selectedIds.value = []
-        getList()
-        getAlbumList()
-    }
-})
-
-// 获取标签列表
-const getList = async () => {
-    loading.value = true
-    try {
-        queryParams.albumId = props.albumId
-        const { data } = await listPhotoApi(queryParams)
-        photoList.value = data.records
-        total.value = data.total
-    } catch (error) {
-    }
-    loading.value = false
-}
-
-// 全选
-const handleAllSelect = () => {
-    if(photoList.value.length === selectedIds.value.length){
-        selectedIds.value = []
-    }else{
-        selectedIds.value = photoList.value.map(item => item.id)
-    }
-}
-
-// 批量移动
-const handleBatchMove = () => {
-    if (selectedIds.value.length === 0) return
-    moveDialog.visible = true
-}
-
-// 移动对话框数据
 const moveDialog = reactive({
-    visible: false,
-    targetAlbumId: undefined
+  visible: false,
+  targetAlbumId: undefined as number | undefined
 })
 
-// 确认移动
-const confirmMove = async () => {
-    if (!moveDialog.targetAlbumId) {
-        ElMessage.warning('请选择目标相册')
-        return
-    }
+const photoForm = reactive<any>({
+  id: undefined,
+  albumId: 0,
+  url: [] as string[] | string,
+  description: '',
+  recordTime: '',
+  sort: 1
+})
 
-    try {
-        await movePhotoApi({
-            photoIds: selectedIds.value,
-            albumId: moveDialog.targetAlbumId
-        })
-        ElMessage.success('移动成功')
-        moveDialog.visible = false
-        moveDialog.targetAlbumId = undefined
-        selectedIds.value = []
-        getList()
-    } catch (error) {
-        console.error('移动失败:', error)
-    }
+const rules = reactive<FormRules>({
+  url: [
+    { required: true, message: '请先上传照片', trigger: 'change' }
+  ]
+})
+
+const syncMobile = () => {
+  isMobile.value = window.innerWidth <= 768
 }
 
-// 取消移动
-const cancelMove = () => {
-    moveDialog.visible = false
-    moveDialog.targetAlbumId = undefined
+const resetForm = () => {
+  photoForm.id = undefined
+  photoForm.albumId = props.albumId
+  photoForm.url = dialog.type === 'add' ? [] : ''
+  photoForm.description = ''
+  photoForm.recordTime = ''
+  photoForm.sort = 1
 }
 
-// 获取所有相册
+const getList = async () => {
+  loading.value = true
+  try {
+    queryParams.albumId = props.albumId
+    const { data } = await listPhotoApi(queryParams)
+    photoList.value = data.records || []
+    total.value = data.total || 0
+    selectedIds.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
 const getAlbumList = async () => {
-    const { data } = await listAlbumAllApi()
-    albumList.value = data
+  const { data } = await listAlbumAllApi()
+  albumList.value = data || []
 }
 
-// 批量删除
-const handleBatchDelete = () => {
-    if (selectedIds.value.length === 0) return
-
-    ElMessageBox.confirm(`是否确认删除 ${selectedIds.value.length} 个照片?`, '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-    }).then(async () => {
-        try {
-            await deletePhotoApi(selectedIds.value)
-            ElMessage.success('批量删除成功')
-            getList()
-            selectedIds.value = []
-        } catch (error) {
-        }
-    })
+const toggleSelect = (id: number, checked: boolean) => {
+  if (checked) {
+    if (!selectedIds.value.includes(id)) {
+      selectedIds.value.push(id)
+    }
+    return
+  }
+  selectedIds.value = selectedIds.value.filter(item => item !== id)
 }
 
-// 删除
-const handleDelete = (row: any) => {
-    ElMessageBox.confirm(`是否确认删除 ${row.description} 这个照片?`, '警告', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-    }).then(async () => {
-        try {
-            await deletePhotoApi(row.id)
-            ElMessage.success('删除成功')
-            getList()
-        } catch (error) {
-        }
-    })
+const handleAllSelect = () => {
+  if (photoList.value.length && selectedIds.value.length === photoList.value.length) {
+    selectedIds.value = []
+    return
+  }
+  selectedIds.value = photoList.value.map(item => item.id)
 }
 
-
-// 新增相册
 const handleAdd = () => {
-    dialog.type = 'add'
-    dialog.title = '新增照片'
-    dialog.visible = true
-    photoForm.id = undefined
-    photoForm.albumId = props.albumId
-    photoForm.name = ''
-    photoForm.description = ''
-    photoForm.url = ''
-    photoForm.recordTime = ''
-    photoForm.sort = 1
+  dialog.type = 'add'
+  dialog.title = '新增照片'
+  dialog.visible = true
+  resetForm()
 }
 
-// 修改说说
 const handleUpdate = (row: any) => {
-    dialog.type = 'edit'
-    dialog.title = '修改照片'
-    dialog.visible = true
-    Object.assign(photoForm, row)
-    photoForm.createTime = undefined
+  dialog.type = 'edit'
+  dialog.title = '编辑照片'
+  dialog.visible = true
+  resetForm()
+  Object.assign(photoForm, {
+    id: row.id,
+    albumId: props.albumId,
+    url: row.url,
+    description: row.description || '',
+    recordTime: row.recordTime || '',
+    sort: row.sort || 1
+  })
 }
 
-// 关闭预览
-const closeViewer = () => {
-    openPreview.value = false
-    previewList.value = []
-}
-
-// 查看照片
-const handlePreviewPhotos = (item: any) => {
-    previewList.value = [item.url]
-    openPreview.value = true
-}
-
-// 提交表单
 const submitForm = async () => {
-    if (!photoFormRef.value) return
+  if (!photoFormRef.value) return
 
-    await photoFormRef.value.validate(async (valid) => {
-        if (valid) {
-            submitLoading.value = true
-            try {
-                if (dialog.type === 'add') {
-                    await addPhotoApi(photoForm)
-                    ElMessage.success('新增成功')
-                } else {
-                    await updatePhotoApi(photoForm)
-                    ElMessage.success('修改成功')
-                }
-                getList()
-                dialog.visible = false
-            } catch (error) {
-            } finally {
-                submitLoading.value = false
-            }
-        }
-    })
+  await photoFormRef.value.validate(async (valid) => {
+    if (!valid) return
+
+    const urls = normalizeImageList(photoForm.url)
+    if (!urls.length) {
+      ElMessage.warning('请先上传照片')
+      return
+    }
+
+    submitLoading.value = true
+    try {
+      if (dialog.type === 'add') {
+        await Promise.all(
+          urls.map((url, index) => addPhotoApi({
+            albumId: props.albumId,
+            url,
+            description: photoForm.description,
+            recordTime: photoForm.recordTime,
+            sort: Number(photoForm.sort || 1) + index
+          }))
+        )
+        ElMessage.success(`已新增 ${urls.length} 张照片`)
+      } else {
+        await updatePhotoApi({
+          ...photoForm,
+          albumId: props.albumId,
+          url: urls[0]
+        })
+        ElMessage.success('照片修改成功')
+      }
+
+      dialog.visible = false
+      getList()
+    } finally {
+      submitLoading.value = false
+    }
+  })
 }
 
-// 取消按钮
 const cancel = () => {
-    dialog.visible = false
-    photoFormRef.value?.resetFields()
+  dialog.visible = false
+  photoFormRef.value?.resetFields()
+  resetForm()
 }
 
-// 分页大小改变
+const handleBatchMove = () => {
+  if (selectedIds.value.length === 0) return
+  moveDialog.visible = true
+}
+
+const confirmMove = async () => {
+  if (!moveDialog.targetAlbumId) {
+    ElMessage.warning('请选择目标相册')
+    return
+  }
+
+  await movePhotoApi({
+    photoIds: selectedIds.value,
+    albumId: moveDialog.targetAlbumId
+  })
+  ElMessage.success('照片移动成功')
+  moveDialog.visible = false
+  moveDialog.targetAlbumId = undefined
+  selectedIds.value = []
+  getList()
+}
+
+const cancelMove = () => {
+  moveDialog.visible = false
+  moveDialog.targetAlbumId = undefined
+}
+
+const handleBatchDelete = async () => {
+  if (selectedIds.value.length === 0) return
+
+  await ElMessageBox.confirm(
+    `确定要删除选中的 ${selectedIds.value.length} 张照片吗？`,
+    '提示',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  )
+  await deletePhotoApi(selectedIds.value)
+  ElMessage.success('批量删除成功')
+  getList()
+}
+
+const handleDelete = async (row: any) => {
+  await ElMessageBox.confirm(
+    `确定要删除这张照片吗？`,
+    '提示',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  )
+  await deletePhotoApi(row.id)
+  ElMessage.success('删除成功')
+  getList()
+}
+
+const handlePreviewPhotos = (item: any) => {
+  previewList.value = [item.url]
+  openPreview.value = true
+}
+
+const closeViewer = () => {
+  openPreview.value = false
+  previewList.value = []
+}
+
 const handleSizeChange = (val: number) => {
-    queryParams.pageSize = val
-    getList()
+  queryParams.pageSize = val
+  getList()
 }
 
-// 页码改变
 const handleCurrentChange = (val: number) => {
-    queryParams.pageNum = val
-    getList()
+  queryParams.pageNum = val
+  getList()
 }
 
-// 处理弹框关闭
 const handleDialogClose = (val: boolean) => {
-    emit('update:openPhotos', val)
+  emit('update:openPhotos', val)
 }
+
+watch(
+  () => props.openPhotos,
+  (visible) => {
+    if (!visible) return
+    queryParams.pageNum = 1
+    getAlbumList()
+    getList()
+  }
+)
+
+onMounted(() => {
+  syncMobile()
+  window.addEventListener('resize', syncMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', syncMobile)
+})
 </script>
 
 <style scoped lang="scss">
-
 .photo-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
 
-    .photo-card {
-        border: 1px solid #e6e6e6;
-        border-radius: 12px;
-        position: relative;
-        overflow: hidden;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        
-        &:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-            
-            .photo-overlay {
-                opacity: 1;
-                
-                .photo-content {
-                    transform: translateY(0);
-                    opacity: 1;
-                }
-                
-                .photo-actions {
-                    transform: translateY(0);
-                    opacity: 1;
-                }
-            }
-        }
+.photo-card {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--el-bg-color);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
 
-        .photo-select {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            z-index: 2;
-        }
+.photo-card__media {
+  position: relative;
+}
 
-        .photo-image {
-            border-radius: 12px;
-            width: 300px;
-            height: 200px;
-            object-fit: cover;
-            display: block;
-        }
+.photo-card__check {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+}
 
-        .photo-overlay {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to bottom, 
-                rgba(0, 0, 0, 0.2) 0%,
-                rgba(0, 0, 0, 0.7) 100%);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            opacity: 0;
-            transition: opacity 0.4s ease;
-            border-radius: 12px;
-        }
+.photo-card__image {
+  display: block;
+  width: 100%;
+  height: 220px;
+  background: var(--el-fill-color);
+}
 
-        .photo-content {
-            padding: 20px 15px;
-            color: #fff;
-            transform: translateY(-20px);
-            opacity: 0;
-            transition: all 0.4s ease;
+.photo-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
 
-            .photo-time {
-                font-size: 14px;
-                margin-bottom: 12px;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                opacity: 0.9;
-                
-                .time-text {
-                    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-                }
-            }
+.photo-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 
-            .photo-desc {
-                font-size: 14px;
-                line-height: 1.5;
-                opacity: 0.95;
-                display: -webkit-box;
-                -webkit-line-clamp: 3;
-                -webkit-box-orient: vertical;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-            }
-        }
+  strong {
+    color: var(--el-text-color-primary);
+    font-weight: 600;
+  }
+}
 
-        .photo-actions {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            padding: 15px;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(4px);
-            transform: translateY(20px);
-            opacity: 0;
-            transition: all 0.4s ease;
+.photo-card__desc {
+  min-height: 44px;
+  color: var(--el-text-color-primary);
+  line-height: 1.65;
+  word-break: break-word;
+}
 
-            :deep(.el-button) {
-                font-weight: 500;
-                transition: all 0.3s ease;
-                
-                &:hover {
-                    transform: scale(1.05);
-                    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
-                }
-            }
-        }
-    }
+.photo-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.photo-upload-hint {
+  margin-top: 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .photo-list {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .photo-card__image {
+    height: 200px;
+  }
+
+  :deep(.photo-edit-dialog),
+  :deep(.photos-dialog) {
+    border-radius: 0 !important;
+  }
+
+  :deep(.photo-form .el-form-item) {
+    display: block;
+    margin-bottom: 16px !important;
+  }
+
+  :deep(.photo-form .el-form-item__label) {
+    display: block;
+    width: 100% !important;
+    padding: 0 0 8px !important;
+    text-align: left !important;
+    font-weight: 600;
+  }
+
+  :deep(.photo-form .el-form-item__content) {
+    margin-left: 0 !important;
+    width: 100%;
+  }
 }
 </style>

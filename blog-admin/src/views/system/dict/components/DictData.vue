@@ -8,7 +8,7 @@
           :icon="Plus"
           @click="handleAdd"
         >
-          ??
+          新增
         </el-button>
       </PageToolbarGroup>
       <PageToolbarGroup kind="danger">
@@ -19,7 +19,9 @@
           :icon="Delete"
           :disabled="selectedIds.length === 0"
           @click="handleBatchDelete"
-        >批量删除</el-button>
+        >
+          批量删除
+        </el-button>
       </PageToolbarGroup>
     </PageToolbar>
 
@@ -43,21 +45,30 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="??" width="180" align="center">
+      <el-table-column label="操作" width="180" align="center">
         <template #default="{ row }">
           <PageTableActions>
-            <PageTableAction type="primary" :icon="Edit" @click="handleEdit(row)" v-permission="['sys:dict:update']">
-              ??
+            <PageTableAction
+              type="primary"
+              :icon="Edit"
+              v-permission="['sys:dict:update']"
+              @click="handleEdit(row)"
+            >
+              修改
             </PageTableAction>
-            <PageTableAction type="danger" :icon="Delete" @click="handleDelete(row)" v-permission="['sys:dict:delete']">
-              ??
+            <PageTableAction
+              type="danger"
+              :icon="Delete"
+              v-permission="['sys:dict:delete']"
+              @click="handleDelete(row)"
+            >
+              删除
             </PageTableAction>
           </PageTableActions>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 添加分页组件 -->
     <PagePagination
       v-model:current-page="queryParams.pageNum"
       v-model:page-size="queryParams.pageSize"
@@ -66,7 +77,6 @@
       @current-change="handleCurrentChange"
     />
 
-    <!-- 字典数据表单对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogType === 'add' ? '新增字典数据' : '修改字典数据'"
@@ -92,9 +102,14 @@
           <el-input-number v-model="dictDataForm.sort" :min="0" />
         </el-form-item>
         <el-form-item label="回显样式" prop="style">
-           <el-select v-model="dictDataForm.style" placeholder="请选择显示样式">
-             <el-option v-for="(item, index) in styleOptions" :key="index" :label="item.label" :value="item.value" />
-           </el-select>
+          <el-select v-model="dictDataForm.style" placeholder="请选择显示样式">
+            <el-option
+              v-for="(item, index) in styleOptions"
+              :key="index"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="dictDataForm.status">
@@ -125,10 +140,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Edit, Plus } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import {
-  getDictDataListApi,
   addDictDataApi,
-  updateDictDataApi,
-  deleteDictDataApi
+  deleteDictDataApi,
+  getDictDataListApi,
+  updateDictDataApi
 } from '@/api/system/dict'
 
 const props = defineProps<{
@@ -136,25 +151,20 @@ const props = defineProps<{
   dictType: string
 }>()
 
-const emit = defineEmits(['update:dictId'])
-
 const dialogVisible = ref(false)
 const dialogType = ref<'add' | 'edit'>('add')
 const submitLoading = ref(false)
 const dictDataFormRef = ref<FormInstance>()
 const dictDataList = ref<any[]>([])
-
-// 添加总数变量
 const total = ref(0)
+const selectedIds = ref<number[]>([])
 
-// 查询参数
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
   dictId: props.dictId
 })
 
-// 表单对象
 const dictDataForm = reactive<Partial<any>>({
   dictType: props.dictType,
   dictId: props.dictId,
@@ -166,7 +176,6 @@ const dictDataForm = reactive<Partial<any>>({
   remark: ''
 })
 
-// 显示样式选项
 const styleOptions = [
   { label: 'primary', value: 'primary' },
   { label: 'success', value: 'success' },
@@ -175,7 +184,6 @@ const styleOptions = [
   { label: 'danger', value: 'danger' }
 ]
 
-// 表单校验规则
 const rules = {
   label: [
     { required: true, message: '请输入数据标签', trigger: 'blur' }
@@ -194,21 +202,50 @@ const rules = {
   ]
 }
 
-// 添加选中项数组
-const selectedIds = ref<number[]>([])
-
-// 选择变化
 const handleSelectionChange = (selection: any[]) => {
   selectedIds.value = selection.map(item => item.id)
 }
 
-// 批量删除
+const getList = async () => {
+  try {
+    const { data } = await getDictDataListApi(queryParams)
+    dictDataList.value = data.records
+    total.value = data.total
+  } catch (error) {
+  }
+}
+
+const resetForm = () => {
+  dictDataForm.id = undefined
+  dictDataForm.dictType = props.dictType
+  dictDataForm.dictId = props.dictId
+  dictDataForm.label = ''
+  dictDataForm.value = ''
+  dictDataForm.sort = 0
+  dictDataForm.status = 1
+  dictDataForm.style = 'primary'
+  dictDataForm.remark = ''
+}
+
+const handleAdd = () => {
+  resetForm()
+  dialogType.value = 'add'
+  dialogVisible.value = true
+}
+
+const handleEdit = (row: any) => {
+  resetForm()
+  dialogType.value = 'edit'
+  dialogVisible.value = true
+  Object.assign(dictDataForm, row)
+}
+
 const handleBatchDelete = () => {
   if (selectedIds.value.length === 0) {
     ElMessage.warning('请选择要删除的记录')
     return
   }
-  
+
   ElMessageBox.confirm(
     `确定要删除选中的 ${selectedIds.value.length} 条记录吗？`,
     '警告',
@@ -226,9 +263,9 @@ const handleBatchDelete = () => {
     }
   })
 }
-// 删除
+
 const handleDelete = (row: any) => {
-  ElMessageBox.confirm(`确定要删除 ${row.label} 吗？`, '提示', {
+  ElMessageBox.confirm(`确定要删除“${row.label}”吗？`, '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
@@ -242,70 +279,32 @@ const handleDelete = (row: any) => {
   })
 }
 
-// 获取字典数据列表
-const getList = async () => {
-  try {
-    const { data } = await getDictDataListApi(queryParams)
-    dictDataList.value = data.records
-    total.value = data.total // 设置总数
-  } catch (error) {
-  }
-}
-
-// 重置表单
-const resetForm = () => {
-  dictDataForm.id = undefined
-  dictDataForm.dictId = props.dictId
-  dictDataForm.label = ''
-  dictDataForm.value = ''
-  dictDataForm.sort = 0
-  dictDataForm.status = 1
-  dictDataForm.style = 'primary'
-  dictDataForm.remark = ''
-}
-
-// 新增
-const handleAdd = () => {
-  resetForm()
-  dialogType.value = 'add'
-  dialogVisible.value = true
-}
-
-// 修改
-const handleEdit = (row: any) => {
-  resetForm()
-  dialogType.value = 'edit'
-  dialogVisible.value = true
-  Object.assign(dictDataForm, row)
-}
-
-// 提交表单
 const submitForm = async () => {
   if (!dictDataFormRef.value) return
-  
+
   await dictDataFormRef.value.validate(async (valid) => {
-    if (valid) {
-      submitLoading.value = true
-      try {
-        if (dialogType.value === 'add') {
-          await addDictDataApi(dictDataForm)
-          ElMessage.success('新增成功')
-        } else {
-          await updateDictDataApi(dictDataForm)
-          ElMessage.success('修改成功')
-        }
-        dialogVisible.value = false
-        getList()
-      } catch (error) {
-      } finally {
-        submitLoading.value = false
+    if (!valid) {
+      return
+    }
+
+    submitLoading.value = true
+    try {
+      if (dialogType.value === 'add') {
+        await addDictDataApi(dictDataForm)
+        ElMessage.success('新增成功')
+      } else {
+        await updateDictDataApi(dictDataForm)
+        ElMessage.success('修改成功')
       }
+      dialogVisible.value = false
+      getList()
+    } catch (error) {
+    } finally {
+      submitLoading.value = false
     }
   })
 }
 
-
-// 添加分页方法
 const handleSizeChange = (val: number) => {
   queryParams.pageSize = val
   getList()
@@ -316,15 +315,18 @@ const handleCurrentChange = (val: number) => {
   getList()
 }
 
-// 监听 dictId 变化
 watch(() => props.dictId, (newVal) => {
   if (newVal) {
     queryParams.dictId = newVal
+    dictDataForm.dictId = newVal
     getList()
   }
 })
 
-// 初始化
+watch(() => props.dictType, (newVal) => {
+  dictDataForm.dictType = newVal
+})
+
 if (props.dictId) {
   getList()
 }

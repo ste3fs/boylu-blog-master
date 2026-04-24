@@ -2,7 +2,7 @@
   <div class="app-container">
     <!-- 搜索表单 -->
     <PageSearch>
-      <el-form ref="queryFormRef" :model="queryParams" :inline="true">
+      <el-form ref="queryFormRef" :model="queryParams" :inline="!isMobile">
         <el-form-item label="标题" prop="title">
           <el-input v-model="queryParams.title" placeholder="请输入文章标题" clearable @keyup.enter="handleQuery" />
         </el-form-item>
@@ -44,7 +44,7 @@
       </template>
 
       <!-- 数据表格 -->
-      <el-table v-loading="loading" :data="tableData" style="width: 100%" @selection-change="handleSelectionChange">
+      <el-table v-if="!isMobile" v-loading="loading" :data="tableData" style="width: 100%" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" align="center" />
         <el-table-column label="封面" align="center" width="133">
           <template #default="scope">
@@ -92,17 +92,111 @@
         </el-table-column>
         <el-table-column label="阅读量" align="center" prop="quantity" />
         <el-table-column label="发布时间" align="center" prop="createTime" width="180" />
-        <el-table-column label="??" align="center" width="200" fixed="right">
+        <el-table-column label="操作" align="center" width="200" fixed="right">
           <template #default="scope">
             <PageTableActions>
               <PageTableAction type="primary" :icon="Edit" @click="handleUpdate(scope.row)"
-                v-permission="['sys:article:update']">??</PageTableAction>
+                v-permission="['sys:article:update']">编辑</PageTableAction>
               <PageTableAction type="danger" :icon="Delete" @click="handleDelete(scope.row)"
-                v-permission="['sys:article:delete']">??</PageTableAction>
+                v-permission="['sys:article:delete']">删除</PageTableAction>
             </PageTableActions>
           </template>
         </el-table-column>
       </el-table>
+
+      <div v-else v-loading="loading" class="mobile-article-list">
+        <div v-if="selectedIds.length" class="mobile-selection-bar">
+          <span>已选 {{ selectedIds.length }} 篇文章</span>
+          <el-button link type="primary" @click="selectedIds = []">清空</el-button>
+        </div>
+
+        <template v-if="tableData.length">
+          <article v-for="row in tableData" :key="row.id" class="mobile-article-card">
+            <div class="mobile-article-card__top">
+              <el-checkbox
+                class="mobile-article-card__check"
+                :model-value="isArticleSelected(row.id)"
+                @change="(checked) => toggleArticleSelection(row.id, Boolean(checked))"
+              />
+              <el-image class="mobile-article-card__cover" :src="row.cover" fit="cover">
+                <template #error>
+                  <div class="mobile-article-card__cover-fallback">无封面</div>
+                </template>
+              </el-image>
+              <div class="mobile-article-card__main">
+                <div class="mobile-article-card__title">{{ row.title || '未命名文章' }}</div>
+                <div class="mobile-article-card__summary">{{ row.summary || '暂无摘要' }}</div>
+              </div>
+            </div>
+
+            <div class="mobile-article-card__meta">
+              <div class="mobile-article-card__meta-item">
+                <span class="mobile-article-card__meta-label">作者</span>
+                <span>{{ row.nickname || '未知' }}</span>
+              </div>
+              <div class="mobile-article-card__meta-item">
+                <span class="mobile-article-card__meta-label">分类</span>
+                <span>{{ row.categoryName || '未分类' }}</span>
+              </div>
+              <div class="mobile-article-card__meta-item">
+                <span class="mobile-article-card__meta-label">阅读</span>
+                <span>{{ row.quantity || 0 }}</span>
+              </div>
+              <div class="mobile-article-card__meta-item">
+                <span class="mobile-article-card__meta-label">发布时间</span>
+                <span>{{ row.createTime || '未发布' }}</span>
+              </div>
+            </div>
+
+            <div class="mobile-article-card__tags" v-if="row.tags && row.tags.length">
+              <el-tag
+                v-for="tag in row.tags.slice(0, 3)"
+                :key="tag.id || tag.name"
+                size="small"
+                effect="plain"
+              >
+                {{ tag.name }}
+              </el-tag>
+            </div>
+
+            <div class="mobile-article-card__status">
+              <div class="mobile-article-card__switch">
+                <span>发布状态</span>
+                <el-switch
+                  v-model="row.status"
+                  :active-value="1"
+                  :inactive-value="0"
+                  style="--el-switch-on-color: #13ce66; --el-switch-off-color: #ff4949"
+                  @change="handleChangeStatus(row)"
+                />
+              </div>
+              <div class="mobile-article-card__flags">
+                <el-tag
+                  size="small"
+                  effect="light"
+                  :type="resolveOptionMeta(yesNoOptions, row.isRecommend).style || 'info'"
+                >
+                  推荐 {{ resolveOptionMeta(yesNoOptions, row.isRecommend).label }}
+                </el-tag>
+                <el-tag
+                  size="small"
+                  effect="light"
+                  :type="resolveOptionMeta(yesNoOptions, row.isStick).style || 'info'"
+                >
+                  置顶 {{ resolveOptionMeta(yesNoOptions, row.isStick).label }}
+                </el-tag>
+              </div>
+            </div>
+
+            <div class="mobile-article-card__actions">
+              <el-button type="primary" plain :icon="Edit" @click="handleUpdate(row)">编辑</el-button>
+              <el-button type="danger" plain :icon="Delete" @click="handleDelete(row)">删除</el-button>
+            </div>
+          </article>
+        </template>
+
+        <el-empty v-else description="暂无文章数据" />
+      </div>
 
       <!-- 分页组件 -->
       <PagePagination
@@ -115,8 +209,15 @@
     </el-card>
 
     <!-- 添加或修改对话框 -->
-    <el-dialog :title="dialog.title" v-model="dialog.visible" width="1400px" top="3vh" :close-on-click-modal="false">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+    <el-dialog
+      :title="dialog.title"
+      v-model="dialog.visible"
+      :width="isMobile ? '100vw' : '1400px'"
+      :top="isMobile ? '0' : '3vh'"
+      :fullscreen="isMobile"
+      :close-on-click-modal="false"
+    >
+      <el-form ref="formRef" :model="form" :rules="rules" :label-width="isMobile ? '88px' : '100px'">
         <el-form-item label="文章标题" prop="title">
           <el-input v-model="form.title" placeholder="请输入文章标题" />
         </el-form-item>
@@ -130,7 +231,7 @@
         </el-form-item>
 
         <el-row :gutter="20" class="mb-20">
-          <el-col :span="12">
+          <el-col :xs="24" :sm="24" :md="12">
             <el-form-item label="分类" prop="categoryName">
               <el-tag
                 type="success"
@@ -176,7 +277,7 @@
             </el-form-item>
 
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :sm="24" :md="12">
             <el-form-item label="标签" prop="tags">
               <el-tag
                 v-for="(item, index) of form.tags"
@@ -223,7 +324,7 @@
         </el-row>
 
         <el-row :gutter="20" class="mb-20">
-          <el-col :span="8">
+          <el-col :xs="24" :sm="24" :md="8">
             <el-form-item label="阅读方式" prop="readType">
               <el-select v-model="form.readType" placeholder="请选择阅读方式">
                 <el-option label="免费" :value="1" />
@@ -232,7 +333,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :xs="24" :sm="24" :md="8">
             <el-form-item label="文章类型" prop="isOriginal">
               <el-select v-model="form.isOriginal" placeholder="请选择文章类型">
                 <el-option label="原创" :value="1" />
@@ -240,7 +341,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :xs="24" :sm="24" :md="8">
             <el-form-item label="关键词" prop="keywords">
               <el-input v-model="form.keywords" placeholder="请输入关键词" />
             </el-form-item>
@@ -252,13 +353,13 @@
         </el-form-item>
 
         <el-row :gutter="20" class="mb-20">
-          <el-col :span="6">
+          <el-col :xs="12" :sm="12" :md="6">
             <el-form-item label="是否置顶" prop="isStick">
               <el-switch style="--el-switch-on-color: #13ce66; --el-switch-off-color: #ff4949" v-model="form.isStick"
                 :active-value="1" :inactive-value="0" />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :xs="12" :sm="12" :md="6">
             <el-form-item label="是否发布" prop="status">
               <el-select v-model="form.status" placeholder="请选择文章状态">
                 <el-option v-for="item in statusOptions" :key="item.id" :value="Number(item.value)"
@@ -266,13 +367,13 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :xs="12" :sm="12" :md="6">
             <el-form-item label="首页轮播" prop="isCarousel">
               <el-switch style="--el-switch-on-color: #13ce66; --el-switch-off-color: #ff4949" v-model="form.isCarousel"
                 :active-value="1" :inactive-value="0" />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :xs="12" :sm="12" :md="6">
             <el-form-item label="是否推荐" prop="isRecommend">
               <el-switch style="--el-switch-on-color: #13ce66; --el-switch-off-color: #ff4949"
                 v-model="form.isRecommend" :active-value="1" :inactive-value="0" />
@@ -281,7 +382,14 @@
         </el-row>
 
         <el-form-item label="文章内容" prop="contentMd" class="mb-20">
-          <mavon-editor placeholder="输入文章内容..." style="height: 500px; width: 100%" ref="mdRef" v-model="form.contentMd"
+          <mavon-editor
+            placeholder="输入文章内容..."
+            :style="{ height: isMobile ? '52dvh' : '500px', width: '100%' }"
+            :subfield="!isMobile"
+            :default-open="isMobile ? 'edit' : 'preview'"
+            :toolbars="articleEditorToolbars"
+            ref="mdRef"
+            v-model="form.contentMd"
             @imgDel="imgDel" @imgAdd="imgAdd">
             <template #left-toolbar-after>
                   <el-dropdown>
@@ -325,8 +433,8 @@
     </el-dialog>
 
     <!-- 爬取文章对话框 -->
-    <el-dialog title="爬取文章" v-model="reptileDialog.visible" width="800px">
-      <el-form ref="reptileFormRef" :model="reptileForm" :rules="rules" label-width="100px">
+    <el-dialog title="爬取文章" v-model="reptileDialog.visible" :width="isMobile ? '100vw' : '800px'" :fullscreen="isMobile">
+      <el-form ref="reptileFormRef" :model="reptileForm" :rules="rules" :label-width="isMobile ? '88px' : '100px'">
         <el-form-item label="爬取地址" prop="url">
           <el-input v-model="reptileForm.url" placeholder="请输入爬取地址" />
         </el-form-item>
@@ -344,7 +452,7 @@
     </el-dialog>
 
     <!-- 添加视频地址对话框 -->
-    <el-dialog center title="添加视频" v-model="dialogVisible" width="30%">
+    <el-dialog center title="添加视频" v-model="dialogVisible" :width="isMobile ? '100vw' : '30%'" :fullscreen="isMobile">
       <el-input v-model="videoInput" placeholder="视频地址"></el-input>
 
       <template #footer>
@@ -388,14 +496,15 @@ const queryParams = reactive({
 
 const loading = ref(false)
 const total = ref(0)
-const tableData = ref([])
+const tableData = ref<any[]>([])
 const queryFormRef = ref<FormInstance>()
 const formRef = ref<FormInstance>()
 const mdRef = ref();
 const submitLoading = ref(false)
+const isMobile = ref(false)
 
 // 选中项数组
-const selectedIds = ref<string[]>([])
+const selectedIds = ref<Array<string | number>>([])
 
 // 弹窗控制
 const dialog = reactive({
@@ -440,6 +549,47 @@ const videoInput = ref('')
 
 const tagName = ref('')
 const categoryName = ref('')
+
+const syncMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
+
+const mobileArticleToolbars = {
+  bold: true,
+  italic: true,
+  header: true,
+  quote: true,
+  ol: true,
+  ul: true,
+  link: true,
+  imagelink: true,
+  code: true,
+  table: true,
+  undo: true,
+  redo: true,
+  trash: true,
+  save: true,
+  fullscreen: true,
+  preview: true
+}
+
+const articleEditorToolbars = computed(() => (isMobile.value ? mobileArticleToolbars : undefined))
+
+const isArticleSelected = (id: string | number) => selectedIds.value.includes(id)
+
+const toggleArticleSelection = (id: string | number, checked: boolean) => {
+  if (checked) {
+    if (!selectedIds.value.includes(id)) {
+      selectedIds.value.push(id)
+    }
+    return
+  }
+  selectedIds.value = selectedIds.value.filter(item => item !== id)
+}
+
+const resolveOptionMeta = (options: any[], value: string | number) => {
+  return options.find(item => Number(item.value) === Number(value)) || {}
+}
 
 
 
@@ -587,6 +737,7 @@ const getList = async () => {
     const { data } = await getArticleListApi(queryParams)
     tableData.value = data.records
     total.value = data.total
+    selectedIds.value = []
   } catch (error) {
   }
   loading.value = false
@@ -755,6 +906,7 @@ const handleCurrentChange = (val: number) => {
 
 // 初始化
 onMounted(() => {
+  syncMobile()
   getList()
   getCategoryListApi({ pageNum: 1, pageSize: 1000 }).then((res) => {
     categoryOptions.value = res.data.records
@@ -764,6 +916,11 @@ onMounted(() => {
   })
 
   getStatusList()
+  window.addEventListener('resize', syncMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', syncMobile)
 })
 
 // 图片上传前的处理
@@ -881,6 +1038,245 @@ const beforeAvatarUpload = (file: File) => {
   .el-tag {
     margin-right: 8px;
     margin-bottom: 8px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    .mobile-article-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .mobile-selection-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 4px 0;
+      color: var(--el-text-color-secondary);
+      font-size: 13px;
+    }
+
+    .mobile-article-card {
+      padding: 14px;
+      border-radius: 16px;
+      background: var(--el-fill-color-extra-light);
+      border: 1px solid var(--el-border-color-lighter);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .mobile-article-card__top {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .mobile-article-card__check {
+      padding-top: 4px;
+      flex: 0 0 auto;
+    }
+
+    .mobile-article-card__cover {
+      width: 96px;
+      height: 72px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--el-fill-color);
+      flex: 0 0 auto;
+    }
+
+    .mobile-article-card__cover-fallback {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--el-text-color-secondary);
+      font-size: 12px;
+    }
+
+    .mobile-article-card__main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .mobile-article-card__title {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.45;
+      color: var(--el-text-color-primary);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .mobile-article-card__summary {
+      margin-top: 6px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--el-text-color-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .mobile-article-card__meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--el-border-color-lighter);
+    }
+
+    .mobile-article-card__meta-item {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 13px;
+      color: var(--el-text-color-primary);
+
+      span:last-child {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    .mobile-article-card__meta-label {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+    }
+
+    .mobile-article-card__tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .mobile-article-card__status {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .mobile-article-card__switch {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--el-text-color-primary);
+    }
+
+    .mobile-article-card__flags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .mobile-article-card__actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+
+      .el-button {
+        flex: 1;
+        min-height: 38px;
+        margin: 0;
+      }
+    }
+
+    :deep(.el-dialog) {
+      border-radius: 0 !important;
+
+      .el-dialog__header {
+        padding: 14px 16px;
+      }
+
+      .el-dialog__body {
+        padding: 14px !important;
+      }
+
+      .el-dialog__footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 2;
+      }
+
+      .el-form-item {
+        display: block;
+        margin-bottom: 16px !important;
+
+        .el-form-item__label {
+          display: block;
+          width: 100% !important;
+          padding: 0 0 8px !important;
+          text-align: left !important;
+        }
+
+        .el-form-item__content {
+          margin-left: 0 !important;
+          width: 100%;
+        }
+      }
+
+      .el-row {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+      }
+
+      .el-col {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .v-note-wrapper {
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 52dvh;
+        margin-bottom: 0;
+      }
+
+      .v-note-op {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        height: auto !important;
+        min-height: 48px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+          display: none;
+        }
+
+        .op-icon,
+        .op-icon-divider {
+          flex: 0 0 auto;
+        }
+      }
+
+      .v-note-panel,
+      .v-note-edit {
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      .v-note-show {
+        display: none !important;
+      }
+    }
+
+    .dialog-footer {
+      padding-top: 0;
+      border-top: none;
+    }
   }
 }
 

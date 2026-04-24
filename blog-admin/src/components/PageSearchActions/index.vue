@@ -35,4 +35,16 @@ const emit = defineEmits<{
   align-items: center;
   gap: 8px;
 }
+
+@media (max-width: 768px) {
+  .page-search-actions {
+    width: 100%;
+  }
+
+  .page-search-actions :deep(.el-button) {
+    flex: 1;
+    min-width: 0;
+    min-height: 38px;
+  }
+}
 </style>
