@@ -2,8 +2,8 @@ package com.mojian.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mojian.common.Constants;
 import com.mojian.common.RedisConstants;
 import com.mojian.common.Result;
@@ -31,9 +31,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/file")
@@ -42,6 +47,8 @@ import java.util.UUID;
 public class FileController {
 
     private static final String DEFAULT_PUBLIC_FILE_CONTENT_PREFIX = "/boylu/file/content/";
+    private static final long MB = 1024L * 1024L;
+    private static final Pattern SOURCE_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{1,40}$");
 
     private final FileDetailService fileDetailService;
 
@@ -51,6 +58,9 @@ public class FileController {
 
     @Value("${app.file.public-prefix:" + DEFAULT_PUBLIC_FILE_CONTENT_PREFIX + "}")
     private String publicFileContentPrefix;
+
+    @Value("${app.file.max-upload-size-mb:30}")
+    private long maxUploadSizeMb;
 
     @SaCheckLogin
     @GetMapping("/list")
@@ -94,22 +104,21 @@ public class FileController {
     @PostMapping("/upload")
     @ApiOperation(value = "上传文件")
     public Result<String> upload(MultipartFile file, String source) {
+        validateUploadFile(file);
+        String normalizedSource = normalizeSource(source);
+        DetectedImageType imageType = detectImageType(file);
+
         String path = DateUtil.parseDateToStr(DateUtil.YYYYMMDD, DateUtil.getNowDate()) + "/";
-        if (StringUtils.isNotBlank(source)) {
-            path = path + source + "/";
+        if (StringUtils.isNotBlank(normalizedSource)) {
+            path = path + normalizedSource + "/";
         }
 
-        String originalFilename = file.getOriginalFilename();
-        String extension = StringUtils.substringAfterLast(originalFilename, ".");
-        String saveFilename = UUID.randomUUID().toString().replace("-", "");
-        if (StringUtils.isNotBlank(extension)) {
-            saveFilename = saveFilename + "." + extension.toLowerCase();
-        }
+        String saveFilename = UUID.randomUUID().toString().replace("-", "") + "." + imageType.getExtension();
 
         FileInfo fileInfo = fileStorageService.of(file)
                 .setPath(path)
                 .setSaveFilename(saveFilename)
-                .putAttr("source", source)
+                .putAttr("source", normalizedSource)
                 .upload();
 
         if (fileInfo == null) {
@@ -119,13 +128,13 @@ public class FileController {
     }
 
     @GetMapping("/content/{id}")
-    @ApiOperation(value = "閫氳繃鏂囦欢 ID 璁块棶鏂囦欢")
+    @ApiOperation(value = "根据文件 ID 访问文件")
     public void content(@PathVariable String id, HttpServletResponse response) throws IOException {
         redirectToFile(id, response);
     }
 
     @GetMapping("/view/{id}")
-    @ApiOperation(value = "閫氳繃鏂囦欢 ID 棰勮鏂囦欢")
+    @ApiOperation(value = "根据文件 ID 预览文件")
     public void view(@PathVariable String id, HttpServletResponse response) throws IOException {
         redirectToFile(id, response);
     }
@@ -150,6 +159,64 @@ public class FileController {
             fileDetailService.delete(url);
         }
         return Result.success(flag);
+    }
+
+    private void validateUploadFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ServiceException("上传文件不能为空");
+        }
+        long maxBytes = Math.max(1L, maxUploadSizeMb) * MB;
+        if (file.getSize() > maxBytes) {
+            throw new ServiceException("上传文件大小不能超过 " + maxUploadSizeMb + "MB");
+        }
+    }
+
+    private String normalizeSource(String source) {
+        if (StringUtils.isBlank(source)) {
+            return "default";
+        }
+        String normalized = source.trim();
+        if (!SOURCE_PATTERN.matcher(normalized).matches()) {
+            throw new ServiceException("非法上传来源");
+        }
+        return normalized.toLowerCase(Locale.ROOT);
+    }
+
+    private DetectedImageType detectImageType(MultipartFile file) {
+        try (InputStream inputStream = file.getInputStream()) {
+            byte[] header = new byte[16];
+            int length = inputStream.read(header);
+            if (length < 12) {
+                throw new ServiceException("不支持的文件格式");
+            }
+
+            if (length >= 3
+                    && (header[0] & 0xFF) == 0xFF
+                    && (header[1] & 0xFF) == 0xD8
+                    && (header[2] & 0xFF) == 0xFF) {
+                return new DetectedImageType("jpg");
+            }
+
+            byte[] pngSignature = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+            if (length >= pngSignature.length && Arrays.equals(Arrays.copyOf(header, pngSignature.length), pngSignature)) {
+                return new DetectedImageType("png");
+            }
+
+            String gifHeader = new String(header, 0, Math.min(length, 6), StandardCharsets.US_ASCII);
+            if ("GIF87a".equals(gifHeader) || "GIF89a".equals(gifHeader)) {
+                return new DetectedImageType("gif");
+            }
+
+            String riffHeader = new String(header, 0, 4, StandardCharsets.US_ASCII);
+            String webpHeader = new String(header, 8, 4, StandardCharsets.US_ASCII);
+            if ("RIFF".equals(riffHeader) && "WEBP".equals(webpHeader)) {
+                return new DetectedImageType("webp");
+            }
+
+            throw new ServiceException("仅允许上传 jpg/png/gif/webp 图片");
+        } catch (IOException ex) {
+            throw new ServiceException("读取上传文件失败");
+        }
     }
 
     private String buildPublicContentUrl(FileInfo fileInfo) {
@@ -326,5 +393,17 @@ public class FileController {
             normalized = normalized.substring(0, normalized.length() - 1);
         }
         return normalized;
+    }
+
+    private static class DetectedImageType {
+        private final String extension;
+
+        private DetectedImageType(String extension) {
+            this.extension = extension;
+        }
+
+        public String getExtension() {
+            return extension;
+        }
     }
 }

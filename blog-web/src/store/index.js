@@ -37,6 +37,8 @@ export default new Vuex.Store({
     mobileMenuVisible: false,
     visitorAccess: 0,
     siteAccess: 0,
+    dailyVisitorAccess: null,
+    dailySiteAccess: null,
     isLoading: false,
     notice: null,
     isUnread: false
@@ -78,6 +80,12 @@ export default new Vuex.Store({
     },
     setSiteAccess(state, value) {
       state.siteAccess = value
+    },
+    setDailyVisitorAccess(state, value) {
+      state.dailyVisitorAccess = value
+    },
+    setDailySiteAccess(state, value) {
+      state.dailySiteAccess = value
     },
     SET_LOADING(state, status) {
       state.isLoading = status

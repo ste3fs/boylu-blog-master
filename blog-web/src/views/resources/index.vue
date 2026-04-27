@@ -1,145 +1,225 @@
 <template>
-  <div class="resources-container">
-    <!-- 页面标题和搜索栏 -->
-    <div class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">资源中心</h1>
-      </div>
-      <div class="header-right">
-        <div class="search-bar">
-          <el-input
-            v-model="params.name"
-            placeholder="搜索你感兴趣的资源,按回车键搜索..."
-            prefix-icon="el-icon-search"
-            clearable
-            @keyup.enter.native="handleSearch"
-          />
-        </div>
-        <el-button type="primary" icon="el-icon-upload" @click="showUploadDialog">
-          上传资源
-        </el-button>
-      </div>
-    </div>
+  <div class="resources-page">
+    <section class="resources-hero">
+      <div class="hero-copy">
+        <span class="hero-eyebrow">Resource Hub</span>
+        <h1>资源中心</h1>
+        <p class="hero-summary">
+          收集好用的教程、工具和素材。没有登录也能正常打开页面，有公开资源就能直接浏览详情。
+        </p>
 
-    <!-- 分类内容 -->
-    <div v-for="category in categories" :key="category.id" class="category-section" v-if="category.resources?.length > 0">
-      <div class="category-header">
-        <div class="category-title">
-          <svg-icon :icon-class="category.remark"></svg-icon>
-          <h2>{{ category.label }}</h2>
+        <div class="hero-stats">
+          <article class="hero-stat">
+            <strong>{{ total }}</strong>
+            <span>公开资源</span>
+          </article>
+          <article class="hero-stat">
+            <strong>{{ categoryOptions.length || 1 }}</strong>
+            <span>分类筛选</span>
+          </article>
+          <article class="hero-stat">
+            <strong>{{ resourceList.length }}</strong>
+            <span>当前页条目</span>
+          </article>
         </div>
       </div>
-      
-      <div class="resources-grid">
-        <div
-          v-for="resource in category.resources"
+
+      <div class="hero-actions">
+        <div class="search-card">
+          <label class="search-label">搜索资源</label>
+          <div class="search-bar">
+            <el-input
+              v-model="params.name"
+              placeholder="输入资源名后回车搜索"
+              clearable
+              @keyup.enter.native="handleSearch"
+            />
+            <el-button type="primary" @click="handleSearch">
+              <i class="fas fa-search"></i>
+              搜索
+            </el-button>
+          </div>
+        </div>
+
+        <div class="hero-actions__footer">
+          <el-button type="primary" icon="el-icon-upload" @click="showUploadDialog">
+            上传资源
+          </el-button>
+          <el-button plain @click="handleReset">
+            重置筛选
+          </el-button>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="categoryOptions.length" class="category-strip">
+      <button
+        type="button"
+        class="category-chip"
+        :class="{ active: !params.category }"
+        @click="selectCategory('')"
+      >
+        全部
+      </button>
+      <button
+        v-for="category in categoryOptions"
+        :key="category.value"
+        type="button"
+        class="category-chip"
+        :class="{ active: params.category === category.value }"
+        @click="selectCategory(category.value)"
+      >
+        <svg-icon v-if="category.remark" :icon-class="category.remark"></svg-icon>
+        <span>{{ category.label }}</span>
+      </button>
+    </section>
+
+    <section class="resources-board">
+      <div class="board-header">
+        <div>
+          <p class="board-eyebrow">公开资源</p>
+          <h2>{{ currentBoardTitle }}</h2>
+        </div>
+        <div class="board-meta">
+          <span v-if="dictLoadFailed" class="meta-tip">
+            分类接口未开放，当前已自动切到公开资源模式
+          </span>
+        </div>
+      </div>
+
+      <div v-if="errorMessage" class="status-panel status-panel--error">
+        <i class="fas fa-circle-exclamation"></i>
+        <div>
+          <strong>资源加载失败</strong>
+          <p>{{ errorMessage }}</p>
+        </div>
+      </div>
+
+      <div v-else-if="loading" class="status-panel">
+        <i class="fas fa-spinner fa-spin"></i>
+        <div>
+          <strong>资源加载中</strong>
+          <p>正在整理最新公开资源</p>
+        </div>
+      </div>
+
+      <div v-else-if="!resourceList.length" class="empty-panel">
+        <div class="empty-illustration">
+          <i class="fas fa-box-open"></i>
+        </div>
+        <h3>这里暂时还没有公开资源</h3>
+        <p>资源页已经可以正常访问了，只是当前接口返回的数据为空。后续上传并审核通过后，这里会直接显示出来。</p>
+        <el-button type="primary" @click="showUploadDialog">上传第一个资源</el-button>
+      </div>
+
+      <div v-else class="resource-grid">
+        <article
+          v-for="resource in resourceList"
           :key="resource.id"
           class="resource-card"
           @click="handleResourceClick(resource)"
         >
-          <div class="resource-content">
-            <div class="resource-icon">
-              <svg-icon :icon-class="category.remark"></svg-icon>
+          <div class="resource-card__icon">
+            <svg-icon :icon-class="resolveCategoryIcon(resource.category)"></svg-icon>
+          </div>
+
+          <div class="resource-card__content">
+            <div class="resource-card__top">
+              <h3 class="resource-card__title" :title="resource.name">{{ resource.name }}</h3>
+              <el-tag size="mini" :type="Number(resource.isFree) === 1 ? 'success' : 'warning'" effect="plain">
+                {{ Number(resource.isFree) === 1 ? '免费' : '付费' }}
+              </el-tag>
             </div>
-            <div class="resource-info">
-              <div class="resource-name text-ellipsis" :title="resource.name">{{ resource.name }}</div>
-              <div class="resource-meta">
-                <el-tag size="mini" :type="!resource.isFree ? 'success' : 'warning'" effect="plain">
-                  {{ !resource.isFree ? '免费' : '付费' }}
-                </el-tag>
-                
+
+            <p class="resource-card__description">
+              {{ resource.description || '暂未填写资源描述，点开详情可继续获取下载方式。' }}
+            </p>
+
+            <div class="resource-card__footer">
+              <div class="resource-owner">
+                <img :src="resolveAvatar(resource.avatar)" class="uploader-avatar" alt="avatar">
+                <span>{{ resource.nickname || '匿名分享者' }}</span>
+              </div>
+
+              <div class="resource-stats">
+                <span><i class="el-icon-time"></i>{{ formatRelative(resource.createTime) }}</span>
+                <span><i class="el-icon-download"></i>{{ resource.downloads || 0 }}</span>
+                <span><i class="el-icon-view"></i>{{ resource.views || 0 }}</span>
               </div>
             </div>
           </div>
-          <div class="resource-footer">
-            <div class="resource-uploader text-ellipsis">
-              <img :src="resource.avatar" class="uploader-avatar">
-              <span class="uploader-name">{{ resource.nickname }}</span>
-            </div>
-            <div class="resource-stats">
-              <span class="upload-time">
-               <i class="el-icon-time"></i> {{ formatTime(resource.createTime) }}
-             </span>
-              <span class="download-count" title="下载次数">
-                <i class="el-icon-download"></i> {{ resource.downloads || 0 }}
-              </span>
-              <span class="view-count" title="浏览次数">
-                <i class="el-icon-view"></i> {{ resource.views || 0 }}
-              </span>
-            </div>
-          </div>
-        </div>
+        </article>
       </div>
 
-      <!-- 每个分类的分页 -->
-      <div class="pagination-box" v-if="category.total > params.pageSize">
+      <div v-if="total > params.pageSize" class="pagination-box">
         <el-pagination
-          :current-page.sync="categoryPages[category.id]"
+          :current-page.sync="params.pageNum"
           :page-size="params.pageSize"
           layout="prev, pager, next"
-          :total="category.total"
-          @current-change="(page) => handlePageChange(page, category)"
+          :total="total"
+          @current-change="handlePageChange"
         />
       </div>
-    </div>
+    </section>
 
-    <Add :visible.sync="uploadDialogVisible" :categories="categories" />
+    <Add :visible.sync="uploadDialogVisible" :categories="uploadCategories" />
 
-    <!-- 资源详情对话框 -->
     <el-dialog
       title="资源详情"
       :visible.sync="detailDialogVisible"
-      width="600px"
+      :width="isMobile ? '94%' : '640px'"
+      top="6vh"
       class="resource-detail-dialog"
-      top="5vh"
       :close-on-click-modal="false"
     >
-      <div class="resource-detail" v-if="currentResource">
+      <div v-if="currentResource" class="resource-detail">
         <div class="detail-header">
-          <div class="resource-icon">
-            <svg-icon :icon-class="currentResource.categoryIcon"></svg-icon>
+          <div class="detail-header__icon">
+            <svg-icon :icon-class="resolveCategoryIcon(currentResource.category)"></svg-icon>
           </div>
-          <h3 class="resource-title">{{ currentResource.name }}</h3>
-          <el-tag size="small" :type="!currentResource.isFree ? 'success' : 'warning'" effect="plain">
-            {{ !currentResource.isFree ? '免费' : '付费' }}
+          <div class="detail-header__copy">
+            <h3>{{ currentResource.name }}</h3>
+            <p>{{ currentResource.description || '当前资源暂未填写描述。' }}</p>
+          </div>
+          <el-tag size="small" :type="Number(currentResource.isFree) === 1 ? 'success' : 'warning'" effect="plain">
+            {{ Number(currentResource.isFree) === 1 ? '免费' : '付费' }}
           </el-tag>
         </div>
 
-        <el-descriptions  border>
-          <el-descriptions-item label="上传者">
-            <div class="uploader-info text-ellipsis">
-              <img :src="currentResource.avatar" class="uploader-avatar">
-              <span>{{ currentResource.nickname }}</span>
-            </div>
-          </el-descriptions-item>
-          <el-descriptions-item label="上传时间">{{ formatTime(currentResource.createTime) }}</el-descriptions-item>
-          <el-descriptions-item label="下载次数">{{ currentResource.downloads || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="资源描述">{{ currentResource.description || '暂无描述' }}</el-descriptions-item>
-      </el-descriptions>
-        
-        <!-- 添加获取链接部分 -->
-        <div class="get-link-section" v-if="!showVerifyCode">
+        <div class="detail-meta">
+          <article class="detail-meta__item">
+            <span>上传者</span>
+            <strong>{{ currentResource.nickname || '匿名分享者' }}</strong>
+          </article>
+          <article class="detail-meta__item">
+            <span>上传时间</span>
+            <strong>{{ formatDate(currentResource.createTime) || '未知' }}</strong>
+          </article>
+          <article class="detail-meta__item">
+            <span>下载次数</span>
+            <strong>{{ currentResource.downloads || 0 }}</strong>
+          </article>
+        </div>
+
+        <div v-if="!showVerifyCode && !currentResource.panPath" class="get-link-section">
           <el-button type="primary" @click="handleGetLink">
             获取下载链接
           </el-button>
-          <p class="tip">点击获取链接后需要扫码验证</p>
+          <p>为控制资源外链滥用，当前仍保留验证码校验流程。</p>
         </div>
 
-        <!-- 验证码部分 -->
-        <div class="verify-section" v-if="showVerifyCode">
+        <div v-if="showVerifyCode && !currentResource.panPath" class="verify-section">
           <div class="qr-code">
             <img v-lazy="scanPlaceholderUrl" :key="scanPlaceholderUrl" alt="扫码占位图">
-            <p class="scan-tip">如未配置公众号二维码，请联系站长微信 <span class="code-tip">a3453619783</span> 获取支持</p>
+            <p class="scan-tip">
+              如未配置公众号二维码，请联系站长微信 <span class="code-tip">a3453619783</span>
+            </p>
           </div>
           <el-form :model="verifyForm" class="verify-form">
             <el-form-item>
-              <el-input
-                v-model="verifyForm.code"
-                placeholder="请输入验证码"
-                maxlength="6"
-              >
+              <el-input v-model="verifyForm.code" placeholder="请输入验证码" maxlength="6">
                 <template slot="append">
-                  <el-button type="primary" @click="handleVerify" :loading="verifying">
+                  <el-button type="primary" :loading="verifying" @click="handleVerify">
                     验证
                   </el-button>
                 </template>
@@ -148,19 +228,18 @@
           </el-form>
         </div>
 
-        <!-- 下载链接部分 -->
-        <div class="download-link-section" v-if="currentResource.panPath">
+        <div v-if="currentResource.panPath" class="download-link-section">
           <div class="link-item">
-            <span class="label">网盘链接:</span>
-            <el-input v-model="currentResource.panPath" readonly>
+            <span class="label">网盘链接</span>
+            <el-input :value="currentResource.panPath" readonly>
               <el-button slot="append" @click="copyText(currentResource.panPath)">
                 复制
               </el-button>
             </el-input>
           </div>
-          <div class="link-item" v-if="currentResource.panCode">
-            <span class="label">提取码:</span>
-            <el-input v-model="currentResource.panCode" readonly>
+          <div v-if="currentResource.panCode" class="link-item">
+            <span class="label">提取码</span>
+            <el-input :value="currentResource.panCode" readonly>
               <el-button slot="append" @click="copyText(currentResource.panCode)">
                 复制
               </el-button>
@@ -168,6 +247,7 @@
           </div>
         </div>
       </div>
+
       <div slot="footer" class="dialog-footer">
         <el-button @click="handleCloseDetail">关闭</el-button>
       </div>
@@ -176,12 +256,26 @@
 </template>
 
 <script>
-import Add from './components/add.vue';
-import { getDictDataApi } from '@/api/dict';
-import { getResourcesApi } from '@/api/resources';
-import { formatTime } from '@/utils/time';
-import { verifyCodeApi } from '@/api/resources';
-import { copyText as copyPlainText } from '@/utils/contact';
+import Add from './components/add.vue'
+import { getDictDataApi } from '@/api/dict'
+import { getResourcesApi, verifyCodeApi } from '@/api/resources'
+import { copyText as copyPlainText } from '@/utils/contact'
+import { resolveImageUrl } from '@/utils/image'
+import { formatDate, formatDateTime } from '@/utils/time'
+
+const CATEGORY_ICON_MAP = {
+  code: 'code',
+  source: 'code',
+  blog: 'book',
+  book: 'book',
+  design: 'picture',
+  image: 'picture',
+  tool: 'tool',
+  software: 'tool',
+  note: 'document',
+  tutorial: 'education'
+}
+
 export default {
   name: 'ResourcesView',
   components: {
@@ -189,8 +283,11 @@ export default {
   },
   data() {
     return {
-      categoryPages: {},
-      categories: [],
+      loading: false,
+      dictLoadFailed: false,
+      categoryOptions: [],
+      resourceList: [],
+      total: 0,
       uploadDialogVisible: false,
       params: {
         pageNum: 1,
@@ -202,586 +299,710 @@ export default {
       currentResource: null,
       showVerifyCode: false,
       verifying: false,
-      scanPlaceholderUrl: new URL("../../assets/scan-placeholder.svg", import.meta.url).href,
+      errorMessage: '',
+      scanPlaceholderUrl: new URL('../../assets/scan-placeholder.svg', import.meta.url).href,
       verifyForm: {
         code: ''
+      },
+      isMobile: typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+    }
+  },
+  computed: {
+    currentBoardTitle() {
+      if (!this.params.category) {
+        return '全部公开资源'
       }
+
+      const matched = this.categoryOptions.find(item => item.value === this.params.category)
+      return matched?.label || '分类资源'
+    },
+    uploadCategories() {
+      return this.categoryOptions.length
+        ? this.categoryOptions
+        : [{ id: 'fallback', label: '默认分类', value: 'default', remark: 'folder-open' }]
     }
   },
   created() {
-    this.getCategory()
-
-    // 初始化每个分类的页码
-    this.categories.forEach(category => {
-      this.$set(this.categoryPages, category.id, 1)
-    })
+    this.bootstrap()
+  },
+  mounted() {
+    window.addEventListener('resize', this.syncViewport)
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.syncViewport)
   },
   methods: {
-    /**
-     * 获取资源
-     */
-     getCategory() {
-      //1. 首先获取资源分类
-      getDictDataApi('sys_resource_category').then(res => {
-        this.categories = res.data
-        this.getResources()
-      })
-    
+    async bootstrap() {
+      await this.loadCategories()
+      await this.fetchResources()
     },
-    /**
-     * 获取资源
-     */
-     getResources() {
-      this.categories.forEach(category => {
-          this.params.category = category.value
-          getResourcesApi(this.params).then(res => {
-            this.$set(category, 'resources', res.data.records)
-            this.$set(category, 'total', res.data.total)
-          })
-        })
+    syncViewport() {
+      this.isMobile = window.innerWidth <= 768
     },
-    /**
-     * 格式化时间
-     */
-    formatTime(time) {
-      return formatTime(time)
+    async loadCategories() {
+      try {
+        const res = await getDictDataApi('sys_resource_category')
+        this.categoryOptions = Array.isArray(res?.data) ? res.data : []
+      } catch (error) {
+        this.categoryOptions = []
+        this.dictLoadFailed = true
+      }
     },
-    /**
-     * 搜索
-     */
+    async fetchResources() {
+      this.loading = true
+      this.errorMessage = ''
+
+      try {
+        const res = await getResourcesApi(this.params)
+        this.resourceList = Array.isArray(res?.data?.records) ? res.data.records : []
+        this.total = Number(res?.data?.total || 0)
+      } catch (error) {
+        this.resourceList = []
+        this.total = 0
+        this.errorMessage = error.message || '资源接口暂时不可用，请稍后重试'
+      } finally {
+        this.loading = false
+      }
+    },
     handleSearch() {
       this.params.pageNum = 1
-      this.getResources()
+      this.fetchResources()
     },
-    /**
-     * 分页
-     */
-    handlePageChange(page, category) {
-       this.$set(this.categoryPages, category.id, page)
-      //获取资源
-      this.params.category = category.value
+    handleReset() {
+      this.params.pageNum = 1
+      this.params.name = ''
+      this.params.category = ''
+      this.fetchResources()
+    },
+    selectCategory(value) {
+      this.params.category = value
+      this.params.pageNum = 1
+      this.fetchResources()
+    },
+    handlePageChange(page) {
       this.params.pageNum = page
-      getResourcesApi(this.params).then(res => {
-        this.$set(category, 'resources', res.data.records)
-        this.$set(category, 'total', res.data.total)
-      })
+      this.fetchResources()
     },
-    /**
-     * 处理资源点击事件
-     */
     handleResourceClick(resource) {
-      this.currentResource = {
-        ...resource,
-        categoryIcon: this.categories.find(c => c.value === resource.category)?.remark
-      }
+      this.currentResource = { ...resource }
       this.detailDialogVisible = true
+      this.showVerifyCode = false
+      this.verifyForm.code = ''
     },
-
-    /**
-     * 显示上传对话框
-     */
     showUploadDialog() {
-      //需要登录
-      if(!this.$store.state.userInfo) {
+      if (!this.$store.state.userInfo) {
         this.$message.warning('请先登录')
         return
       }
       this.uploadDialogVisible = true
     },
-
-    /**
-     * 获取下载链接
-     */
     handleGetLink() {
-      if(!this.$store.state.userInfo) {
+      if (!this.$store.state.userInfo) {
         this.$message.warning('请先登录')
         return
       }
       this.showVerifyCode = true
     },
-
-    /**
-     * 验证码验证
-     */
-    handleVerify() {
-      if(!this.verifyForm.code) {
+    async handleVerify() {
+      if (!this.verifyForm.code) {
         this.$message.warning('请输入验证码')
         return
       }
-      this.verifying = true
-      this.verifyForm.id = this.currentResource.id
-      verifyCodeApi(this.verifyForm).then(res => {
-        this.currentResource.panPath = res.data.panPath
-        this.currentResource.panCode = res.data.panCode
-        this.verifying = false
-      }).catch(err => {
-        this.$message.error(err.message)
-      }).finally(() => {
-        this.verifying = false
-      })
-    },
 
-    /**
-     * 复制文本
-     */
+      this.verifying = true
+      try {
+        const res = await verifyCodeApi({
+          id: this.currentResource.id,
+          code: this.verifyForm.code
+        })
+        this.currentResource = {
+          ...this.currentResource,
+          panPath: res.data.panPath,
+          panCode: res.data.panCode
+        }
+      } catch (error) {
+        this.$message.error(error.message || '验证码校验失败')
+      } finally {
+        this.verifying = false
+      }
+    },
     copyText(text) {
       copyPlainText(text).then(copied => {
         if (copied) {
-        this.$message.success('复制成功')
-        } else {
-        this.$message.error('复制失败')
+          this.$message.success('复制成功')
+          return
         }
+        this.$message.error('复制失败')
       }).catch(() => {
-        this.$message.error('澶嶅埗澶辫触')
+        this.$message.error('复制失败')
       })
     },
-
-    /**
-     * 关闭详情对话框
-     */
     handleCloseDetail() {
       this.detailDialogVisible = false
       this.showVerifyCode = false
-      this.qrCodeUrl = ''
       this.verifyForm.code = ''
-      this.downloadInfo = {
-        link: '',
-        code: ''
-      }
+      this.currentResource = null
+    },
+    resolveCategoryIcon(category) {
+      const key = String(category || '').toLowerCase()
+      return CATEGORY_ICON_MAP[key] || 'folder-open'
+    },
+    resolveAvatar(url) {
+      return resolveImageUrl(url, this.$store.state.defaultImage)
+    },
+    formatDate(value) {
+      return formatDate(value)
+    },
+    formatRelative(value) {
+      const dateText = formatDateTime(value)
+      return dateText || '刚刚'
     }
   }
 }
 </script>
 
 <style scoped lang="scss">
-$text-color: #2c3e50;
-
-.resources-container {
-  padding: 30px;
-  max-width: 1200px;
+.resources-page {
+  max-width: 1240px;
   margin: 0 auto;
-  min-height: calc(100vh - 60px);
+  padding: 24px 20px 84px;
 }
 
-.page-header {
-  margin-bottom: 40px;
-  text-align: left;
-  background: var(--resources-bg);
-  padding: 60px;
-  border-radius: 24px;
-  position: relative;
-  overflow: hidden;
+.resources-hero {
   display: grid;
-  grid-template-columns: 0.8fr 1.2fr;
-  gap: 40px;
-  align-items: center;
-  box-shadow: 
-    inset 0 0 60px rgba(64, 158, 255, 0.06),
-    0 10px 30px -10px rgba(64, 158, 255, 0.05);
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: 
-      radial-gradient(circle at 20% 30%, rgba(64, 158, 255, 0.08) 0%, transparent 50%),
-      radial-gradient(circle at 80% 70%, rgba(83, 82, 237, 0.08) 0%, transparent 50%);
-    animation: rotate 60s linear infinite;
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: 
-      linear-gradient(120deg, rgba(255, 255, 255, 0.6) 0%, transparent 50%),
-      linear-gradient(-120deg, rgba(255, 255, 255, 0.4) 0%, transparent 50%);
-    pointer-events: none;
-  }
-
-  .header-left {
-    position: relative;
-    z-index: 1;
-  }
-
-  .header-right {
-    display: flex;
-    gap: 20px;
-    align-items: center;
-    position: relative;
-    z-index: 1;
-    width: 100%;
-
-    .search-bar {
-      flex: 1;
-    }
-
-    .el-button {
-      flex-shrink: 0;
-      height: 56px;
-      padding: 0 30px;
-      font-size: 16px;
-      border-radius: 16px;
-      transition: all 0.3s ease;
-
-      &:hover {
-        transform: translateY(-2px);
-      }
-    }
-  }
-
-  .search-bar {
-    max-width: none;
-    margin: 0;
-    position: relative;
-    z-index: 1;
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.04));
-
-    :deep(.el-input__inner) {
-      height: 56px;
-      border-radius: 16px;
-    }
-
-    :deep(.el-input-group__append) {
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(10px);
-      border-color: rgba(64, 158, 255, 0.1);
-      padding: 0 20px;
-      font-size: 15px;
-    }
-
-    :deep(.el-select .el-input__inner) {
-      border: none;
-      background: transparent;
-      height: auto;
-      padding: 0;
-    }
-  }
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 24px;
+  margin-bottom: 22px;
 }
 
-.page-title {
-  font-size: 42px;
-  line-height: 1.2;
-  background: linear-gradient(120deg, #2b5dff 0%, #5352ed 50%, #2b5dff 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 20px;
+.hero-copy,
+.hero-actions,
+.resources-board {
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 28px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(245, 248, 255, 0.9)),
+    rgba(255, 255, 255, 0.86);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+.hero-copy {
+  padding: 34px;
+}
+
+.hero-eyebrow,
+.board-eyebrow,
+.search-label {
+  display: inline-flex;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hero-copy h1,
+.board-header h2 {
+  margin: 14px 0 14px;
+  color: var(--text-primary);
+  font-size: clamp(32px, 6vw, 52px);
+  line-height: 1.02;
   font-weight: 800;
-  position: relative;
-  z-index: 1;
-  letter-spacing: -0.5px;
-  text-shadow: 0 2px 15px rgba(83, 82, 237, 0.15);
-  animation: shine 8s linear infinite;
+}
 
-  &::after {
-    content: '发现优质资源';
+.hero-summary {
+  max-width: 560px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.85;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.hero-stat {
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+
+  strong {
     display: block;
-    font-size: 16px;
-    font-weight: 400;
-    color: #666;
-    margin-top: 12px;
-    background: none;
-    -webkit-text-fill-color: initial;
-    text-shadow: none;
+    margin-bottom: 8px;
+    color: #1d4ed8;
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 800;
+  }
+
+  span {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.6;
   }
 }
 
-.category-section {
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  background: var(--card-bg);
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 28px;
+}
 
-  .category-header {
-    display: flex;
-    justify-content: space-between;
+.search-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.search-bar {
+  display: flex;
+  gap: 10px;
+
+  :deep(.el-input__inner) {
+    height: 52px;
+    border-radius: 16px;
+  }
+
+  :deep(.el-button) {
+    min-width: 112px;
+    border-radius: 16px;
+  }
+}
+
+.hero-actions__footer {
+  display: flex;
+  gap: 12px;
+
+  :deep(.el-button) {
+    flex: 1;
+    border-radius: 16px;
+  }
+}
+
+.category-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &.active {
+    border-color: transparent;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    color: #fff;
+    box-shadow: 0 16px 28px rgba(37, 99, 235, 0.18);
+  }
+}
+
+.resources-board {
+  padding: 28px;
+}
+
+.board-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-end;
+  margin-bottom: 18px;
+
+  h2 {
+    margin: 10px 0 0;
+    font-size: clamp(24px, 4vw, 32px);
+  }
+}
+
+.meta-tip {
+  display: inline-flex;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.status-panel,
+.empty-panel {
+  padding: 22px;
+  border-radius: 22px;
+  border: 1px dashed rgba(148, 163, 184, 0.24);
+}
+
+.status-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #64748b;
+
+  i {
+    font-size: 20px;
+    color: #2563eb;
+  }
+
+  strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+}
+
+.status-panel--error {
+  border-style: solid;
+  border-color: rgba(239, 68, 68, 0.18);
+  background: rgba(254, 242, 242, 0.7);
+
+  i,
+  strong {
+    color: #dc2626;
+  }
+}
+
+.empty-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+
+  h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 24px;
+    font-weight: 800;
+  }
+
+  p {
+    max-width: 540px;
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.8;
+  }
+
+  :deep(.el-button) {
+    margin-top: 8px;
+    border-radius: 16px;
+  }
+}
+
+.empty-illustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 24px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  font-size: 28px;
+}
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.resource-card {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: rgba(37, 99, 235, 0.18);
+    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+  }
+}
+
+.resource-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(79, 70, 229, 0.14));
+  color: #2563eb;
+  font-size: 28px;
+}
+
+.resource-card__content {
+  min-width: 0;
+}
+
+.resource-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.resource-card__title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+
+.resource-card__description {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.resource-card__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.resource-owner,
+.resource-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.resource-stats {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+
+  span {
+    display: inline-flex;
     align-items: center;
-    margin-bottom: 20px;
-
-    .category-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: linear-gradient(135deg, rgba(64, 158, 255, 0.12), rgba(83, 82, 237, 0.12));
-      padding: 12px 20px;
-      border-radius: 8px;
-      position: relative;
-      overflow: hidden;
-      border: 1px solid rgba(64, 158, 255, 0.1);
-
-      &::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), transparent);
-        pointer-events: none;
-      }
-
-      i {
-        font-size: 20px;
-        color: $primary;
-      }
-
-      h2 {
-        font-size: 18px;
-        font-weight: 600;
-        color: var(--text-primary);
-        margin: 0;
-      }
-    }
-
-  }
-
-  .resources-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 20px;
-
-    .resource-card {
-      background: var(--card-bg);
-      border-radius: 8px;
-      transition: all 0.3s ease;
-      cursor: pointer;
-      border: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      color: var(--text-primary);
-      &:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        border-color: $primary;
-      }
-
-      .resource-content {
-        padding: 16px;
-        flex: 1;
-      }
-
-      .resource-icon {
-        text-align: center;
-        margin-bottom: 12px;
-        svg{
-          width: 50px;
-          height: 50px;
-        }
-      }
-
-      .resource-info {
-        text-align: center;
-
-        .resource-name {
-          font-size: 14px;
-          margin-bottom: 8px;
-          font-weight: 500;
-        }
-
-        .resource-meta {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 8px;
-        }
-      }
-
-      .resource-footer {
-        padding: 12px 16px;
-        border-top: 1px solid var(--border-color);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-
-        .resource-uploader {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          max-width: 90px;
-
-          .uploader-name {
-            font-size: 12px;
-          }
-        }
-
-        .resource-stats {
-          display: flex;
-          gap: 12px;
-          font-size: 12px;
-
-          .download-count,
-          .view-count,.upload-time {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-          }
-        }
-      }
-    }
+    gap: 4px;
   }
 }
 
-.text-ellipsis {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.uploader-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
-
-@keyframes shine {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 1200px) {
-  .page-header {
-    grid-template-columns: 1fr;
-    gap: 30px;
-    padding: 40px 30px;
-  }
-}
-
-@media (max-width: 768px) {
-  .page-header {
-    padding: 30px 20px;
-    
-    .header-right {
-      flex-direction: column;
-      gap: 15px;
-      
-      .el-button {
-        width: 100%;
-      }
-    }
-  }
-  
-  .page-title {
-    font-size: 32px;
-  }
-}
-
-.resource-detail-dialog {
-  :deep(.el-dialog__body) {
-    padding: 30px;
-  }
+.pagination-box {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
 }
 
 .resource-detail {
-  .detail-header {
-    text-align: center;
-    margin-bottom: 30px;
-    
-    .resource-icon {
-      margin-bottom: 15px;
-      
-      svg {
-        width: 60px;
-        height: 60px;
-      }
-    }
-    
-    .resource-title {
-      font-size: 20px;
-      margin: 0 0 10px;
-      color: var(--text-primary);
-    }
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.detail-header {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.detail-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(79, 70, 229, 0.14));
+  color: #2563eb;
+  font-size: 28px;
+}
+
+.detail-header__copy {
+  min-width: 0;
+
+  h3 {
+    margin: 0 0 8px;
+    color: var(--text-primary);
+    font-size: 24px;
+    font-weight: 800;
   }
-  .uploader-info {
-    display: flex !important;
-    align-items: center !important;
-    gap: $spacing-base !important;
-    max-width: 140px;
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.75;
   }
+}
+
+.detail-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.detail-meta__item {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+
+  span {
+    display: block;
+    margin-bottom: 8px;
+    color: #64748b;
+    font-size: 13px;
+  }
+
+  strong {
+    color: var(--text-primary);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+}
+
+.get-link-section,
+.verify-section,
+.download-link-section {
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(248, 250, 252, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 .get-link-section {
   text-align: center;
-  margin-top: 20px;
-  padding: 20px;
-  border-top: 1px solid var(--border-color);
-  
-  .tip {
-    margin-top: 10px;
-    color: #909399;
-    font-size: 12px;
+
+  p {
+    margin: 12px 0 0;
+    color: #64748b;
+    font-size: 13px;
   }
 }
 
 .verify-section {
-  text-align: center;
-  margin-top: 20px;
-  padding: 20px;
-  border-top: 1px solid var(--border-color);
-  
   .qr-code {
-    margin-bottom: 20px;
-    
+    text-align: center;
+    margin-bottom: 18px;
+
     img {
       width: 200px;
       height: 200px;
-      margin-bottom: 10px;
-    }
-    
-    .scan-tip {
-      color: #909399;
-      font-size: 14px;
-      .code-tip {
-        color: $primary;
-      }
+      border-radius: 20px;
+      object-fit: cover;
+      margin-bottom: 12px;
     }
   }
-  
+
+  .scan-tip {
+    margin: 0;
+    color: #64748b;
+    line-height: 1.7;
+  }
+
+  .code-tip {
+    color: #2563eb;
+    font-weight: 700;
+  }
+
   .verify-form {
-    max-width: 300px;
+    max-width: 320px;
     margin: 0 auto;
   }
 }
 
 .download-link-section {
-  margin-top: 20px;
-  padding: 20px;
-  border-top: 1px solid var(--border-color);
-  
-  .link-item {
-    margin-bottom: 15px;
-    
-    .label {
-      display: block;
-      margin-bottom: 5px;
-      color: #909399;
-    }
-    
-    :deep(.el-input-group__append) {
-      cursor: pointer;
-    }
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.label {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+@media (max-width: 1024px) {
+  .resources-hero,
+  .resource-grid {
+    grid-template-columns: 1fr;
   }
 }
-.uploader-avatar {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  object-fit: cover;
+
+@media (max-width: 768px) {
+  .resources-page {
+    padding: 14px 12px 64px;
+  }
+
+  .hero-copy,
+  .hero-actions,
+  .resources-board {
+    border-radius: 24px;
+    padding: 20px 16px;
+  }
+
+  .hero-stats,
+  .detail-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .search-bar,
+  .hero-actions__footer,
+  .detail-header,
+  .resource-card,
+  .resource-card__footer {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .board-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .resource-owner,
+  .resource-stats {
+    justify-content: flex-start;
+  }
+
+  .detail-header__icon {
+    margin-bottom: 4px;
+  }
 }
 </style>

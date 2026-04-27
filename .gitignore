@@ -23,6 +23,15 @@ target/
 _deploy_*
 _restore_*
 *.fix-*
+.tmp-*.sh
+.javac_*.args
+.javac_cp.txt
+blog/.javac_*.args
+blog/.javac_cp.txt
+blog-web/dist-*/
+blog-web/distfix/
+output/
+ops/server-*.sh
 
 # Playwright E2E
 .playwright-cli/

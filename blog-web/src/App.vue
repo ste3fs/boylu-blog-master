@@ -58,6 +58,18 @@ export default {
     this.setSiteInfo(res.data)
     this.$store.commit('setVisitorAccess', res.extra.visitorCount)
     this.$store.commit('setSiteAccess', res.extra.blogViewsCount)
+    this.$store.commit(
+      'setDailyVisitorAccess',
+      Object.prototype.hasOwnProperty.call(res.extra || {}, 'dailyVisitorCount')
+        ? res.extra.dailyVisitorCount
+        : null
+    )
+    this.$store.commit(
+      'setDailySiteAccess',
+      Object.prototype.hasOwnProperty.call(res.extra || {}, 'dailyBlogViewsCount')
+        ? res.extra.dailyBlogViewsCount
+        : null
+    )
 
     const noticeRes = await getNoticeApi()
     this.$store.commit('SET_NOTICE', noticeRes.data)

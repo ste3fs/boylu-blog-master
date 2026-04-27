@@ -304,6 +304,7 @@ import UploadImage from '@/components/Upload/Image.vue'
 import { getWebConfigApi, updateWebConfigApi } from '@/api/site/config'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
 import { uploadApi } from '@/api/file'
+import { prepareImageFileForUpload } from '@/utils/upload-image'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 import '@wangeditor/editor/dist/css/style.css'
 
@@ -411,13 +412,18 @@ const handleCreated = (editor: any) => {
   editorRef.value = editor
 }
 
-function contentUpload(file: any, insertFn: any) {
-  files.value = file
-  const formData = new FormData()
-  formData.append('file', files.value)
-  uploadApi(formData).then((res: any) => {
+async function contentUpload(file: File, insertFn: any) {
+  try {
+    files.value = await prepareImageFileForUpload(file)
+    const formData = new FormData()
+    formData.append('file', files.value)
+    const res = await uploadApi(formData, 'site-config')
     insertFn(res.data, '', res.data)
-  })
+  } catch (error: any) {
+    if (error?.message) {
+      ElMessage.error(error.message)
+    }
+  }
 }
 
 const getDictDataByDictTypes = async () => {

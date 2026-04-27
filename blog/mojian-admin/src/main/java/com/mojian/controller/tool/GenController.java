@@ -67,7 +67,6 @@ public class GenController {
     public void downloadCode(@PathVariable String[] tableNames, HttpServletResponse response) throws IOException {
         byte[] data = genTableService.downloadCode(tableNames);
         response.reset();
-        response.addHeader("Access-Control-Allow-Origin", "*");
         response.addHeader("Access-Control-Expose-Headers", "Content-Disposition");
         response.setHeader("Content-Disposition", "attachment; filename=\"ruoyi.zip\"");
         response.addHeader("Content-Length", "" + data.length);

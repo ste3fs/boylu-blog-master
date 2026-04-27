@@ -217,7 +217,7 @@ public class AuthServiceImpl implements AuthService {
     public String getWechatLoginCode() {
         //随机获取4位数字
         String code = "DL" + (int) ((Math.random() * 9 + 1) * 1000);
-        redisUtil.set(RedisConstants.WX_LOGIN_USER_CODE + code, "NOT-LOGIN", RedisConstants.MINUTE_EXPIRE, TimeUnit.SECONDS);
+        redisUtil.set(RedisConstants.WX_LOGIN_USER_CODE + code, "NOT-LOGIN", RedisConstants.FIVE_MINUTES_EXPIRE, TimeUnit.SECONDS);
         return code;
     }
 
@@ -247,7 +247,7 @@ public class AuthServiceImpl implements AuthService {
         }
         LoginUserInfo loginUserInfo = wechatLogin(message.getFromUser());
         //修改redis缓存 以便监听是否已经授权成功
-        redisUtil.set(RedisConstants.WX_LOGIN_USER + code, JSONUtil.toJsonStr(loginUserInfo), RedisConstants.MINUTE_EXPIRE, TimeUnit.SECONDS);
+        redisUtil.set(RedisConstants.WX_LOGIN_USER + code, JSONUtil.toJsonStr(loginUserInfo), RedisConstants.FIVE_MINUTES_EXPIRE, TimeUnit.SECONDS);
         return "网站登录成功！(若页面长时间未跳转请刷新验证码)";
     }
 

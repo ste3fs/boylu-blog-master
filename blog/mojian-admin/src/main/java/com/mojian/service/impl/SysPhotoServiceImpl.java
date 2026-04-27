@@ -4,12 +4,15 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import com.mojian.mapper.SysPhotoMapper;
 import com.mojian.entity.SysPhoto;
+import com.mojian.exception.ServiceException;
 import com.mojian.service.SysPhotoService;
+import com.mojian.utils.LocalFileUrlNormalizeUtil;
 import com.mojian.utils.PageUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -58,6 +61,7 @@ public class SysPhotoServiceImpl extends ServiceImpl<SysPhotoMapper, SysPhoto> i
      */
     @Override
     public boolean insert(SysPhoto sysPhoto) {
+        normalizePhotoUrl(sysPhoto);
         return save(sysPhoto);
     }
 
@@ -66,6 +70,7 @@ public class SysPhotoServiceImpl extends ServiceImpl<SysPhotoMapper, SysPhoto> i
      */
     @Override
     public boolean update(SysPhoto sysPhoto) {
+        normalizePhotoUrl(sysPhoto);
         return updateById(sysPhoto);
     }
 
@@ -83,5 +88,18 @@ public class SysPhotoServiceImpl extends ServiceImpl<SysPhotoMapper, SysPhoto> i
     public Object move(List<Long> ids, Long albumId) {
         baseMapper.move(ids, albumId);
         return Boolean.TRUE;
+    }
+
+    private void normalizePhotoUrl(SysPhoto sysPhoto) {
+        if (sysPhoto == null || StringUtils.isBlank(sysPhoto.getUrl())) {
+            return;
+        }
+
+        String normalizedUrl = LocalFileUrlNormalizeUtil.normalizeUrl(sysPhoto.getUrl());
+        if (StringUtils.startsWithIgnoreCase(normalizedUrl, "blob:")
+                || StringUtils.startsWithIgnoreCase(normalizedUrl, "data:")) {
+            throw new ServiceException("图片还在上传中，请等待上传完成后再保存");
+        }
+        sysPhoto.setUrl(normalizedUrl);
     }
 }

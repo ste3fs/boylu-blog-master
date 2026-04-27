@@ -139,7 +139,7 @@ public class EmailUtil {
         log.info("邮箱验证码发送成功,邮箱:{},验证码:{}",email,code);
 
         redisUtil.set(RedisConstants.CAPTCHA_CODE_KEY + email, code +"");
-        redisUtil.expire(RedisConstants.CAPTCHA_CODE_KEY + email, RedisConstants.MINUTE_EXPIRE, TimeUnit.SECONDS);
+        redisUtil.expire(RedisConstants.CAPTCHA_CODE_KEY + email, RedisConstants.FIVE_MINUTES_EXPIRE, TimeUnit.SECONDS);
     }
 
     private void send(String email, String template) throws MessagingException {

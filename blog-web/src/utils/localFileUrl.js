@@ -20,6 +20,8 @@ const STANDALONE_ABSOLUTE_LOCAL_FILE_PREFIX = /^https?:\/\/[^"'\\s)]+\/localFile
 const STANDALONE_PROTOCOL_RELATIVE_LOCAL_FILE_PREFIX = /^\/\/[^"'\\s)]+\/localFile\//i
 const STANDALONE_ABSOLUTE_FILE_VIEW_PREFIX = /^https?:\/\/[^"'\\s)]+(?:\/(?:boylu|mojian))?\/file\/(?:view|content)\//i
 const STANDALONE_PROTOCOL_RELATIVE_FILE_VIEW_PREFIX = /^\/\/[^"'\\s)]+(?:\/(?:boylu|mojian))?\/file\/(?:view|content)\//i
+const SELF_HOSTED_SITE_PREFIX = /^https?:\/\/(?:(?:www\.)?boylu\.(?:cn|top)|111\.229\.123\.234)(?::\d+)?\//i
+const SELF_HOSTED_PROTOCOL_PREFIX = /^\/\/(?:(?:www\.)?boylu\.(?:cn|top)|111\.229\.123\.234)(?::\d+)?\//i
 
 function stripOrigin(url = '') {
   if (typeof url !== 'string' || !url) {
@@ -31,6 +33,27 @@ function stripOrigin(url = '') {
   }
 
   if (/^https?:\/\//i.test(url)) {
+    try {
+      const parsed = new URL(url)
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`
+    } catch (error) {
+      return url
+    }
+  }
+
+  return url
+}
+
+function normalizeSelfHostedOrigin(url = '') {
+  if (typeof url !== 'string' || !url) {
+    return ''
+  }
+
+  if (SELF_HOSTED_PROTOCOL_PREFIX.test(url)) {
+    return url.replace(/^\/\/[^/]+/, '/')
+  }
+
+  if (SELF_HOSTED_SITE_PREFIX.test(url)) {
     try {
       const parsed = new URL(url)
       return `${parsed.pathname}${parsed.search}${parsed.hash}`
@@ -93,15 +116,17 @@ export function isFileViewUrl(url = '') {
 }
 
 export function normalizeLocalFileUrl(url = '') {
-  if (isFileViewUrl(url)) {
-    return normalizeFileViewUrl(url)
+  const selfHostedUrl = normalizeSelfHostedOrigin(url)
+
+  if (isFileViewUrl(selfHostedUrl)) {
+    return normalizeFileViewUrl(selfHostedUrl)
   }
 
-  if (typeof url !== 'string' || !url.includes(LOCAL_FILE_SEGMENT)) {
-    return url || ''
+  if (typeof selfHostedUrl !== 'string' || !selfHostedUrl.includes(LOCAL_FILE_SEGMENT)) {
+    return selfHostedUrl || ''
   }
 
-  return url.slice(url.indexOf(LOCAL_FILE_SEGMENT))
+  return selfHostedUrl.slice(selfHostedUrl.indexOf(LOCAL_FILE_SEGMENT))
 }
 
 export function normalizeFileViewUrl(url = '') {
@@ -113,20 +138,21 @@ export function normalizeFileViewUrl(url = '') {
 }
 
 export function normalizeLocalFileText(text = '') {
+  const normalizedSelfHostedText = normalizeSelfHostedOrigin(text)
   if (
-    typeof text !== 'string'
+    typeof normalizedSelfHostedText !== 'string'
     || (
-      !text.includes(LOCAL_FILE_SEGMENT)
-      && !isFileViewUrl(text)
-      && !ABSOLUTE_LOCAL_FILE_PREFIX.test(text)
-      && !ABSOLUTE_FILE_VIEW_PREFIX.test(text)
+      !normalizedSelfHostedText.includes(LOCAL_FILE_SEGMENT)
+      && !isFileViewUrl(normalizedSelfHostedText)
+      && !ABSOLUTE_LOCAL_FILE_PREFIX.test(normalizedSelfHostedText)
+      && !ABSOLUTE_FILE_VIEW_PREFIX.test(normalizedSelfHostedText)
     )
   ) {
     ABSOLUTE_LOCAL_FILE_PREFIX.lastIndex = 0
     PROTOCOL_RELATIVE_LOCAL_FILE_PREFIX.lastIndex = 0
     ABSOLUTE_FILE_VIEW_PREFIX.lastIndex = 0
     PROTOCOL_RELATIVE_FILE_VIEW_PREFIX.lastIndex = 0
-    return text || ''
+    return normalizedSelfHostedText || ''
   }
 
   ABSOLUTE_LOCAL_FILE_PREFIX.lastIndex = 0
@@ -134,7 +160,7 @@ export function normalizeLocalFileText(text = '') {
   ABSOLUTE_FILE_VIEW_PREFIX.lastIndex = 0
   PROTOCOL_RELATIVE_FILE_VIEW_PREFIX.lastIndex = 0
 
-  let normalized = text
+  let normalized = normalizedSelfHostedText
     .replace(ABSOLUTE_LOCAL_FILE_PREFIX, LOCAL_FILE_SEGMENT)
     .replace(PROTOCOL_RELATIVE_LOCAL_FILE_PREFIX, LOCAL_FILE_SEGMENT)
     .replace(ABSOLUTE_FILE_VIEW_PREFIX, match => normalizeContentPath(match))

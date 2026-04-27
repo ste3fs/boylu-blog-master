@@ -244,7 +244,7 @@ export default {
   padding: 0 $spacing-xl;
   margin-bottom: $spacing-xl * 2;
   min-height: calc(100vh - 80px);
-  align-items: start;
+  align-items: stretch;
 
   @include responsive(lg) {
     grid-template-columns: 1fr;

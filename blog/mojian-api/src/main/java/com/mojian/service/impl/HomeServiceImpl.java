@@ -62,14 +62,29 @@ public class HomeServiceImpl implements HomeService {
         //获取浏览量和访问量
         long blogViewsCount = 0;
         long visitorCount = 0;
+        long dailyBlogViewsCount = 0;
+        long dailyVisitorCount = 0;
         if (redisUtil.hasKey(RedisConstants.BLOG_VIEWS_COUNT)) {
             blogViewsCount = Long.parseLong(redisUtil.get(RedisConstants.BLOG_VIEWS_COUNT).toString());
         }
         if (redisUtil.hasKey(RedisConstants.UNIQUE_VISITOR_COUNT)) {
             visitorCount = Long.parseLong(redisUtil.get(RedisConstants.UNIQUE_VISITOR_COUNT).toString());
         }
+        String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+        String dailyVisitorCountKey = RedisConstants.UNIQUE_VISITOR_DAILY + today;
+        String dailyViewCountKey = RedisConstants.BLOG_VIEWS_DAILY + today;
+        if (redisUtil.hasKey(dailyViewCountKey)) {
+            dailyBlogViewsCount = Long.parseLong(redisUtil.get(dailyViewCountKey).toString());
+        }
+        if (redisUtil.hasKey(dailyVisitorCountKey)) {
+            dailyVisitorCount = Long.parseLong(redisUtil.get(dailyVisitorCountKey).toString());
+        }
 
-        return Result.success(sysWebConfig).putExtra("blogViewsCount", blogViewsCount).putExtra("visitorCount", visitorCount);
+        return Result.success(sysWebConfig)
+                .putExtra("blogViewsCount", blogViewsCount)
+                .putExtra("visitorCount", visitorCount)
+                .putExtra("dailyBlogViewsCount", dailyBlogViewsCount)
+                .putExtra("dailyVisitorCount", dailyVisitorCount);
     }
 
     @Override

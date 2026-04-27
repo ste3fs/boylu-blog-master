@@ -1,79 +1,105 @@
 <template>
-  <div class="album-detail">
+  <div class="album-detail-page">
     <div v-if="isAuthenticated">
-      <div class="album-header">
-        <div class="header-content">
-          <div class="back-button" @click="$router.back()">
-            <i class="fas fa-arrow-left"></i>
-            <span>返回</span>
-          </div>
-          <div class="album-info">
-            <div class="album-meta">
-              <span class="album-date">
+      <section class="album-hero">
+        <div class="album-hero__back" @click="$router.push('/photos')">
+          <i class="fas fa-arrow-left"></i>
+          <span>返回相册</span>
+        </div>
+
+        <div class="album-hero__content">
+          <div class="album-hero__copy">
+            <span class="album-hero__eyebrow">Album Detail</span>
+            <h1>{{ album.name || '未命名相册' }}</h1>
+            <p class="album-hero__description">
+              {{ album.description || '这本相册还没有补充更多说明，先看看里面收录的照片。' }}
+            </p>
+
+            <div class="album-hero__meta">
+              <span>
                 <i class="fas fa-calendar-alt"></i>
-                {{ formatDate(album.createTime) }}
+                {{ formatDate(album.createTime) || '最近更新' }}
               </span>
-              <span class="album-count">
+              <span>
                 <i class="fas fa-image"></i>
                 {{ photos.length }} 张照片
               </span>
+              <span v-if="album.isLock === 1">
+                <i class="fas fa-lock"></i>
+                加密相册
+              </span>
             </div>
-            <h1>{{ album.name }}</h1>
-            <p class="album-description">{{ album.description }}</p>
-            <div class="album-actions">
-              <button class="action-btn share-btn">
-                <i class="fas fa-share-alt"></i>
-                分享相册
+
+            <div class="album-hero__actions">
+              <button v-if="photos.length" type="button" class="hero-btn hero-btn--primary" @click="previewImage(0)">
+                预览第一张
               </button>
-              <button class="action-btn download-btn">
-                <i class="fas fa-download"></i>
-                下载全部
+              <button type="button" class="hero-btn" @click="$router.push('/photos')">
+                回到相册列表
               </button>
             </div>
           </div>
-        </div>
-        <div class="header-background">
-          <div class="gradient-overlay"></div>
-          <div class="pattern-overlay"></div>
-        </div>
-      </div>
 
-      <div class="photo-container">
-        <div class="photo-grid" v-if="photos.length > 0">
-          <div v-for="(photo,index) in photos" :key="photo.url" class="photo-item">
-            <a href="javascript:;" class="photo-card" @click="previewImage(index)">
-              <img v-lazy="photo.url" :key="photo.url" :alt="photo.description">
-              <div class="photo-overlay">
-                <div class="photo-info">
-                  <h3 class="photo-description">{{ photo.description }}</h3>
-                  <div class="photo-meta">
-                    <span class="photo-date">
-                      <i class="fas fa-calendar"></i> {{ photo.recordTime }}
+          <div class="album-hero__cover">
+            <img :src="heroCover" :data-origin="heroCover" :alt="album.name || 'album cover'" @error="handleHeroCoverError">
+          </div>
+        </div>
+      </section>
+
+      <section class="photo-board">
+        <div class="board-header">
+          <div>
+            <p class="board-eyebrow">Photo Collection</p>
+            <h2>照片列表</h2>
+          </div>
+        </div>
+
+        <div v-if="photos.length" class="photo-grid">
+          <article v-for="(photo, index) in photos" :key="photo.url || index" class="photo-item">
+            <button type="button" class="photo-card" @click="previewImage(index)">
+              <img
+                :src="resolvePhotoUrl(photo.url)"
+                :data-origin="resolvePhotoUrl(photo.url)"
+                :alt="photo.description || `photo-${index + 1}`"
+                @error="handlePhotoError"
+              >
+              <div class="photo-card__overlay">
+                <div class="photo-card__info">
+                  <h3>{{ photo.description || `照片 ${index + 1}` }}</h3>
+                  <div class="photo-card__meta">
+                    <span v-if="photo.recordTime">
+                      <i class="fas fa-calendar"></i>
+                      {{ photo.recordTime }}
                     </span>
-                    <span class="photo-location" v-if="photo.location">
-                      <i class="fas fa-map-marker-alt"></i> {{ photo.location }}
+                    <span v-if="photo.location">
+                      <i class="fas fa-location-dot"></i>
+                      {{ photo.location }}
                     </span>
                   </div>
                 </div>
               </div>
-            </a>
+            </button>
+          </article>
+        </div>
+
+        <div v-else class="empty-state">
+          <i class="fas fa-image"></i>
+          <div>
+            <strong>这个相册还没有照片</strong>
+            <p>当前详情页已经改成更稳的结构，等后台继续往这个相册里补图后，这里会直接展示出来。</p>
           </div>
         </div>
-        <div v-else class="no-photos">
-          <el-empty description="暂无照片" />
-        </div>
-      </div>
+      </section>
 
-      <!-- 添加图片预览组件 -->
       <mj-image-preview ref="imagePreview" />
     </div>
+
     <div v-else class="loading-container">
       <div class="loading-spinner">
         <i class="fas fa-spinner fa-spin"></i>
       </div>
     </div>
 
-    <!-- 密码验证对话框 -->
     <album-password-dialog
       ref="passwordDialog"
       @submit="handlePasswordSubmit"
@@ -83,8 +109,10 @@
 </template>
 
 <script>
-import { getAlbumPhotosApi, verifyAlbumPasswordApi,getAlbumDetailApi } from '@/api/album'
+import { getAlbumPhotosApi, verifyAlbumPasswordApi, getAlbumDetailApi } from '@/api/album'
 import AlbumPasswordDialog from '@/views/photos/components/password.vue'
+import { resolveImageUrl, retryImageLoad } from '@/utils/image'
+import { formatDate } from '@/utils/time'
 
 export default {
   name: 'AlbumDetail',
@@ -98,76 +126,74 @@ export default {
         name: '',
         description: '',
         createTime: '',
-        isLock: 0
+        isLock: 0,
+        cover: ''
       },
       photos: [],
       images: [],
       isAuthenticated: false
     }
   },
+  computed: {
+    heroCover() {
+      const firstPhoto = this.photos[0]?.url
+      return resolveImageUrl(firstPhoto || this.album.cover, this.$store.state.defaultImage)
+    }
+  },
   mounted() {
     this.checkAlbumAuth()
   },
   methods: {
-    formatDate(date) {
-      return new Date(date).toLocaleDateString('zh-CN', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })
+    formatDate(value) {
+      return formatDate(value)
     },
-    /**
-     * 预览图片
-     */
+    resolvePhotoUrl(url) {
+      return resolveImageUrl(url, this.album.cover || this.$store.state.defaultImage)
+    },
+    handleHeroCoverError(event) {
+      retryImageLoad(event.target, this.$store.state.defaultImage)
+    },
+    handlePhotoError(event) {
+      retryImageLoad(event.target, this.album.cover || this.$store.state.defaultImage)
+    },
     previewImage(index) {
+      if (!this.images.length) {
+        return
+      }
       this.$refs.imagePreview.show(this.images, index)
     },
-    /**
-     * 检查相册权限
-     */
     async checkAlbumAuth() {
       try {
         const res = await getAlbumDetailApi(this.album.id)
         this.album = res.data
         if (this.album.isLock === 1) {
           this.$refs.passwordDialog.show()
-        }else{
-          this.getAlbumPhotos()
+          return
         }
+        this.getAlbumPhotos()
       } catch (error) {
         this.$message.error('获取相册信息失败')
         this.$router.push('/photos')
       }
     },
-  
-    /**
-     * 获取相册图片
-     */
     getAlbumPhotos() {
       getAlbumPhotosApi(this.album.id).then(res => {
-        this.photos = res.data
-        this.images = res.data.map(item => item.url)
+        this.photos = Array.isArray(res.data) ? res.data : []
+        this.images = this.photos.map(item => this.resolvePhotoUrl(item.url))
       }).finally(() => {
         this.isAuthenticated = true
       })
     },
-    /**
-     * 处理密码验证
-     */
     async handlePasswordSubmit(password, callback) {
       try {
         await verifyAlbumPasswordApi(this.album.id, password)
         this.getAlbumPhotos()
-        // this.$refs.passwordDialog.visible = false
         callback()
       } catch (error) {
         this.$message.error(error.message || '密码错误')
         this.$refs.passwordDialog.loading = false
       }
     },
-    /**
-     * 处理取消密码验证
-     */
     handlePasswordCancel() {
       this.$router.push('/photos')
     }
@@ -176,390 +202,245 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.album-header {
+.album-detail-page {
+  padding: 24px 20px 84px;
+}
+
+.album-hero,
+.photo-board {
+  max-width: 1240px;
+  margin: 0 auto 24px;
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 80% 10%, rgba(236, 72, 153, 0.08), transparent 28%),
+    radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.08), transparent 26%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 255, 0.9));
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+.album-hero {
   position: relative;
-  min-height: 400px;
-  padding: 60px 20px;
-  margin-bottom: 40px;
-  overflow: hidden;
-  display: flex;
+  padding: 28px;
+}
+
+.album-hero__back {
+  display: inline-flex;
   align-items: center;
-  
-  .header-background {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    
-    .gradient-overlay {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        135deg,
-        rgba(30, 41, 59, 0.95) 0%,
-        rgba(30, 41, 59, 0.8) 100%
-      );
-    }
-    
-    .pattern-overlay {
-      position: absolute;
-      inset: 0;
-      opacity: 0.4;
-      background-image: 
-        linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%),
-        linear-gradient(-45deg, rgba(255,255,255,0.1) 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.1) 75%),
-        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.1) 75%);
-      background-size: 20px 20px;
-      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-      animation: patternMove 20s linear infinite;
-    }
-  }
-  
-  .header-content {
-    max-width: 1200px;
-    width: 100%;
-    margin: 0 auto;
-    position: relative;
-    z-index: 1;
-  }
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #4338ca;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 
-  .back-button {
-    position: absolute;
-    left: 0;
-    top: 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    padding: 12px 24px;
-    border-radius: 30px;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    font-weight: 500;
-    letter-spacing: 0.5px;
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.15);
-      transform: translateX(-5px);
-      border-color: rgba(255, 255, 255, 0.25);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    }
-
-    i {
-      font-size: 1.1em;
-      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    &:hover i {
-      transform: translateX(-4px);
-    }
-  }
-
-  .album-info {
-    text-align: center;
-    padding: 40px 60px;
-    animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-    
-    .album-meta {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      margin-bottom: 20px;
-      
-      span {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.95em;
-        color: rgba(255, 255, 255, 0.8);
-        padding: 6px 16px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 20px;
-        backdrop-filter: blur(8px);
-        
-        i {
-          color: #64B5F6;
-          font-size: 1.1em;
-        }
-      }
-    }
-
-    h1 {
-      font-size: 2.5em;
-      margin: 0;
-      font-weight: 800;
-      letter-spacing: -1px;
-      background: linear-gradient(120deg, 
-        #ffffff 0%,
-        #e0e0e0 50%,
-        #ffffff 100%
-      );
-      background-size: 200% auto;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: shine 3s linear infinite;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .album-description {
-      margin: 20px auto;
-      max-width: 700px;
-      font-size: 1.2em;
-      line-height: 1.6;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: 400;
-    }
-
-    .album-actions {
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      margin-top: 30px;
-
-      .action-btn {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 12px 24px;
-        border-radius: 30px;
-        border: none;
-        font-size: 1em;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        background: transparent;
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-
-        i {
-          font-size: 1.1em;
-        }
-
-        &:hover {
-          background: rgba(255, 255, 255, 0.1);
-          transform: translateY(-2px);
-          border-color: rgba(255, 255, 255, 0.3);
-          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        &.share-btn {
-          background: #64B5F6;
-          border: none;
-
-          &:hover {
-            background: #42A5F5;
-          }
-        }
-      }
-    }
-  }
-}
-
-.photo-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 20px 40px;
-  animation: fadeIn 0.8s ease-out;
-}
-
-.photo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 25px;
-}
-
-.photo-item {
-  aspect-ratio: 1;
-  animation: fadeInUp 0.6s ease-out backwards;
-
-  @for $i from 1 through 20 {
-    &:nth-child(#{$i}) {
-      animation-delay: #{$i * 0.1}s;
-    }
-  }
-}
-
-.photo-card {
-  height: 100%;
-  position: relative;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  display: block;
-  
   &:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
-
-    img {
-      transform: scale(1.1);
-    }
+    transform: translateY(-1px);
+    box-shadow: 0 16px 28px rgba(67, 56, 202, 0.12);
   }
+}
+
+.album-hero__content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+  gap: 22px;
+  align-items: center;
+}
+
+.album-hero__eyebrow,
+.board-eyebrow {
+  display: inline-flex;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.album-hero__copy h1,
+.board-header h2 {
+  margin: 14px 0 14px;
+  color: var(--text-primary);
+  font-size: clamp(34px, 6vw, 54px);
+  line-height: 1.02;
+  font-weight: 800;
+}
+
+.album-hero__description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.85;
+}
+
+.album-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+  }
+}
+
+.album-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 138px;
+  height: 46px;
+  padding: 0 18px;
+  border: 1px solid rgba(99, 102, 241, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #4338ca;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hero-btn--primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+}
+
+.album-hero__cover {
+  overflow: hidden;
+  border-radius: 26px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  aspect-ratio: 16 / 10;
+  background: rgba(255, 255, 255, 0.72);
 
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .photo-overlay {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(to top, 
-      rgba(0, 0, 0, 0.9) 0%,
-      rgba(0, 0, 0, 0.5) 50%,
-      transparent 100%);
-    opacity: 0;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    padding: 25px;
-    color: white;
-
-    .photo-info {
-      transform: translateY(20px);
-      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-
-      .photo-description {
-        margin: 0 0 12px;
-        font-size: 1.1em;
-        font-weight: 500;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      }
-
-      .photo-meta {
-        display: flex;
-        gap: 15px;
-        font-size: 0.9em;
-        opacity: 0.9;
-
-        span {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-
-          i {
-            color: #64B5F6;
-          }
-        }
-      }
-    }
-  }
-
-  &:hover .photo-overlay {
-    opacity: 1;
-
-    .photo-info {
-      transform: translateY(0);
-    }
+    display: block;
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
+.photo-board {
+  padding: 28px;
+}
+
+.board-header {
+  margin-bottom: 18px;
+
+  h2 {
+    margin: 10px 0 0;
+    font-size: clamp(24px, 4vw, 32px);
   }
 }
 
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.photo-item {
+  min-width: 0;
+}
+
+.photo-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: none;
+  border-radius: 24px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+
+  img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    display: block;
   }
 }
 
-@keyframes patternMove {
-  from {
-    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-  }
-  to {
-    background-position: 40px 0, 40px 10px, 50px -10px, 30px 0px;
+.photo-card__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: end;
+  padding: 18px;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.06) 62%);
+}
+
+.photo-card__info {
+  color: #fff;
+  text-align: left;
+
+  h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.5;
   }
 }
 
-@keyframes shine {
-  to {
-    background-position: 200% center;
+.photo-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: rgba(226, 232, 240, 0.88);
+  font-size: 12px;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
 }
 
-@media (max-width: 768px) {
-  .album-header {
-    min-height: 350px;
-    padding: 40px 20px;
+.empty-state {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px dashed rgba(148, 163, 184, 0.24);
+  color: #64748b;
 
-    .header-content {
-      .back-button {
-        padding: 8px 16px;
-        font-size: 0.9em;
-      }
-    }
-
-    .album-info {
-      padding: 30px 20px;
-      
-      .album-meta {
-        flex-wrap: wrap;
-        gap: 10px;
-        
-        span {
-          font-size: 0.9em;
-          padding: 4px 12px;
-        }
-      }
-
-      h1 {
-        font-size: 2.5em;
-      }
-
-      .album-description {
-        font-size: 1.1em;
-        margin: 15px auto;
-      }
-
-      .album-actions {
-        flex-direction: column;
-        gap: 10px;
-        padding: 0 20px;
-
-        .action-btn {
-          width: 100%;
-          justify-content: center;
-          padding: 10px 20px;
-        }
-      }
-    }
+  i {
+    color: #8b5cf6;
+    font-size: 24px;
   }
 
-  .photo-grid {
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
+  strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--text-primary);
   }
 
-  .photo-card {
-    .photo-overlay {
-      opacity: 1;
-      background: linear-gradient(to top, 
-        rgba(0, 0, 0, 0.9) 0%,
-        rgba(0, 0, 0, 0.6) 50%,
-        rgba(0, 0, 0, 0.3) 100%);
-
-      .photo-info {
-        transform: translateY(0);
-      }
-    }
+  p {
+    margin: 0;
+    line-height: 1.75;
   }
 }
 
@@ -568,10 +449,43 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+}
 
-  .loading-spinner {
-    font-size: 40px;
-    color: var(--primary-color);
+.loading-spinner {
+  color: #6366f1;
+  font-size: 40px;
+}
+
+@media (max-width: 1024px) {
+  .album-hero__content,
+  .photo-grid {
+    grid-template-columns: 1fr;
   }
 }
-</style> 
+
+@media (max-width: 768px) {
+  .album-detail-page {
+    padding: 14px 12px 64px;
+  }
+
+  .album-hero,
+  .photo-board {
+    border-radius: 24px;
+    padding: 20px 16px;
+  }
+
+  .album-hero__meta,
+  .album-hero__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero-btn {
+    width: 100%;
+  }
+
+  .photo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

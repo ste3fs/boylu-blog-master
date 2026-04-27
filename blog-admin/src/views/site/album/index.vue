@@ -147,7 +147,11 @@
       </template>
     </el-dialog>
 
-    <Photos v-model:openPhotos="openPhotos" :albumId="albumForm.id" />
+    <Photos
+      v-model:openPhotos="openPhotos"
+      :album-id="activeAlbum.id"
+      :album-name="activeAlbum.name"
+    />
   </div>
 </template>
 
@@ -183,6 +187,11 @@ const dialog = reactive({
   title: '',
   visible: false,
   type: 'add' as 'add' | 'edit'
+})
+
+const activeAlbum = reactive({
+  id: 0,
+  name: ''
 })
 
 const albumForm = reactive<any>({
@@ -261,14 +270,13 @@ const handleAllSelect = () => {
 const handleAdd = () => {
   dialog.type = 'add'
   dialog.title = '新增相册'
-  dialog.visible = true
   resetForm()
+  dialog.visible = true
 }
 
 const handleUpdate = (row: any) => {
   dialog.type = 'edit'
   dialog.title = '编辑相册'
-  dialog.visible = true
   resetForm()
   Object.assign(albumForm, {
     id: row.id,
@@ -278,6 +286,7 @@ const handleUpdate = (row: any) => {
     isLock: row.isLock ?? 0,
     password: row.password || ''
   })
+  dialog.visible = true
 }
 
 const submitForm = async () => {
@@ -296,6 +305,7 @@ const submitForm = async () => {
         ElMessage.success('相册修改成功')
       }
       dialog.visible = false
+      queryParams.pageNum = 1
       getList()
     } finally {
       submitLoading.value = false
@@ -344,19 +354,24 @@ const handleDelete = async (row: any) => {
 const handlePreviewPhotos = async (row: any) => {
   if (row.isLock === 1) {
     try {
-      const { value } = await ElMessageBox.prompt('请输入相册访问密码', '访问受保护相册', {
-        inputType: 'password',
-        inputPlaceholder: '请输入密码',
-        confirmButtonText: '进入相册',
-        cancelButtonText: '取消'
-      })
+      const { value } = await ElMessageBox.prompt(
+        '请输入相册访问密码',
+        '访问受保护相册',
+        {
+          inputType: 'password',
+          inputPlaceholder: '请输入密码',
+          confirmButtonText: '进入相册',
+          cancelButtonText: '取消'
+        }
+      )
       await verifyAlbumPasswordApi(row.id, value)
     } catch (error) {
       return
     }
   }
 
-  albumForm.id = row.id
+  activeAlbum.id = row.id
+  activeAlbum.name = row.name || ''
   openPhotos.value = true
 }
 

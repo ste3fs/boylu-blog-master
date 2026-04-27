@@ -14,11 +14,11 @@
 
       <div class="metric-grid">
         <div class="metric-box">
-          <span class="metric-label">访客</span>
+          <span class="metric-label">{{ visitorLabel }}</span>
           <strong>{{ visitorCount }}</strong>
         </div>
         <div class="metric-box">
-          <span class="metric-label">浏览</span>
+          <span class="metric-label">{{ viewLabel }}</span>
           <strong>{{ viewCount }}</strong>
         </div>
         <div class="metric-box">
@@ -61,11 +61,25 @@ export default {
     };
   },
   computed: {
+    hasDailyStats() {
+      return this.$store.state.dailyVisitorAccess !== null
+        && this.$store.state.dailySiteAccess !== null;
+    },
+    visitorLabel() {
+      return this.hasDailyStats ? "今日访客" : "总访客";
+    },
+    viewLabel() {
+      return this.hasDailyStats ? "今日浏览" : "总浏览";
+    },
     visitorCount() {
-      return this.$store.state.visitorAccess || 0;
+      return this.hasDailyStats
+        ? (this.$store.state.dailyVisitorAccess || 0)
+        : (this.$store.state.visitorAccess || 0);
     },
     viewCount() {
-      return this.$store.state.siteAccess || 0;
+      return this.hasDailyStats
+        ? (this.$store.state.dailySiteAccess || 0)
+        : (this.$store.state.siteAccess || 0);
     },
   },
   created() {

@@ -11,22 +11,24 @@
         <p class="hero-note">拖动图片星球浏览相册，点击任意封面进入对应相册。</p>
       </div>
 
-      <SphereImageGrid
-        v-if="sphereImages.length"
-        class="album-sphere"
-        :images="sphereImages"
-        :container-size="sphereSize"
-        :sphere-radius="sphereRadius"
-        :min-items="sphereMinItems"
-        :base-image-scale="0.13"
-        :auto-rotate="true"
-        :auto-rotate-speed="0.13"
-        @select="openAlbumFromSphere"
-      />
+      <div class="hero-visual">
+        <SphereImageGrid
+          v-if="sphereImages.length"
+          class="album-sphere"
+          :images="sphereImages"
+          :container-size="sphereSize"
+          :sphere-radius="sphereRadius"
+          :min-items="sphereMinItems"
+          :base-image-scale="0.13"
+          :auto-rotate="true"
+          :auto-rotate-speed="0.13"
+          @select="openAlbumFromSphere"
+        />
 
-      <div v-else class="sphere-empty">
-        <i class="fas fa-images"></i>
-        <span>相册图片添加后，这里会自动生成图片星球</span>
+        <div v-else class="sphere-empty">
+          <i class="fas fa-images"></i>
+          <span>相册图片添加后，这里会自动生成图片星球</span>
+        </div>
       </div>
 
       <div class="header-background">
@@ -36,7 +38,12 @@
     </section>
 
     <div class="photos-grid">
-      <div v-for="(album, index) in albums" :key="index" class="album-card" @click="openAlbum(album)">
+      <div
+        v-for="(album, index) in albums"
+        :key="album.id || index"
+        class="album-card"
+        @click="openAlbum(album)"
+      >
         <div class="album-cover">
           <img v-lazy="resolveAlbumCover(album.cover)" :key="album.cover" :alt="album.name">
           <div v-if="album.isLock === 1" class="lock-icon">
@@ -44,9 +51,9 @@
           </div>
         </div>
         <div class="album-info">
-          <h3>{{ album.name }}</h3>
-          <p>{{ album.description }}</p>
-          <span class="photo-count">{{ album.photoNum }}张照片</span>
+          <h3>{{ album.name || '未命名相册' }}</h3>
+          <p>{{ album.description || '这本相册还没有补充描述，点击卡片可以继续查看详情。' }}</p>
+          <span class="photo-count">{{ Number(album.photoNum || 0) }}张照片</span>
         </div>
       </div>
     </div>
@@ -71,11 +78,14 @@ export default {
   },
   computed: {
     sphereSize() {
-      if (this.viewportWidth <= 480) {
-        return 360
+      if (this.viewportWidth <= 420) {
+        return 300
       }
       if (this.viewportWidth <= 768) {
-        return 430
+        return 360
+      }
+      if (this.viewportWidth <= 1024) {
+        return 440
       }
       return 540
     },
@@ -83,13 +93,13 @@ export default {
       return Math.round(this.sphereSize * 0.38)
     },
     sphereMinItems() {
-      if (this.viewportWidth <= 480) {
-        return 20
+      if (this.viewportWidth <= 420) {
+        return Math.max(this.sphereImages.length, 20)
       }
       if (this.viewportWidth <= 768) {
-        return 26
+        return Math.max(this.sphereImages.length, 26)
       }
-      return 32
+      return Math.max(this.sphereImages.length, 32)
     },
     sphereImages() {
       return this.albums
@@ -114,17 +124,13 @@ export default {
     window.removeEventListener('resize', this.handleResize)
   },
   methods: {
-    /**
-     * 获取相册列表
-     */
     getAlbumList() {
       getAlbumListApi().then(res => {
-        this.albums = res.data
+        this.albums = Array.isArray(res.data) ? res.data : []
+      }).catch(() => {
+        this.albums = []
       })
     },
-    /**
-     * 打开相册详情
-     */
     openAlbum(album) {
       this.$router.push({
         name: 'PhotoDetail',
@@ -156,9 +162,9 @@ export default {
 .photos-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
   align-items: center;
-  gap: 40px;
+  gap: 32px;
   min-height: 590px;
   margin-bottom: 44px;
   padding: 42px 36px 34px;
@@ -170,6 +176,7 @@ export default {
     linear-gradient(135deg, rgba(248, 250, 252, 0.74), rgba(255, 247, 250, 0.74));
 
   .hero-copy,
+  .hero-visual,
   .album-sphere,
   .sphere-empty {
     position: relative;
@@ -222,13 +229,29 @@ export default {
   }
 
   .hero-note {
+    max-width: 430px;
     margin-top: 22px;
     color: #64748b;
     font-size: 0.95em;
     line-height: 1.7;
   }
 
+  .hero-visual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 440px;
+  }
+
+  .album-sphere {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .sphere-empty {
+    width: min(100%, 420px);
     height: 420px;
     display: flex;
     flex-direction: column;
@@ -282,6 +305,8 @@ export default {
 }
 
 .album-card {
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border-radius: 12px;
   overflow: hidden;
@@ -327,6 +352,9 @@ export default {
   }
 
   .album-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     padding: 20px;
 
     h3 {
@@ -336,13 +364,15 @@ export default {
     }
 
     p {
+      flex: 1;
       color: var(--text-secondary);
       margin: 0 0 15px;
       font-size: 0.9em;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     .photo-count {
+      align-self: flex-start;
       display: inline-block;
       padding: 4px 12px;
       background: rgba(99, 102, 241, 0.1);
@@ -357,9 +387,10 @@ export default {
 @media (max-width: 900px) {
   .photos-hero {
     grid-template-columns: 1fr;
+    gap: 20px;
     min-height: auto;
     padding: 32px 18px;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
     text-align: center;
 
     .title-group {
@@ -371,10 +402,38 @@ export default {
       margin-left: auto;
       margin-right: auto;
     }
+
+    .hero-visual {
+      min-height: 320px;
+    }
   }
 }
 
 @media (max-width: 768px) {
+  .photos-container {
+    padding: 14px 12px 60px;
+  }
+
+  .photos-hero {
+    gap: 16px;
+    padding: 24px 14px;
+    border-radius: 26px;
+
+    .subtitle {
+      font-size: 1em;
+      line-height: 1.75;
+    }
+
+    .hero-note {
+      margin-top: 16px;
+      font-size: 0.9em;
+    }
+
+    .hero-visual {
+      min-height: 280px;
+    }
+  }
+
   .photos-grid {
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 15px;
@@ -382,20 +441,21 @@ export default {
 }
 
 @media (max-width: 480px) {
-  .photos-container {
-    padding: 14px 12px 60px;
-  }
-
   .photos-hero {
-    padding: 25px 10px;
+    padding: 22px 10px;
     border-radius: 24px;
 
     h1 {
       font-size: 2.6em;
     }
 
-    .subtitle {
-      font-size: 1em;
+    .hero-visual {
+      min-height: 250px;
+    }
+
+    .sphere-empty {
+      width: min(100%, 300px);
+      height: 300px;
     }
 
     .circle-1 {

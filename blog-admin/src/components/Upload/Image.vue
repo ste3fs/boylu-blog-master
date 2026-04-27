@@ -1,44 +1,54 @@
 <template>
-  <div class="upload-container">
+  <div class="upload-image">
     <el-upload
       v-model:file-list="fileList"
-      :action="uploadUrl"
+      class="upload-image__list"
       list-type="picture-card"
-      :headers="headers"
+      accept="image/jpeg,image/png,image/gif,image/webp"
       :multiple="multiple"
       :limit="limit"
-      :on-preview="handlePreview"
-      :on-remove="handleRemove"
-      :on-success="handleSuccess"
-      :on-exceed="handleExceed"
+      :http-request="handleUploadRequest"
       :before-upload="beforeUpload"
+      :on-success="handleSuccess"
+      :on-remove="handleRemove"
+      :on-preview="handlePreview"
+      :on-exceed="handleExceed"
     >
       <el-icon><Plus /></el-icon>
-      <template #tip>
-        <div class="upload-tip">
-          只能上传 jpg/png/gif/webp 图片，且不超过 {{ fileSize }}MB
-        </div>
-      </template>
     </el-upload>
 
-    <el-dialog v-model="dialogVisible" top="5vh" title="预览图片">
-      <img class="preview-image" :src="dialogImageUrl" alt="Preview Image" />
+    <div class="el-upload__tip upload-image__tip">
+      可上传不超过 {{ fileSize }}MB 的 jpg/png/gif/webp 图片，上传时会自动压缩后再发布
+    </div>
+
+    <el-dialog v-model="previewVisible" title="预览图片" width="min(92vw, 720px)" append-to-body>
+      <img class="upload-image__preview" :src="previewUrl" alt="preview" />
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type PropType } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import type { UploadProps, UploadUserFile } from 'element-plus'
-import { getToken } from '@/utils/auth'
-import { deleteFileApi } from '@/api/file'
+import type {
+  UploadFile,
+  UploadFiles,
+  UploadProps,
+  UploadRequestOptions,
+  UploadUserFile
+} from 'element-plus'
+import { deleteFileApi, uploadApi } from '@/api/file'
 import { getImageName, normalizeImageList, normalizeImageUrl } from '@/utils/image'
+import {
+  DEFAULT_IMAGE_UPLOAD_LIMIT_MB,
+  compressImageBeforeUpload,
+  validateImageFile
+} from '@/utils/upload-image'
 
 const props = defineProps({
   modelValue: {
-    type: [String, Array],
+    type: [String, Array] as PropType<string | string[]>,
     default: ''
   },
   limit: {
@@ -47,7 +57,7 @@ const props = defineProps({
   },
   fileSize: {
     type: Number,
-    default: 5
+    default: DEFAULT_IMAGE_UPLOAD_LIMIT_MB
   },
   multiple: {
     type: Boolean,
@@ -59,127 +69,196 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:modelValue'])
-
-const uploadUrl = computed(() => {
-  const source = encodeURIComponent(props.source || 'default')
-  return `${import.meta.env.VITE_APP_BASE_API}/file/upload?source=${source}`
-})
-
-const headers = computed(() => ({
-  Authorization: getToken()
-}))
+const emit = defineEmits(['update:modelValue', 'uploading-change'])
 
 const fileList = ref<UploadUserFile[]>([])
-const dialogImageUrl = ref('')
-const dialogVisible = ref(false)
+const previewVisible = ref(false)
+const previewUrl = ref('')
 
-function toUploadFile(url: string): UploadUserFile {
-  const normalizedUrl = normalizeImageUrl(url)
-  return {
-    name: getImageName(normalizedUrl),
-    url: normalizedUrl
+const shouldEmitArrayValue = () => props.multiple || props.limit > 1 || Array.isArray(props.modelValue)
+
+const isTemporaryUrl = (url: string) => url.startsWith('blob:') || url.startsWith('data:')
+
+const resolvePersistedUrl = (item: Partial<UploadFile> & { response?: any; url?: string }) => {
+  const responseUrl = normalizeImageUrl(String(item.response?.data || ''))
+  if (responseUrl && !isTemporaryUrl(responseUrl)) {
+    return responseUrl
   }
+
+  const normalizedUrl = normalizeImageUrl(String(item.url || ''))
+  if (normalizedUrl && !isTemporaryUrl(normalizedUrl)) {
+    return normalizedUrl
+  }
+
+  return ''
 }
 
-function initFileList() {
-  fileList.value = normalizeImageList(props.modelValue as string | string[]).map(toUploadFile)
+const buildFileList = (value: string | string[] | undefined | null) => {
+  return normalizeImageList(value).map((url, index) => ({
+    name: getImageName(url) || `image-${index + 1}`,
+    url
+  }))
 }
 
-const handlePreview: UploadProps['onPreview'] = (uploadFile) => {
-  dialogImageUrl.value = normalizeImageUrl(uploadFile.url || '')
-  dialogVisible.value = true
+const mergePersistedAndPendingFiles = (persistedList: UploadUserFile[]) => {
+  const pendingItems = fileList.value.filter((item) => {
+    const status = String(item.status || '')
+    return status === 'ready' || status === 'uploading'
+  })
+
+  if (!pendingItems.length) {
+    return persistedList
+  }
+
+  return [...persistedList, ...pendingItems]
 }
 
-const handleRemove: UploadProps['onRemove'] = async (uploadFile) => {
-  const removedUrl = normalizeImageUrl(uploadFile.url || '')
-  if (!removedUrl) {
+const syncFromFileList = (list: UploadUserFile[]) => {
+  const urls = list
+    .map((item) => resolvePersistedUrl(item))
+    .filter(Boolean)
+
+  emit('update:modelValue', shouldEmitArrayValue() ? urls : (urls[0] || ''))
+}
+
+const pendingUploadCount = computed(() => {
+  return fileList.value.filter((item) => {
+    const status = String(item.status || '')
+    return status === 'ready' || status === 'uploading'
+  }).length
+})
+
+const handlePreview: UploadProps['onPreview'] = (file) => {
+  previewUrl.value = resolvePersistedUrl(file) || String(file.url || '')
+  previewVisible.value = true
+}
+
+const handleRemove: UploadProps['onRemove'] = async (file, uploadFiles) => {
+  const url = resolvePersistedUrl(file)
+
+  if (url) {
+    await deleteFileApi(url).catch(() => undefined)
+  }
+
+  fileList.value = uploadFiles
+    .map((item) => ({
+      ...item,
+      name: item.name || getImageName(resolvePersistedUrl(item)),
+      url: resolvePersistedUrl(item) || String(item.url || '')
+    }))
+
+  syncFromFileList(fileList.value)
+}
+
+const handleSuccess = (response: any, uploadFile: UploadFile, uploadFiles: UploadFiles) => {
+  const currentUrl = normalizeImageUrl(String(response?.data || uploadFile.url || ''))
+
+  if (!currentUrl) {
+    ElMessage.error('上传成功，但未获取到图片地址')
     return
   }
 
-  await deleteFileApi(removedUrl)
+  uploadFile.url = currentUrl
+  uploadFile.name = getImageName(currentUrl) || uploadFile.name
 
-  if (props.multiple) {
-    const urls = normalizeImageList(props.modelValue as string[])
-      .filter(url => normalizeImageUrl(url) !== removedUrl)
-    emit('update:modelValue', urls)
-    fileList.value = urls.map(toUploadFile)
-    return
-  }
+  fileList.value = uploadFiles
+    .map((item) => ({
+      ...item,
+      name: item.name || getImageName(String(item.url || (item.response as any)?.data || '')),
+      url: resolvePersistedUrl(item) || String(item.url || '')
+    }))
 
-  emit('update:modelValue', '')
-  fileList.value = []
+  syncFromFileList(fileList.value)
 }
 
-const handleSuccess: UploadProps['onSuccess'] = (response) => {
-  if (response.code !== 200) {
-    ElMessage.error(response.message || '上传失败')
-    return
-  }
-
-  const url = normalizeImageUrl(response.data)
-  if (!url) {
-    ElMessage.error('上传成功，但没有返回有效图片地址')
-    return
-  }
-
-  if (props.multiple) {
-    const urls = normalizeImageList(props.modelValue as string[])
-    urls.push(url)
-    emit('update:modelValue', urls)
-    fileList.value = urls.map(toUploadFile)
-  } else {
-    emit('update:modelValue', url)
-    fileList.value = [toUploadFile(url)]
-  }
-
-  ElMessage.success('上传成功')
+const handleExceed = () => {
+  ElMessage.warning(limitMessage(props.limit))
 }
 
-const handleExceed: UploadProps['onExceed'] = () => {
-  ElMessage.warning(`最多只能上传 ${props.limit} 个文件`)
-}
-
-const beforeUpload: UploadProps['beforeUpload'] = (file) => {
-  const isImage = /^image\/(jpeg|png|gif|webp)$/.test(file.type)
-  const isLt = file.size / 1024 / 1024 < props.fileSize
-
-  if (!isImage) {
-    ElMessage.error('只能上传 jpg/png/gif/webp 格式的图片')
+const beforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
+  const validation = validateImageFile(rawFile, props.fileSize)
+  if (!validation.valid) {
+    ElMessage.error(validation.message)
     return false
   }
-  if (!isLt) {
-    ElMessage.error(`图片大小不能超过 ${props.fileSize}MB`)
-    return false
-  }
+
   return true
 }
 
-watch(() => props.modelValue, () => {
-  initFileList()
-}, { immediate: true })
-</script>
+const handleUploadRequest = async (options: UploadRequestOptions) => {
+  try {
+    const compressedFile = await compressImageBeforeUpload(options.file as File)
+    const formData = new FormData()
+    formData.append('file', compressedFile)
 
-<style scoped>
-.upload-container {
-  .upload-tip {
-    font-size: 12px;
-    color: #909399;
-    margin-top: 8px;
+    options.onProgress({ percent: 35 } as any)
+    const response = await uploadApi(formData, props.source)
+    options.onProgress({ percent: 100 } as any)
+    options.onSuccess(response as any)
+  } catch (error: any) {
+    if (!error?.response) {
+      ElMessage.error(error?.message || '上传失败')
+    }
+    options.onError(error)
   }
 }
 
-.preview-image {
+const limitMessage = (limit: number) => {
+  if (limit <= 1) {
+    return '只能上传 1 张图片'
+  }
+  return `最多上传 ${limit} 张图片`
+}
+
+watch(
+  () => props.modelValue,
+  (value) => {
+    const nextList = buildFileList(value as string | string[] | undefined | null)
+    fileList.value = mergePersistedAndPendingFiles(nextList)
+  },
+  { immediate: true, deep: true }
+)
+
+watch(
+  pendingUploadCount,
+  (count) => {
+    emit('uploading-change', count > 0)
+  },
+  { immediate: true }
+)
+</script>
+
+<style scoped lang="scss">
+.upload-image {
   width: 100%;
-  height: 500px;
+}
+
+.upload-image :deep(.el-upload--picture-card),
+.upload-image :deep(.el-upload-list__item) {
+  border-radius: 18px;
+}
+
+.upload-image__tip {
+  margin-top: 10px;
+  line-height: 1.6;
+}
+
+.upload-image__preview {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
   object-fit: contain;
 }
 
-:deep(.el-upload--picture-card) {
-  --el-upload-picture-card-size: 100px;
-}
+@media (max-width: 768px) {
+  .upload-image :deep(.el-upload--picture-card),
+  .upload-image :deep(.el-upload-list__item) {
+    width: 88px;
+    height: 88px;
+  }
 
-:deep(.el-upload-list--picture-card) {
-  --el-upload-list-picture-card-size: 100px;
+  .upload-image__tip {
+    font-size: 12px;
+  }
 }
 </style>

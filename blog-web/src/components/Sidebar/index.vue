@@ -238,6 +238,21 @@ export default {
 .sidebar {
   width: 100%;
   max-width: 320px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  &::after {
+    content: '';
+    flex: 1;
+    min-height: 320px;
+    margin-top: $spacing-lg;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.08), transparent 28%) center top / 100% 140px no-repeat,
+      linear-gradient(180deg, rgba(59, 130, 246, 0), rgba(59, 130, 246, 0.12), rgba(236, 72, 153, 0.07), rgba(59, 130, 246, 0)) center / 1px 100% no-repeat;
+    opacity: 0.72;
+    pointer-events: none;
+  }
 
   .author-card {
 

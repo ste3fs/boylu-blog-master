@@ -217,7 +217,13 @@
       :fullscreen="isMobile"
       :close-on-click-modal="false"
     >
-      <el-form ref="formRef" :model="form" :rules="rules" :label-width="isMobile ? '88px' : '100px'">
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        :label-width="isMobile ? '100%' : '100px'"
+        :label-position="isMobile ? 'top' : 'right'"
+      >
         <el-form-item label="文章标题" prop="title">
           <el-input v-model="form.title" placeholder="请输入文章标题" />
         </el-form-item>
@@ -382,9 +388,27 @@
         </el-row>
 
         <el-form-item label="文章内容" prop="contentMd" class="mb-20">
+          <div v-if="isMobile" class="article-editor__toolbar-actions">
+            <div class="article-editor__meta">
+              已输入 {{ articleContentStats.characters }} 字
+              <span v-if="articleContentStats.lines"> · {{ articleContentStats.lines }} 行</span>
+            </div>
+            <el-button type="primary" size="large" @click="contentEditorDialogVisible = true">
+              展开大编辑器
+            </el-button>
+            <button
+              type="button"
+              class="article-editor__mobile-preview"
+              @click="contentEditorDialogVisible = true"
+            >
+              <span class="article-editor__mobile-preview-label">当前内容预览</span>
+              <span class="article-editor__mobile-preview-text">{{ articleContentPreview }}</span>
+            </button>
+          </div>
           <mavon-editor
+            v-else
             placeholder="输入文章内容..."
-            :style="{ height: isMobile ? '52dvh' : '500px', width: '100%' }"
+            :style="{ height: `${articleEditorHeight}px`, width: '100%' }"
             :subfield="!isMobile"
             :default-open="isMobile ? 'edit' : 'preview'"
             :toolbars="articleEditorToolbars"
@@ -432,6 +456,69 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="contentEditorDialogVisible"
+      title="编辑文章内容"
+      width="100vw"
+      top="0"
+      fullscreen
+      append-to-body
+      :close-on-click-modal="false"
+      class="article-content-dialog"
+    >
+      <div class="article-content-dialog__header">
+        <div class="article-content-dialog__meta">
+          已输入 {{ articleContentStats.characters }} 字
+          <span v-if="articleContentStats.lines"> · {{ articleContentStats.lines }} 行</span>
+        </div>
+      </div>
+      <mavon-editor
+        v-if="contentEditorDialogVisible"
+        ref="fullscreenMdRef"
+        v-model="form.contentMd"
+        placeholder="输入文章内容..."
+        :style="{ height: `${fullscreenArticleEditorHeight}px`, width: '100%' }"
+        :subfield="false"
+        default-open="edit"
+        :toolbars="articleEditorToolbars"
+        @imgDel="imgDel"
+        @imgAdd="imgAdd"
+      >
+        <template #left-toolbar-after>
+          <el-dropdown>
+            <span class="el-dropdown-link">
+              <i title="上传视频"></i>
+              <el-icon class="op-icon fa el-icon-video-camera"><VideoPlay /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item>
+                  <el-upload
+                    style="display: inline-block"
+                    :show-file-list="false"
+                    name="filedatas"
+                    action=""
+                    :http-request="uploadVideo"
+                    multiple
+                  >
+                    <span>上传视频</span>
+                  </el-upload>
+                </el-dropdown-item>
+                <el-dropdown-item>
+                  <div @click="dialogVisible = true">添加视频地址</div>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </template>
+      </mavon-editor>
+      <template #footer>
+        <div class="dialog-footer article-content-dialog__footer">
+          <el-button @click="contentEditorDialogVisible = false">完成编辑</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 爬取文章对话框 -->
     <el-dialog title="爬取文章" v-model="reptileDialog.visible" :width="isMobile ? '100vw' : '800px'" :fullscreen="isMobile">
       <el-form ref="reptileFormRef" :model="reptileForm" :rules="rules" :label-width="isMobile ? '88px' : '100px'">
@@ -469,6 +556,7 @@
 import { ElMessage, ElMessageBox,ElLoading  } from 'element-plus'
 import { Delete, Edit, Plus, Refresh, Search, Setting } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import mavonEditorLib from 'mavon-editor'
 import UploadImage from '@/components/Upload/Image.vue'
 import { getCategoryListApi } from '@/api/article/category'
 import { getTagListApi } from '@/api/article/tag'
@@ -478,6 +566,7 @@ import {
 } from '@/api/article'
 import { uploadApi,deleteFileApi } from '@/api/file'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
+import { prepareImageFileForUpload } from '@/utils/upload-image'
 
 // 模拟数据
 const categoryOptions = ref<any>([])
@@ -500,8 +589,11 @@ const tableData = ref<any[]>([])
 const queryFormRef = ref<FormInstance>()
 const formRef = ref<FormInstance>()
 const mdRef = ref();
+const fullscreenMdRef = ref();
 const submitLoading = ref(false)
 const isMobile = ref(false)
+const contentEditorDialogVisible = ref(false)
+const viewportHeight = ref(0)
 
 // 选中项数组
 const selectedIds = ref<Array<string | number>>([])
@@ -552,6 +644,7 @@ const categoryName = ref('')
 
 const syncMobile = () => {
   isMobile.value = window.innerWidth <= 768
+  viewportHeight.value = window.innerHeight || document.documentElement.clientHeight || 0
 }
 
 const mobileArticleToolbars = {
@@ -564,16 +657,57 @@ const mobileArticleToolbars = {
   link: true,
   imagelink: true,
   code: true,
-  table: true,
   undo: true,
-  redo: true,
-  trash: true,
-  save: true,
-  fullscreen: true,
-  preview: true
+  redo: true
 }
 
 const articleEditorToolbars = computed(() => (isMobile.value ? mobileArticleToolbars : undefined))
+
+const articleEditorHeight = computed(() => {
+  if (!isMobile.value) {
+    return 500
+  }
+  const base = viewportHeight.value || 820
+  return Math.max(430, base - 250)
+})
+
+const fullscreenArticleEditorHeight = computed(() => {
+  const base = viewportHeight.value || 820
+  return Math.max(520, base - 150)
+})
+
+const articleContentStats = computed(() => {
+  const content = String(form.contentMd || '').replace(/\r/g, '')
+  if (!content) {
+    return { characters: 0, lines: 0 }
+  }
+  return {
+    characters: content.length,
+    lines: content.split('\n').length
+  }
+})
+
+const articleContentPreview = computed(() => {
+  const content = String(form.contentMd || '').trim()
+  if (!content) {
+    return '点击进入大编辑器输入正文，手机端会使用更大的单栏编辑区。'
+  }
+
+  return content
+    .replace(/\n{3,}/g, '\n\n')
+    .slice(0, 180)
+})
+
+const getActiveEditor = () => {
+  if (contentEditorDialogVisible.value && fullscreenMdRef.value) {
+    return fullscreenMdRef.value
+  }
+  return mdRef.value
+}
+
+const renderArticleContent = (value: string) => {
+  return mavonEditorLib?.markdownIt?.render?.(value || '') || value || ''
+}
 
 const isArticleSelected = (id: string | number) => selectedIds.value.includes(id)
 
@@ -683,12 +817,18 @@ function imgDel(pos: any, $file: any) {
    })
 }
 //添加图片
-function imgAdd(pos: any, $file: any) {
-  var formdata = new FormData();
-  formdata.append("file", $file);
-  uploadApi(formdata, 'article-content').then((res) => {
-    mdRef.value.$img2Url(pos, res.data);
-  });
+async function imgAdd(pos: any, $file: File) {
+  try {
+    const file = await prepareImageFileForUpload($file)
+    const formdata = new FormData()
+    formdata.append('file', file)
+    const res = await uploadApi(formdata, 'article-content')
+    getActiveEditor()?.$img2Url(pos, res.data)
+  } catch (error: any) {
+    if (error?.message) {
+      ElMessage.error(error.message)
+    }
+  }
 }
 
 // 上传视频
@@ -701,7 +841,10 @@ const uploadVideo = (param: any) => {
   var formData = new FormData();
   formData.append("file", param.file);
   return uploadApi(formData, 'article-content').then((res) => {
-    const $vm = mdRef.value;
+    const $vm = getActiveEditor();
+    if (!$vm) {
+      return res;
+    }
     $vm.insertText($vm.getTextareaDom(), {
       prefix: `<video height=100% width=100% controls autoplay src="${res.data}"></video>`,
       subfix: "",
@@ -718,7 +861,12 @@ const uploadVideo = (param: any) => {
  */
  const addVideo = () => {
   // 这里获取到的是mavon编辑器实例，上面挂载着很多方法
-  const $vm = mdRef.value;
+  const $vm = getActiveEditor();
+  if (!$vm) {
+    dialogVisible.value = false;
+    videoInput.value = "";
+    return;
+  }
   // 将文件名与文件路径插入当前光标位置，这是mavon-editor 内置的方法
   $vm.insertText($vm.getTextareaDom(), {
     prefix: `<video height=100% width=100% controls autoplay src="${videoInput.value}"></video>`,
@@ -837,6 +985,7 @@ const clearForm = () => {
   form.isCarousel = 0
   form.isRecommend = 0
   form.keywords = ''
+  contentEditorDialogVisible.value = false
 }
 
 // 新增用户
@@ -865,7 +1014,7 @@ const submitForm = async () => {
   await formRef.value.validate(async (valid) => {
     if (valid) {
       submitLoading.value = true
-      form.content = mdRef.value.d_render;
+      form.content = getActiveEditor()?.d_render || renderArticleContent(String(form.contentMd || ''));
       try {
         if (dialog.type === 'add') {
           await addArticleApi(form)
@@ -888,6 +1037,7 @@ const submitForm = async () => {
 const cancel = () => {
   dialog.visible = false
   reptileDialog.visible = false
+  contentEditorDialogVisible.value = false
   formRef.value?.resetFields()
   reptileForm.url = ''
 }
@@ -1017,6 +1167,64 @@ const beforeAvatarUpload = (file: File) => {
 
   .mb-20 {
     margin-bottom: 20px;
+  }
+
+  .article-editor__toolbar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .article-editor__mobile-preview {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(64, 158, 255, 0.08), rgba(255, 255, 255, 0.98));
+    text-align: left;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  }
+
+  .article-editor__mobile-preview-label {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .article-editor__mobile-preview-text {
+    color: var(--el-text-color-primary);
+    font-size: 14px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .article-editor__meta {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .article-content-dialog__header {
+    margin-bottom: 12px;
+  }
+
+  .article-content-dialog__footer {
+    text-align: right;
+  }
+
+  :deep(.article-content-dialog .el-dialog__body) {
+    padding: 14px !important;
+  }
+
+  :deep(.article-content-dialog .v-note-wrapper) {
+    margin-bottom: 0;
   }
 
 
@@ -1239,7 +1447,7 @@ const beforeAvatarUpload = (file: File) => {
       .v-note-wrapper {
         width: 100% !important;
         min-width: 0 !important;
-        min-height: 52dvh;
+        min-height: 430px;
         margin-bottom: 0;
       }
 
@@ -1262,6 +1470,12 @@ const beforeAvatarUpload = (file: File) => {
         }
       }
 
+      .content-input-wrapper,
+      .auto-textarea-wrapper,
+      .auto-textarea-input {
+        min-height: 340px !important;
+      }
+
       .v-note-panel,
       .v-note-edit {
         width: 100% !important;
@@ -1270,6 +1484,15 @@ const beforeAvatarUpload = (file: File) => {
 
       .v-note-show {
         display: none !important;
+      }
+    }
+
+    .article-editor__toolbar-actions {
+      align-items: flex-start;
+      flex-direction: column;
+
+      :deep(.el-button) {
+        width: 100%;
       }
     }
 

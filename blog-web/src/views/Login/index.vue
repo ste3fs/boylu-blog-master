@@ -120,6 +120,14 @@
             >
               账号登录
             </button>
+            <button
+              type="button"
+              class="entry-chip"
+              :class="{ active: currentForm === 'wechat' }"
+              @click="switchForm('wechat')"
+            >
+              微信扫码
+            </button>
           </div>
 
           <div v-show="currentForm === 'account'" class="form-surface">
@@ -306,6 +314,51 @@
               <a href="javascript:void(0)" @click="switchForm('account')">返回登录</a>
             </div>
           </div>
+
+          <div v-show="currentForm === 'wechat'" class="form-surface form-surface--wechat">
+            <div class="wechat-panel">
+              <div class="wechat-qr-box">
+                <img :src="wechatQrUrl" alt="微信公众号二维码" @error="handleWechatQrError" />
+              </div>
+
+              <p class="wechat-code-line">
+                当前登录码
+                <span class="wechat-code">{{ wechatForm.code || "正在获取..." }}</span>
+                <button
+                  type="button"
+                  class="code-refresh"
+                  :disabled="wechatForm.refreshCountdown > 0"
+                  @click="getWechatLoginCode"
+                >
+                  {{ wechatRefreshText }}
+                </button>
+              </p>
+
+              <ol class="wechat-guide">
+                <li>使用微信扫描上方公众号二维码，未关注时先完成关注。</li>
+                <li>进入公众号聊天窗口，发送页面上的登录码，例如 <strong>DL1234</strong>。</li>
+                <li>页面会自动轮询登录状态，成功后自动进入当前站点。</li>
+                <li>登录码服务器侧 5 分钟内有效，60 秒后可主动刷新生成新码。</li>
+              </ol>
+
+              <div class="wechat-helper">
+                <span>如果扫码后没有跳转，先确认发送的是页面上当前显示的登录码。</span>
+                <button
+                  type="button"
+                  class="helper-btn"
+                  :disabled="wechatForm.refreshCountdown > 0"
+                  @click="getWechatLoginCode"
+                >
+                  {{ wechatForm.refreshCountdown > 0 ? wechatRefreshText : "刷新登录码" }}
+                </button>
+              </div>
+
+              <div class="surface-footer">
+                <span>想用账号密码？</span>
+                <a href="javascript:void(0)" @click="switchForm('account')">返回账号登录</a>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -355,10 +408,12 @@ export default {
       currentForm: "account",
       loading: false,
       scanPlaceholderUrl: new URL("../../assets/scan-placeholder.svg", import.meta.url).href,
-      wechatQrUrl: "/boylu-wechat-official-qrcode.png",
+      wechatQrUrl: "/boylu-wechat-official-qrcode.jpg",
       wechatForm: {
         code: "",
         showQrcode: false,
+        refreshCountdown: 0,
+        expireCountdown: 0,
       },
       countdown: 0,
       loginForm: {
@@ -474,6 +529,7 @@ export default {
     panelKicker() {
       const map = {
         account: "ACCOUNT LOGIN",
+        wechat: "WECHAT LOGIN",
         register: "REGISTER",
         forgot: "RESET PASSWORD",
       };
@@ -482,6 +538,7 @@ export default {
     panelTitle() {
       const map = {
         account: "账号密码登录",
+        wechat: "微信扫码登录",
         register: "创建你的账号",
         forgot: "找回账号密码",
       };
@@ -490,10 +547,17 @@ export default {
     panelSubtitle() {
       const map = {
         account: "继续进入站点，处理你的文章、评论和 AI 对话。",
+        wechat: "扫码关注公众号后发送登录码，5 分钟内有效，60 秒后可刷新。",
         register: "注册后即可解锁站点完整能力。",
         forgot: "通过邮箱验证码快速重置密码。",
       };
       return map[this.currentForm] || "请输入你的账号信息。";
+    },
+    wechatRefreshText() {
+      if (this.wechatForm.refreshCountdown > 0) {
+        return `${this.wechatForm.refreshCountdown}s 后可刷新`;
+      }
+      return "重新获取";
     },
     isPasswordVisibleMode() {
       return this.currentForm === "account" && !!this.loginForm.password && this.showPassword;
@@ -691,7 +755,7 @@ export default {
         delete this.loginTypes[key];
       }
     });
-    if (this.currentForm === "login") {
+    if (this.currentForm === "wechat") {
       this.getWechatLoginCode();
     }
     this.$nextTick(() => {
@@ -944,7 +1008,7 @@ export default {
       this.currentForm = form;
       this.loading = false;
       this.clearTimer();
-      if (form === "login") {
+      if (form === "wechat") {
         this.getWechatLoginCode();
       }
     },
@@ -1026,18 +1090,38 @@ export default {
       });
     },
     getWechatLoginCode() {
+      if (
+        this.wechatForm.refreshCountdown > 0 &&
+        this.wechatForm.code &&
+        this.wechatForm.code !== "验证码已失效" &&
+        this.wechatForm.code !== "获取失败"
+      ) {
+        return;
+      }
+      this.clearTimer();
+      this.wechatForm.code = "正在获取...";
+      this.wechatForm.refreshCountdown = 0;
+      this.wechatForm.expireCountdown = 0;
       getWechatLoginCodeApi().then((res) => {
         this.wechatForm.code = res.data;
         this.pollingWechatIsLogin();
-        let countdown = 60;
+        this.wechatForm.refreshCountdown = 60;
+        this.wechatForm.expireCountdown = 5 * 60;
         this.codeTimer = setInterval(() => {
-          countdown--;
-          if (countdown <= 0) {
-            clearInterval(this.codeTimer);
-            clearInterval(this.pollingTimer);
+          if (this.wechatForm.refreshCountdown > 0) {
+            this.wechatForm.refreshCountdown--;
+          }
+          if (this.wechatForm.expireCountdown > 0) {
+            this.wechatForm.expireCountdown--;
+          }
+          if (this.wechatForm.expireCountdown <= 0) {
+            this.clearTimer();
             this.wechatForm.code = "验证码已失效";
           }
         }, 1000);
+      }).catch((error) => {
+        this.wechatForm.code = "获取失败";
+        this.$message.error(error.message || "获取微信登录码失败");
       });
     },
     handleWechatQrError() {
@@ -1138,6 +1222,7 @@ export default {
         clearInterval(this.pollingTimer);
         this.pollingTimer = null;
       }
+      this.wechatForm.refreshCountdown = 0;
     },
     backToHome() {
       this.$router.push("/");
@@ -1832,8 +1917,18 @@ export default {
 
 .code-refresh {
   margin-left: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
   color: #6c3ff5;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.code-refresh:disabled {
+  cursor: not-allowed;
+  color: #9ca3af;
 }
 
 .wechat-guide {

@@ -1,6 +1,6 @@
 <template>
   <el-dialog
-    title="相册照片"
+    :title="props.albumName ? `相册照片 · ${props.albumName}` : '相册照片'"
     :model-value="props.openPhotos"
     :width="isMobile ? '100vw' : '88%'"
     :top="isMobile ? '0' : '5vh'"
@@ -22,6 +22,15 @@
               @click="handleAdd"
             >
               新增照片
+            </el-button>
+            <el-button
+              v-permission="['sys:photo:add']"
+              type="primary"
+              plain
+              :icon="PictureFilled"
+              @click="handleOpenLibraryDialog"
+            >
+              从文件库批量添加
             </el-button>
             <el-button
               v-permission="['sys:photo:move']"
@@ -136,6 +145,7 @@
             :source="'photo'"
             :limit="dialog.type === 'add' ? 20 : 1"
             :multiple="dialog.type === 'add'"
+            @uploading-change="handlePhotoUploadingChange"
           />
           <div class="photo-upload-hint">
             <template v-if="dialog.type === 'add'">
@@ -144,6 +154,9 @@
             <template v-else>
               编辑时只修改当前这一张照片。
             </template>
+          </div>
+          <div v-if="photoUploading" class="photo-upload-hint photo-upload-hint--warning">
+            图片还在上传中，请等待上传完成后再点确定，避免写入临时地址。
           </div>
         </el-form-item>
         <el-form-item label="描述" prop="description">
@@ -171,7 +184,7 @@
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="cancel">取消</el-button>
-          <el-button type="primary" :loading="submitLoading" @click="submitForm">确定</el-button>
+          <el-button type="primary" :loading="submitLoading" :disabled="photoUploading" @click="submitForm">确定</el-button>
         </div>
       </template>
     </el-dialog>
@@ -206,15 +219,142 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="libraryDialog.visible"
+      title="从文件库添加照片"
+      :width="isMobile ? '100vw' : '960px'"
+      :top="isMobile ? '0' : '4vh'"
+      :fullscreen="isMobile"
+      append-to-body
+      destroy-on-close
+      :close-on-click-modal="false"
+      class="photo-library-dialog"
+    >
+      <div class="library-toolbar">
+        <el-input
+          v-model="libraryQuery.filename"
+          clearable
+          placeholder="搜索文件名"
+          @keyup.enter="handleLibraryQuery"
+        />
+        <el-button type="primary" :icon="Search" @click="handleLibraryQuery">搜索</el-button>
+        <el-button :icon="Refresh" @click="resetLibraryQuery">重置</el-button>
+      </div>
+
+      <div class="library-summary">
+        已选 {{ selectedLibraryUrls.length }} 张图片，确认后会直接加入当前相册，不会删除原文件。
+      </div>
+
+      <div class="library-summary__actions">
+        <el-button type="success" plain size="small" :icon="Check" @click="handleLibrarySelectCurrentPage">
+          {{ isLibraryCurrentPageSelected ? '取消本页全选' : '全选本页' }}
+        </el-button>
+        <el-button link type="primary" :disabled="!selectedLibraryUrls.length" @click="clearLibrarySelection">
+          清空已选
+        </el-button>
+      </div>
+
+      <div v-if="selectedLibraryItems.length" class="library-selection-tray">
+        <div class="library-selection-tray__header">
+          <div class="library-selection-tray__title">已选图片</div>
+          <div class="library-selection-tray__count">{{ selectedLibraryItems.length }} 张，跨页累计保留</div>
+        </div>
+        <div class="library-selection-tray__list">
+          <article
+            v-for="item in selectedLibraryItems"
+            :key="item.url"
+            class="library-selection-chip"
+          >
+            <el-image class="library-selection-chip__image" :src="item.url" fit="cover" />
+            <div class="library-selection-chip__body">
+              <div class="library-selection-chip__name">{{ item.filename || item.url }}</div>
+              <div class="library-selection-chip__meta">{{ item.extLabel }} · {{ item.sizeLabel }}</div>
+            </div>
+            <el-button link type="danger" @click="removeLibrarySelection(item.url)">移除</el-button>
+          </article>
+        </div>
+      </div>
+
+      <div v-loading="libraryLoading" class="library-grid">
+        <template v-if="libraryFileList.length">
+          <article
+            v-for="item in libraryFileList"
+            :key="item.url"
+            class="library-card"
+            :class="{ 'is-selected': selectedLibraryUrls.includes(item.url) }"
+            @click="toggleLibrarySelect(item.url)"
+          >
+            <div class="library-card__media">
+              <el-checkbox
+                class="library-card__check"
+                :model-value="selectedLibraryUrls.includes(item.url)"
+                @click.stop
+                @change="(checked) => toggleLibrarySelect(item.url, Boolean(checked))"
+              />
+              <el-image class="library-card__image" :src="item.url" fit="cover" />
+            </div>
+            <div class="library-card__body">
+              <div class="library-card__name">{{ item.filename || '未命名图片' }}</div>
+              <div class="library-card__meta">
+                {{ String(item.ext || 'image').toUpperCase() }} · {{ formatFileSize(item.size) }}
+              </div>
+            </div>
+          </article>
+        </template>
+
+        <el-empty v-else description="当前筛选结果没有可加入的图片" />
+      </div>
+
+      <PagePagination
+        v-model:current-page="libraryQuery.pageNum"
+        v-model:page-size="libraryQuery.pageSize"
+        :total="libraryTotal"
+        @size-change="handleLibrarySizeChange"
+        @current-change="handleLibraryCurrentChange"
+      />
+
+      <div v-if="isMobile && selectedLibraryItems.length" class="library-mobile-bar">
+        <div class="library-mobile-bar__meta">
+          <div class="library-mobile-bar__title">已选 {{ selectedLibraryItems.length }} 张</div>
+          <div class="library-mobile-bar__desc">跨页选择会继续保留，可直接加入当前相册</div>
+        </div>
+        <div class="library-mobile-bar__previews">
+          <el-image
+            v-for="item in recentSelectedLibraryItems"
+            :key="item.url"
+            class="library-mobile-bar__preview"
+            :src="item.url"
+            fit="cover"
+          />
+        </div>
+        <div class="library-mobile-bar__actions">
+          <el-button plain @click="clearLibrarySelection">清空</el-button>
+          <el-button type="primary" :loading="librarySubmitLoading" @click="confirmLibraryImport">
+            加入相册
+          </el-button>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="libraryDialog.visible = false">取消</el-button>
+          <el-button type="primary" :loading="librarySubmitLoading" @click="confirmLibraryImport">
+            加入当前相册
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <el-image-viewer v-if="openPreview" :url-list="previewList" @close="closeViewer" />
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Delete, Edit, Notification, Plus, View } from '@element-plus/icons-vue'
+import { Check, Delete, Edit, Notification, PictureFilled, Plus, Refresh, Search, View } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import UploadImage from '@/components/Upload/Image.vue'
+import { getFileListApi } from '@/api/file'
 import { listAlbumAllApi } from '@/api/site/album'
 import {
   addPhotoApi,
@@ -233,6 +373,10 @@ const props = defineProps({
   albumId: {
     type: Number,
     default: 0
+  },
+  albumName: {
+    type: String,
+    default: ''
   }
 })
 
@@ -247,12 +391,25 @@ const selectedIds = ref<number[]>([])
 const previewList = ref<string[]>([])
 const openPreview = ref(false)
 const submitLoading = ref(false)
+const photoUploading = ref(false)
+const libraryLoading = ref(false)
+const libraryTotal = ref(0)
+const librarySubmitLoading = ref(false)
 const photoFormRef = ref<FormInstance>()
+const libraryFileList = ref<any[]>([])
+const selectedLibraryUrls = ref<string[]>([])
+const selectedLibraryItems = ref<any[]>([])
 
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
   albumId: 0
+})
+
+const libraryQuery = reactive({
+  pageNum: 1,
+  pageSize: 24,
+  filename: ''
 })
 
 const dialog = reactive({
@@ -264,6 +421,10 @@ const dialog = reactive({
 const moveDialog = reactive({
   visible: false,
   targetAlbumId: undefined as number | undefined
+})
+
+const libraryDialog = reactive({
+  visible: false
 })
 
 const photoForm = reactive<any>({
@@ -281,6 +442,8 @@ const rules = reactive<FormRules>({
   ]
 })
 
+const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif'])
+
 const syncMobile = () => {
   isMobile.value = window.innerWidth <= 768
 }
@@ -292,9 +455,21 @@ const resetForm = () => {
   photoForm.description = ''
   photoForm.recordTime = ''
   photoForm.sort = 1
+  photoUploading.value = false
+}
+
+const handlePhotoUploadingChange = (uploading: boolean) => {
+  photoUploading.value = uploading
 }
 
 const getList = async () => {
+  if (!props.albumId) {
+    photoList.value = []
+    total.value = 0
+    selectedIds.value = []
+    return
+  }
+
   loading.value = true
   try {
     queryParams.albumId = props.albumId
@@ -310,6 +485,155 @@ const getList = async () => {
 const getAlbumList = async () => {
   const { data } = await listAlbumAllApi()
   albumList.value = data || []
+}
+
+const getLibraryList = async () => {
+  libraryLoading.value = true
+  try {
+    const { data } = await getFileListApi(libraryQuery)
+    const records = data.records || []
+    libraryFileList.value = records.filter((item: any) => IMAGE_EXTENSIONS.has(String(item.ext || '').toLowerCase()))
+    libraryTotal.value = data.total || 0
+  } finally {
+    libraryLoading.value = false
+  }
+}
+
+const formatFileSize = (size: number | string) => `${(Number(size || 0) / 1024).toFixed(1)} KB`
+
+const buildLibrarySelectionItem = (item: any) => ({
+  url: item.url,
+  filename: item.filename || '',
+  extLabel: String(item.ext || 'image').toUpperCase(),
+  sizeLabel: formatFileSize(item.size)
+})
+
+const handleOpenLibraryDialog = () => {
+  libraryDialog.visible = true
+  selectedLibraryUrls.value = []
+  selectedLibraryItems.value = []
+  libraryQuery.pageNum = 1
+  getLibraryList()
+}
+
+const toggleLibrarySelect = (url: string, checked?: boolean) => {
+  const exists = selectedLibraryUrls.value.includes(url)
+  const nextChecked = checked ?? !exists
+  const matchedItem = libraryFileList.value.find((item: any) => item.url === url)
+
+  if (nextChecked) {
+    if (!exists) {
+      selectedLibraryUrls.value.push(url)
+    }
+    if (matchedItem && !selectedLibraryItems.value.some(item => item.url === url)) {
+      selectedLibraryItems.value.push(buildLibrarySelectionItem(matchedItem))
+    }
+    return
+  }
+
+  selectedLibraryUrls.value = selectedLibraryUrls.value.filter(item => item !== url)
+  selectedLibraryItems.value = selectedLibraryItems.value.filter(item => item.url !== url)
+}
+
+const isLibraryCurrentPageSelected = computed(() => {
+  return libraryFileList.value.length > 0
+    && libraryFileList.value.every((item: any) => selectedLibraryUrls.value.includes(item.url))
+})
+
+const handleLibrarySelectCurrentPage = () => {
+  const currentPageUrls = libraryFileList.value.map((item: any) => item.url)
+  if (!currentPageUrls.length) return
+
+  if (isLibraryCurrentPageSelected.value) {
+    selectedLibraryUrls.value = selectedLibraryUrls.value.filter(url => !currentPageUrls.includes(url))
+    return
+  }
+
+  const next = new Set(selectedLibraryUrls.value)
+  currentPageUrls.forEach((url: string) => next.add(url))
+  selectedLibraryUrls.value = Array.from(next)
+  libraryFileList.value.forEach((item: any) => {
+    if (!selectedLibraryItems.value.some(selected => selected.url === item.url)) {
+      selectedLibraryItems.value.push(buildLibrarySelectionItem(item))
+    }
+  })
+}
+
+const clearLibrarySelection = () => {
+  selectedLibraryUrls.value = []
+  selectedLibraryItems.value = []
+}
+
+const removeLibrarySelection = (url: string) => {
+  selectedLibraryUrls.value = selectedLibraryUrls.value.filter(item => item !== url)
+  selectedLibraryItems.value = selectedLibraryItems.value.filter(item => item.url !== url)
+}
+
+const recentSelectedLibraryItems = computed(() => {
+  return selectedLibraryItems.value.slice(-3).reverse()
+})
+
+const handleLibraryQuery = () => {
+  libraryQuery.pageNum = 1
+  getLibraryList()
+}
+
+const resetLibraryQuery = () => {
+  libraryQuery.filename = ''
+  libraryQuery.pageNum = 1
+  getLibraryList()
+}
+
+const handleLibrarySizeChange = (val: number) => {
+  libraryQuery.pageSize = val
+  getLibraryList()
+}
+
+const handleLibraryCurrentChange = (val: number) => {
+  libraryQuery.pageNum = val
+  getLibraryList()
+}
+
+const confirmLibraryImport = async () => {
+  if (!selectedLibraryUrls.value.length) {
+    ElMessage.warning('请先选择要加入相册的图片')
+    return
+  }
+
+  const existingUrls = new Set(photoList.value.map(item => item.url))
+  const urlsToImport = selectedLibraryUrls.value.filter(url => !existingUrls.has(url))
+
+  if (!urlsToImport.length) {
+    ElMessage.warning('选中的图片当前页已经存在，无需重复加入')
+    return
+  }
+
+  librarySubmitLoading.value = true
+  try {
+    const nextSort = photoList.value.reduce((max, item) => Math.max(max, Number(item.sort || 0)), 0) + 1
+    await Promise.all(
+      urlsToImport.map((url, index) => addPhotoApi({
+        albumId: props.albumId,
+        url,
+        description: '',
+        recordTime: '',
+        sort: nextSort + index
+      }))
+    )
+
+    const skippedCount = selectedLibraryUrls.value.length - urlsToImport.length
+    ElMessage.success(
+      skippedCount > 0
+        ? `已加入 ${urlsToImport.length} 张图片，跳过 ${skippedCount} 张重复图片`
+        : `已加入 ${urlsToImport.length} 张图片`
+    )
+    libraryDialog.visible = false
+    selectedLibraryUrls.value = []
+    selectedLibraryItems.value = []
+    getList()
+  } finally {
+    librarySubmitLoading.value = false
+  }
 }
 
 const toggleSelect = (id: number, checked: boolean) => {
@@ -354,6 +678,11 @@ const handleUpdate = (row: any) => {
 
 const submitForm = async () => {
   if (!photoFormRef.value) return
+
+  if (photoUploading.value) {
+    ElMessage.warning('请等待图片上传完成后再保存')
+    return
+  }
 
   await photoFormRef.value.validate(async (valid) => {
     if (!valid) return
@@ -480,16 +809,40 @@ const handleCurrentChange = (val: number) => {
 }
 
 const handleDialogClose = (val: boolean) => {
+  if (!val) {
+    libraryDialog.visible = false
+    selectedLibraryUrls.value = []
+    selectedLibraryItems.value = []
+  }
   emit('update:openPhotos', val)
 }
 
 watch(
   () => props.openPhotos,
   (visible) => {
-    if (!visible) return
+    if (!visible || !props.albumId) return
     queryParams.pageNum = 1
     getAlbumList()
     getList()
+  }
+)
+
+watch(
+  () => props.albumId,
+  (albumId) => {
+    if (!props.openPhotos || !albumId) return
+    queryParams.pageNum = 1
+    resetForm()
+    getList()
+  }
+)
+
+watch(
+  () => libraryDialog.visible,
+  (visible) => {
+    if (visible) return
+    selectedLibraryUrls.value = []
+    selectedLibraryItems.value = []
   }
 )
 
@@ -580,6 +933,177 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
+.photo-upload-hint--warning {
+  color: var(--el-color-warning);
+}
+
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.library-toolbar :deep(.el-input) {
+  flex: 1;
+}
+
+.library-summary {
+  margin-bottom: 14px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.library-summary__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  flex-wrap: wrap;
+}
+
+.library-selection-tray {
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(64, 158, 255, 0.05), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.library-selection-tray__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.library-selection-tray__title {
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.library-selection-tray__count {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.library-selection-tray__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.library-selection-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.library-selection-chip__image {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--el-fill-color);
+}
+
+.library-selection-chip__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.library-selection-chip__name {
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.library-selection-chip__meta {
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.library-card {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--el-bg-color);
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--el-color-primary-light-5);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  &.is-selected {
+    border-color: var(--el-color-primary);
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.16);
+  }
+}
+
+.library-card__media {
+  position: relative;
+}
+
+.library-card__check {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+}
+
+.library-card__image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--el-fill-color);
+}
+
+.library-card__body {
+  padding: 12px;
+}
+
+.library-card__name {
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.library-card__meta {
+  margin-top: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.library-mobile-bar {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .photo-list {
     grid-template-columns: 1fr;
@@ -611,6 +1135,129 @@ onUnmounted(() => {
   :deep(.photo-form .el-form-item__content) {
     margin-left: 0 !important;
     width: 100%;
+  }
+
+  .library-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .library-toolbar :deep(.el-input) {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .library-selection-tray {
+    padding: 12px;
+  }
+
+  .library-selection-tray__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .library-selection-tray__list {
+    grid-template-columns: 1fr;
+  }
+
+  .library-summary__actions {
+    align-items: stretch;
+
+    :deep(.el-button) {
+      flex: 1 1 auto;
+      margin-left: 0;
+    }
+  }
+
+  .library-mobile-bar {
+    position: sticky;
+    bottom: -1px;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 14px -4px -4px;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--el-border-color-lighter);
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 -12px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  .library-mobile-bar__meta {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .library-mobile-bar__previews {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    padding-right: 4px;
+  }
+
+  .library-mobile-bar__preview {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border: 2px solid rgba(255, 255, 255, 0.96);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+
+    & + & {
+      margin-left: -10px;
+    }
+  }
+
+  .library-mobile-bar__title {
+    color: var(--el-text-color-primary);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .library-mobile-bar__desc {
+    margin-top: 2px;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .library-mobile-bar__actions {
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .library-mobile-bar__actions :deep(.el-button) {
+    min-width: 88px;
+  }
+
+  .library-mobile-bar {
+    flex-wrap: wrap;
+  }
+
+  .library-mobile-bar__meta {
+    flex-basis: 100%;
+  }
+
+  .library-mobile-bar__previews {
+    margin-left: 0;
+    padding-right: 0;
+  }
+
+  :deep(.photo-library-dialog .el-dialog__footer) {
+    display: none;
+  }
+
+  :deep(.photo-library-dialog) {
+    border-radius: 0 !important;
   }
 }
 </style>

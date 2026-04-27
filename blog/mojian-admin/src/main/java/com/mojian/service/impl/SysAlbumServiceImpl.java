@@ -37,6 +37,7 @@ public class SysAlbumServiceImpl extends ServiceImpl<SysAlbumMapper, SysAlbum> i
         wrapper.eq(sysAlbum.getPassword() != null, SysAlbum::getPassword, sysAlbum.getPassword());
         wrapper.eq(sysAlbum.getSort() != null, SysAlbum::getSort, sysAlbum.getSort());
         wrapper.eq(sysAlbum.getCreateTime() != null, SysAlbum::getCreateTime, sysAlbum.getCreateTime());
+        wrapper.orderByDesc(SysAlbum::getId);
         return page(PageUtil.getPage(), wrapper);
     }
 
@@ -54,6 +55,7 @@ public class SysAlbumServiceImpl extends ServiceImpl<SysAlbumMapper, SysAlbum> i
         wrapper.eq(sysAlbum.getPassword() != null, SysAlbum::getPassword, sysAlbum.getPassword());
         wrapper.eq(sysAlbum.getSort() != null, SysAlbum::getSort, sysAlbum.getSort());
         wrapper.eq(sysAlbum.getCreateTime() != null, SysAlbum::getCreateTime, sysAlbum.getCreateTime());
+        wrapper.orderByDesc(SysAlbum::getId);
         return list(wrapper);
     }
 
