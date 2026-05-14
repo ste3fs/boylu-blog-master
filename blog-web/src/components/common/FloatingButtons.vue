@@ -27,10 +27,15 @@
 </template>
 
 <script>
+import Tooltip from 'element-ui/lib/tooltip'
+import 'element-ui/lib/theme-chalk/tooltip.css'
 import { getThemeMode, setThemeMode, initTheme } from '@/utils/theme'
 
 export default {
   name: 'FloatingButtons',
+  components: {
+    ElTooltip: Tooltip
+  },
   data() {
     return {
       isDarkMode: false,
@@ -178,5 +183,4 @@ export default {
   }
 }
 
-
-</style> 
+</style>

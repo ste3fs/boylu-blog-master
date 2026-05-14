@@ -56,9 +56,24 @@
 </template>
 
 <script>
+import Option from 'element-ui/lib/option'
+import Radio from 'element-ui/lib/radio'
+import RadioGroup from 'element-ui/lib/radio-group'
+import Select from 'element-ui/lib/select'
+import 'element-ui/lib/theme-chalk/option.css'
+import 'element-ui/lib/theme-chalk/radio.css'
+import 'element-ui/lib/theme-chalk/radio-group.css'
+import 'element-ui/lib/theme-chalk/select.css'
+import 'element-ui/lib/theme-chalk/select-dropdown.css'
 import { addResourceApi } from '@/api/resources';
 export default {
   name: "AddResource",
+  components: {
+    ElOption: Option,
+    ElRadio: Radio,
+    ElRadioGroup: RadioGroup,
+    ElSelect: Select
+  },
   props: {
     visible: {
       type: Boolean,

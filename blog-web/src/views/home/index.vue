@@ -41,6 +41,10 @@
 </template>
 
 <script>
+import Tabs from 'element-ui/lib/tabs'
+import TabPane from 'element-ui/lib/tab-pane'
+import 'element-ui/lib/theme-chalk/tabs.css'
+import 'element-ui/lib/theme-chalk/tab-pane.css'
 import ArticleList from "@/components/ArticleList/index.vue";
 import Carousel from "@/views/home/components/carousel.vue";
 import Sidebar from "@/components/Sidebar/index.vue";
@@ -50,6 +54,7 @@ import {
   getCarouselArticlesApi,
   getAllCategoriesApi,
 } from "@/api/article";
+import { prewarmImageUrls, resolveImageUrl } from "@/utils/image";
 
 const ARTICLE_LIST_STATE_KEY = "boylu:article-list-state";
 const ARTICLE_LIST_STATE_MAX_AGE = 30 * 60 * 1000;
@@ -57,6 +62,8 @@ const ARTICLE_LIST_STATE_MAX_AGE = 30 * 60 * 1000;
 export default {
   name: "Home",
   components: {
+    ElTabs: Tabs,
+    ElTabPane: TabPane,
     ArticleList,
     Carousel,
     Sidebar,
@@ -72,6 +79,7 @@ export default {
       articleList: [],
       carouselSlides: [],
       loading: false,
+      articleRequestSeq: 0,
       activeName: "all",
       restoreListState: null,
       categories: [
@@ -84,6 +92,20 @@ export default {
     };
   },
   methods: {
+    prewarmHomeCriticalImages(records = []) {
+      const warmupUrls = records
+        .slice(0, 2)
+        .flatMap((post) => {
+          const source = resolveImageUrl(
+            (post && post.coverImage && (post.coverImage.fallback || post.coverImage.source)) || post.cover
+          );
+          if (!source) {
+            return [];
+          }
+          return [source];
+        });
+      prewarmImageUrls(warmupUrls, 2);
+    },
     /**
      * 切换标签
      * @param {string} tab 标签
@@ -163,17 +185,29 @@ export default {
      * 获取文章列表
      */
     getArticleList() {
+      const requestSeq = ++this.articleRequestSeq;
       this.loading = true;
       return getArticlesApi(this.params)
         .then((res) => {
+          if (requestSeq !== this.articleRequestSeq) {
+            return;
+          }
           this.articleList = res.data.records;
           this.total = res.data.total;
+          if (Number(this.params.pageNum || 1) === 1) {
+            this.prewarmHomeCriticalImages(this.articleList);
+          }
         })
         .catch((error) => {
+          if (requestSeq !== this.articleRequestSeq) {
+            return;
+          }
           console.error("Failed to fetch articles:", error);
         })
         .finally(() => {
-          this.loading = false;
+          if (requestSeq === this.articleRequestSeq) {
+            this.loading = false;
+          }
         });
     },
     /**

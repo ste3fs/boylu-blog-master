@@ -22,6 +22,7 @@ const STANDALONE_ABSOLUTE_FILE_VIEW_PREFIX = /^https?:\/\/[^"'\\s)]+(?:\/(?:boyl
 const STANDALONE_PROTOCOL_RELATIVE_FILE_VIEW_PREFIX = /^\/\/[^"'\\s)]+(?:\/(?:boylu|mojian))?\/file\/(?:view|content)\//i
 const SELF_HOSTED_SITE_PREFIX = /^https?:\/\/(?:(?:www\.)?boylu\.(?:cn|top)|111\.229\.123\.234)(?::\d+)?\//i
 const SELF_HOSTED_PROTOCOL_PREFIX = /^\/\/(?:(?:www\.)?boylu\.(?:cn|top)|111\.229\.123\.234)(?::\d+)?\//i
+const LOCAL_FILE_REFERENCE = /\/localFile\/[^"'\\s)<]+/g
 
 function stripOrigin(url = '') {
   if (typeof url !== 'string' || !url) {
@@ -63,6 +64,21 @@ function normalizeSelfHostedOrigin(url = '') {
   }
 
   return url
+}
+
+function toLocalFilePath(url = '') {
+  if (typeof url !== 'string' || !url) {
+    return ''
+  }
+
+  const normalized = stripOrigin(url)
+  const localIndex = normalized.indexOf(LOCAL_FILE_SEGMENT)
+  if (localIndex < 0) {
+    return normalized || ''
+  }
+
+  const localPath = normalized.slice(localIndex)
+  return localPath
 }
 
 function findPrefix(url = '', prefixes = []) {
@@ -126,7 +142,7 @@ export function normalizeLocalFileUrl(url = '') {
     return selfHostedUrl || ''
   }
 
-  return selfHostedUrl.slice(selfHostedUrl.indexOf(LOCAL_FILE_SEGMENT))
+  return toLocalFilePath(selfHostedUrl)
 }
 
 export function normalizeFileViewUrl(url = '') {
@@ -165,6 +181,7 @@ export function normalizeLocalFileText(text = '') {
     .replace(PROTOCOL_RELATIVE_LOCAL_FILE_PREFIX, LOCAL_FILE_SEGMENT)
     .replace(ABSOLUTE_FILE_VIEW_PREFIX, match => normalizeContentPath(match))
     .replace(PROTOCOL_RELATIVE_FILE_VIEW_PREFIX, match => normalizeContentPath(match))
+    .replace(LOCAL_FILE_REFERENCE, match => toLocalFilePath(match))
 
   const trimmedNormalized = normalized.trim()
   if (isStandaloneFileReference(trimmedNormalized)) {

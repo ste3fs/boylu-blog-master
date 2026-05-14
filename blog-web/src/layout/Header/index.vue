@@ -79,7 +79,7 @@
         <div class="user-info">
           <div v-if="$store.state.userInfo" class="user-section" @mouseleave="showDropdown = false">
             <div class="avatar" @mouseenter="showDropdown = true">
-              <el-avatar :src="userAvatarSrc" icon="el-icon-user-solid" />
+              <el-avatar class="avatar-icon" :src="userAvatarSrc" icon="el-icon-user-solid" />
             </div>
             <!-- 用户下拉菜单 -->
             <div class="user-dropdown" v-show="showDropdown">
@@ -247,9 +247,9 @@ export default {
     },
     siteLogoSrc() {
       return this.resolveSafeAvatar([
-        this.$store.state.webSiteInfo?.logo,
         this.$store.state.webSiteInfo?.authorAvatar,
-        this.$store.state.webSiteInfo?.touristAvatar
+        this.$store.state.webSiteInfo?.touristAvatar,
+        this.$store.state.webSiteInfo?.logo
       ])
     },
     userAvatarSrc() {
@@ -302,7 +302,7 @@ export default {
         .map(url => (url || '').toString().trim())
         .find(Boolean)
 
-      return resolveImageUrl(match, this.$store.state.webSiteInfo.logo || this.$store.state.defaultImage)
+      return resolveImageUrl(match, this.$store.state.webSiteInfo.authorAvatar || this.$store.state.defaultImage)
     },
     handleOpenMobileMenu() {
       this.$store.commit('SET_MOBILE_MENU_VISIBLE', true)
@@ -560,6 +560,10 @@ export default {
       height: 38px;
       width: 40px;
       border-radius: 5px;
+      object-fit: contain;
+      background: rgba(255, 255, 255, 0.92);
+      padding: 2px;
+      box-sizing: border-box;
     }
 
     .logo-text {
@@ -910,7 +914,11 @@ export default {
       .avatar-icon {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+
+        :deep(img) {
+          object-fit: contain;
+          background: rgba(255, 255, 255, 0.92);
+        }
       }
     }
 
@@ -939,6 +947,8 @@ export default {
           height: 48px;
           border-radius: 50%;
           border: 2px solid rgba(255, 255, 255, 0.8);
+          object-fit: contain;
+          background: rgba(255, 255, 255, 0.92);
         }
 
         .user-details {

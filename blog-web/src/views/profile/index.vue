@@ -97,7 +97,7 @@
       </div>
 
       <!-- 账号绑定 -->
-      <div v-if="currentTab === 'binding'" cla1110ss="content-section">
+      <div v-if="currentTab === 'binding'" class="content-section">
         <h2 class="section-title">账号绑定</h2>
         <div class="binding-tips">
           <el-alert title="账号绑定提示" type="info" description="绑定第三方账号后，您可以直接使用第三方账号登录本站，还可以同步您的个人信息。" show-icon
@@ -179,7 +179,7 @@
         <div v-if="myComments.length" v-loading="loading">
           <el-card v-for="comment in myComments" :key="comment.id" class="comment-item">
             <div class="comment-actions">
-              <p class="comment-text" v-html="parseContent(comment.content)"></p>
+              <p class="comment-text" v-html="$sanitizeHtml(parseContent(comment.content))"></p>
               <el-button type="text" icon="el-icon-delete" class="delete"
                 @click="deleteComment(comment.id)">删除</el-button>
             </div>
@@ -211,7 +211,7 @@
               <div class="comment-actions">
                 <p class="reply-text">
                   <el-tag size="small" type="info">回复 @{{ reply.replyNickname }}</el-tag>
-                <p v-html="parseContent(reply.content)"></p>
+                <p v-html="$sanitizeHtml(parseContent(reply.content))"></p>
                 </p>
                 <el-button type="text" icon="el-icon-delete" class="delete"
                   @click="deleteReply(reply.id)">删除</el-button>
@@ -374,6 +374,29 @@
 </template>
 
 <script>
+import Alert from 'element-ui/lib/alert'
+import Link from 'element-ui/lib/link'
+import Menu from 'element-ui/lib/menu'
+import MenuItem from 'element-ui/lib/menu-item'
+import Option from 'element-ui/lib/option'
+import Radio from 'element-ui/lib/radio'
+import RadioGroup from 'element-ui/lib/radio-group'
+import Select from 'element-ui/lib/select'
+import TabPane from 'element-ui/lib/tab-pane'
+import Tabs from 'element-ui/lib/tabs'
+import Tag from 'element-ui/lib/tag'
+import 'element-ui/lib/theme-chalk/alert.css'
+import 'element-ui/lib/theme-chalk/link.css'
+import 'element-ui/lib/theme-chalk/menu.css'
+import 'element-ui/lib/theme-chalk/menu-item.css'
+import 'element-ui/lib/theme-chalk/option.css'
+import 'element-ui/lib/theme-chalk/radio.css'
+import 'element-ui/lib/theme-chalk/radio-group.css'
+import 'element-ui/lib/theme-chalk/select.css'
+import 'element-ui/lib/theme-chalk/select-dropdown.css'
+import 'element-ui/lib/theme-chalk/tab-pane.css'
+import 'element-ui/lib/theme-chalk/tabs.css'
+import 'element-ui/lib/theme-chalk/tag.css'
 import {
   getUserInfoApi, updateProfileApi, updatePasswordApi,
   getMyCommentApi, delMyCommentApi, getMyLikeApi, getMyReplyApi, getMyFeedbackApi, addFeedbackApi,
@@ -381,12 +404,24 @@ import {
 } from '@/api/user'
 import { getMyArticleApi, likeArticleApi, delArticleApi } from '@/api/article'
 import { getDictDataApi } from '@/api/dict'
+import { getAuthBindRenderApi, getAuthBindingsApi, unbindAuthApi } from '@/api/auth'
 import AvatarCropper from '@/components/common/AvatarCropper.vue'
 
 import { renderMarkdown } from '@/utils/markdown'
 export default {
   name: 'Profile',
   components: {
+    ElAlert: Alert,
+    ElLink: Link,
+    ElMenu: Menu,
+    ElMenuItem: MenuItem,
+    ElOption: Option,
+    ElRadio: Radio,
+    ElRadioGroup: RadioGroup,
+    ElSelect: Select,
+    ElTabPane: TabPane,
+    ElTabs: Tabs,
+    ElTag: Tag,
     AvatarCropper
   },
   data() {
@@ -432,8 +467,9 @@ export default {
           type: 'wechat',
           name: '微信公众号',
           icon: 'fab fa-weixin',
-          isBound: true,
-          username: 'wx_user123',
+          isBound: false,
+          username: '',
+          bindable: false,
           color: '#10b981'
         },
         {
@@ -441,15 +477,36 @@ export default {
           name: 'QQ',
           icon: 'fab fa-qq',
           isBound: false,
+          username: '',
+          bindable: true,
           color: '#60a5fa'
         },
         {
           type: 'gitee',
           name: '码云',
           icon: 'fab fa-git-alt',
-          isBound: true,
-          username: 'github_user',
+          isBound: false,
+          username: '',
+          bindable: true,
           color: '#FF0000'
+        },
+        {
+          type: 'github',
+          name: 'GitHub',
+          icon: 'fab fa-github',
+          isBound: false,
+          username: '',
+          bindable: true,
+          color: '#333333'
+        },
+        {
+          type: 'weibo',
+          name: '微博',
+          icon: 'fab fa-weibo',
+          isBound: false,
+          username: '',
+          bindable: true,
+          color: '#e6162d'
         }
       ],
 
@@ -473,15 +530,18 @@ export default {
       },
       // 个人资料表单
       profileForm: {
+        id: null,
         nickname: '',
         email: '',
         sex: 2,
-        signature: ''
+        signature: '',
+        avatar: ''
       },
+      originalProfileForm: {},
       profileRules: {
-        username: [
-          { required: true, message: '请输入用户名', trigger: 'blur' },
-          { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
+        nickname: [
+          { required: true, message: '请输入昵称', trigger: 'blur' },
+          { min: 1, max: 20, message: '昵称长度不能超过 20 个字符', trigger: 'blur' }
         ],
         email: [
           { required: true, message: '请输入邮箱', trigger: 'blur' },
@@ -563,9 +623,10 @@ export default {
     },
   },
   created() {
+    this.syncTabFromRoute()
     getUserInfoApi().then(res => {
-      this.userInfo = res.data.sysUser
-      Object.assign(this.profileForm, res.data.sysUser)
+      this.applyUserProfile(res.data.sysUser)
+      this.loadBoundAccounts()
     })
 
     this.getFeedbackDict()
@@ -573,7 +634,88 @@ export default {
     this.getSignInStatus()
     this.getSignInStats()
   },
+  mounted() {
+    this.handleOauthBindResult()
+  },
   methods: {
+    syncTabFromRoute() {
+      const routeTab = (this.$route.query.tab || '').toString().trim()
+      const tabExists = this.tabs.some(item => item.key === routeTab)
+      if (tabExists) {
+        this.currentTab = routeTab
+      }
+    },
+    applyUserProfile(user = {}) {
+      this.userInfo = { ...user }
+      const form = {
+        id: user.id || null,
+        nickname: user.nickname || '',
+        email: user.email || '',
+        sex: [0, 1, 2].includes(Number(user.sex)) ? Number(user.sex) : 0,
+        signature: user.signature || '',
+        avatar: user.avatar || ''
+      }
+      this.profileForm = { ...form }
+      this.originalProfileForm = { ...form }
+      this.refreshBoundAccounts(user)
+    },
+    refreshBoundAccounts(user = {}, bindings = []) {
+      const loginType = String(user.loginType || '').toLowerCase()
+      const aliases = {
+        wechat: ['wechat', 'weixin', 'wx', 'applet'],
+        qq: ['qq'],
+        gitee: ['gitee'],
+        github: ['github'],
+        weibo: ['weibo']
+      }
+      const bindingMap = bindings.reduce((map, item) => {
+        map[item.source] = item
+        return map
+      }, {})
+      this.boundAccounts = this.boundAccounts.map(account => {
+        const binding = bindingMap[account.type]
+        const isBound = Boolean(binding) || (aliases[account.type] || []).includes(loginType)
+        return {
+          ...account,
+          isBound,
+          bindable: account.bindable !== false,
+          username: isBound ? (binding?.nickname || binding?.username || user.nickname || user.email || user.username || '已绑定账号') : ''
+        }
+      })
+    },
+    loadBoundAccounts() {
+      getAuthBindingsApi().then(res => {
+        this.refreshBoundAccounts(this.userInfo, res.data || [])
+      }).catch(() => {
+        this.refreshBoundAccounts(this.userInfo)
+      })
+    },
+    handleOauthBindResult() {
+      const { bind, source, message } = this.$route.query || {}
+      if (!bind) {
+        return
+      }
+      this.currentTab = 'binding'
+      if (bind === 'success') {
+        this.$message.success(`${source || '第三方账号'}绑定成功`)
+        this.loadBoundAccounts()
+      } else if (bind === 'cancelled') {
+        this.$message.warning(`已取消${source || '第三方账号'}绑定`)
+      } else if (bind === 'failed') {
+        this.$message.error(message || '第三方账号绑定失败')
+      }
+      this.$router.replace({ path: this.$route.path })
+    },
+    buildProfilePayload() {
+      return {
+        id: this.profileForm.id,
+        nickname: (this.profileForm.nickname || '').trim(),
+        email: (this.profileForm.email || '').trim(),
+        signature: this.profileForm.signature || '',
+        sex: Number(this.profileForm.sex),
+        avatar: this.profileForm.avatar || this.userInfo.avatar || ''
+      }
+    },
     /**
      * 获取反馈类型字典
      */
@@ -679,31 +821,41 @@ export default {
      * @param type
      */
     bindAccount(type) {
-      // 模拟绑定过程
       const account = this.boundAccounts.find(acc => acc.type === type)
-      if (account) {
-        this.$confirm('确定要绑定该账号吗？', '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }).then(() => {
-          account.isBound = true
-          this.$message.success('绑定成功')
-        }).catch(() => { })
+      if (!account) {
+        return
       }
+      if (account.bindable === false) {
+        this.$message.warning('微信公众号绑定需要单独的扫码流程，当前暂不支持在前台直接绑定。')
+        return
+      }
+      getAuthBindRenderApi(type).then(res => {
+        window.open(res.data, '_self')
+      }).catch(err => {
+        this.$message.error(err.message)
+      })
     },
     unbindAccount(type) {
       const account = this.boundAccounts.find(acc => acc.type === type)
-      if (account) {
-        this.$confirm('确定要解除绑定吗？', '提示', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }).then(() => {
-          account.isBound = false
-          this.$message.success('已解除绑定')
-        }).catch(() => { })
+      if (!account) {
+        return
       }
+      if (account.bindable === false) {
+        this.$message.warning('微信公众号绑定状态来自扫码登录，当前暂不支持在前台直接解除。')
+        return
+      }
+      this.$confirm(`确定要解除 ${account.name} 绑定吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        unbindAuthApi(type).then(() => {
+          this.$message.success('已解除绑定')
+          this.loadBoundAccounts()
+        }).catch(err => {
+          this.$message.error(err.message)
+        })
+      }).catch(() => { })
     },
     /**
      * 删除评论
@@ -788,20 +940,38 @@ export default {
     },
     // 提交个人资料
     submitProfile() {
-      this.loading = true
-      updateProfileApi(this.profileForm).then(res => {
-        this.userInfo.nickname = this.profileForm.nickname
-        this.$store.state.userInfo.nickname = this.profileForm.nickname
-        this.$message.success('个人资料更新成功！')
-      }).catch(err => {
-        this.$message.error(err.message)
-      }).finally(() => {
-        this.loading = false
+      this.$refs.profileForm.validate(valid => {
+        if (!valid) {
+          return
+        }
+        const payload = this.buildProfilePayload()
+        this.loading = true
+        updateProfileApi(payload).then(() => {
+          this.userInfo = { ...this.userInfo, ...payload }
+          this.profileForm = { ...payload }
+          this.originalProfileForm = { ...payload }
+          const storeUser = this.$store.state.userInfo || {}
+          this.$store.commit('SET_USER_INFO', {
+            ...storeUser,
+            nickname: payload.nickname,
+            avatar: payload.avatar,
+            sex: payload.sex,
+            signature: payload.signature
+          })
+          this.$message.success('个人资料更新成功！')
+        }).catch(err => {
+          this.$message.error(err.message)
+        }).finally(() => {
+          this.loading = false
+        })
       })
     },
     // 重置个人资料
     resetProfile() {
-      this.profileForm = { ...{} }
+      this.profileForm = { ...this.originalProfileForm }
+      this.$nextTick(() => {
+        this.$refs.profileForm && this.$refs.profileForm.clearValidate()
+      })
     },
     /**
      * 获取我的回复
@@ -887,7 +1057,7 @@ export default {
      * 签到
      */
     handleSignIn() {
-      if (this.signInStatus.hasSignedIn) return
+      if (this.signInStatus) return
       
       this.signInLoading = true
       signInApi().then(res => {
@@ -905,7 +1075,14 @@ export default {
      * 更新头像
      */
     handleAvatarUpdate(newAvatarUrl) {
-      this.userInfo.avatar = newAvatarUrl;
+      this.userInfo.avatar = newAvatarUrl
+      this.profileForm.avatar = newAvatarUrl
+      this.originalProfileForm.avatar = newAvatarUrl
+      const storeUser = this.$store.state.userInfo || {}
+      this.$store.commit('SET_USER_INFO', {
+        ...storeUser,
+        avatar: newAvatarUrl
+      })
     },
   }
 }

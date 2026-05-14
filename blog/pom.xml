@@ -4,19 +4,19 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.mojian</groupId>
+    <groupId>com.boylu</groupId>
     <artifactId>blog</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
-        <module>mojian-commom</module>
-        <module>mojian-admin</module>
-        <module>mojian-api</module>
-        <module>mojian-server</module>
-        <module>mojian-file</module>
-        <module>mojian-quartz</module>
-        <module>mojian-auth</module>
+        <module>boylu-commom</module>
+        <module>boylu-admin</module>
+        <module>boylu-api</module>
+        <module>boylu-server</module>
+        <module>boylu-file</module>
+        <module>boylu-quartz</module>
+        <module>boylu-auth</module>
     </modules>
 
     <parent>
@@ -34,7 +34,7 @@
 
 
     <build>
-        <!-- 注：maven默认是不编译，因此加上如下resources才会生产对应的xml文件 目的：解决mybatis映射关系不对应问题  start =============== -->
+        <!-- 娉細maven榛樿鏄笉缂栬瘧锛屽洜姝ゅ姞涓婂涓媟esources鎵嶄細鐢熶骇瀵瑰簲鐨剎ml鏂囦欢 鐩殑锛氳В鍐砿ybatis鏄犲皠鍏崇郴涓嶅搴旈棶棰? start =============== -->
         <resources>
             <resource>
                 <directory>src/main/java</directory>
@@ -56,20 +56,20 @@
                 <filtering>false</filtering>
             </testResource>
         </testResources>
-        <!-- 注：maven默认是不编译，因此加上如下resources才会生产对应的xml文件 目的：解决mybatis映射关系不对应问题  end =============== -->
+        <!-- 娉細maven榛樿鏄笉缂栬瘧锛屽洜姝ゅ姞涓婂涓媟esources鎵嶄細鐢熶骇瀵瑰簲鐨剎ml鏂囦欢 鐩殑锛氳В鍐砿ybatis鏄犲皠鍏崇郴涓嶅搴旈棶棰? end =============== -->
 
         <plugins>
-            <!-- maven打包插件 -> 将整个工程打成一个 fatjar -->
+            <!-- maven鎵撳寘鎻掍欢 -> 灏嗘暣涓伐绋嬫墦鎴愪竴涓?fatjar -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <!-- 作用:项目打成jar，同时把本地jar包也引入进去 -->
+                <!-- 浣滅敤:椤圭洰鎵撴垚jar锛屽悓鏃舵妸鏈湴jar鍖呬篃寮曞叆杩涘幓 -->
                 <configuration>
                     <includeSystemScope>true</includeSystemScope>
-                    <mainClass>com.mojian.NeatAdminApplication</mainClass>
+                    <mainClass>com.boylu.NeatAdminApplication</mainClass>
                 </configuration>
             </plugin>
-            <!--添加配置跳过测试-->
+            <!--娣诲姞閰嶇疆璺宠繃娴嬭瘯-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -80,7 +80,7 @@
             </plugin>
         </plugins>
 
-        <!-- 固定Jar包名字 -->
-        <finalName>mojian-blog</finalName>
+        <!-- 鍥哄畾Jar鍖呭悕瀛?-->
+        <finalName>boylu-blog</finalName>
     </build>
 </project> 

@@ -5,13 +5,12 @@
     class="custom-carousel"
   >
     <el-carousel-item v-for="(slide, index) in slides" :key="index">
-      <img
-        v-lazy="getLazyImage(slide.cover)"
-        :key="resolveImage(slide.cover)"
-        :data-origin="resolveImage(slide.cover)"
-        :alt="slide.title"
-        @error="handleImageError"
-      >
+      <SmartImage
+        class="carousel-image"
+        :image="resolveSlideImage(slide)"
+        :priority="index === 0"
+        sizes="(max-width: 768px) 100vw, 960px"
+      />
       <div class="slide-content">
         <h3>{{ slide.title }}</h3>
         <p>{{ slide.description }}</p>
@@ -25,10 +24,20 @@
 </template>
 
 <script>
-import { resolveImageUrl, retryImageLoad } from '@/utils/image'
+import Carousel from 'element-ui/lib/carousel'
+import CarouselItem from 'element-ui/lib/carousel-item'
+import 'element-ui/lib/theme-chalk/carousel.css'
+import 'element-ui/lib/theme-chalk/carousel-item.css'
+import { resolveImageUrl } from '@/utils/image'
+import SmartImage from '@/components/common/SmartImage.vue'
 
 export default {
   name: 'Carousel',
+  components: {
+    ElCarousel: Carousel,
+    ElCarouselItem: CarouselItem,
+    SmartImage
+  },
   props: {
     slides: {
       type: Array,
@@ -39,17 +48,20 @@ export default {
     resolveImage(url) {
       return resolveImageUrl(url, this.$store.state.defaultImage)
     },
-    getLazyImage(url) {
-      const src = this.resolveImage(url)
-      const fallback = this.resolveImage(this.$store.state.defaultImage)
-      return {
-        src,
-        error: fallback,
-        loading: fallback
+    resolveSlideImage(slide) {
+      if (slide.coverImage) {
+        return {
+          ...slide.coverImage,
+          alt: slide.coverImage.alt || slide.title
+        }
       }
-    },
-    handleImageError(e) {
-      retryImageLoad(e.target, this.$store.state.defaultImage)
+      return {
+        alt: slide.title,
+        width: 1600,
+        height: 900,
+        dominantColor: '#eef4ff',
+        fallback: this.resolveImage(slide.cover)
+      }
     }
   }
 }
@@ -72,10 +84,8 @@ export default {
 
 .el-carousel__item {
   width: 100%;
-  img {
-    width: 100%;
+  .carousel-image {
     height: 100%;
-    object-fit: cover;
   }
 }
 

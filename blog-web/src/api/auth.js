@@ -102,6 +102,36 @@ export function getAuthRenderApi(source) {
   })
 } 
 
+/**
+ * 获取第三方账号绑定授权地址
+ */
+export function getAuthBindRenderApi(source) {
+  return request({
+    url: `/api/auth/bind/render/${source}`,
+    method: 'get',
+  })
+}
+
+/**
+ * 获取当前用户第三方账号绑定列表
+ */
+export function getAuthBindingsApi() {
+  return request({
+    url: '/api/auth/bindings',
+    method: 'get',
+  })
+}
+
+/**
+ * 解除第三方账号绑定
+ */
+export function unbindAuthApi(source) {
+  return request({
+    url: `/api/auth/bind/${source}`,
+    method: 'delete',
+  })
+}
+
 
 // 获取验证码
 export function getCaptchaApi() {

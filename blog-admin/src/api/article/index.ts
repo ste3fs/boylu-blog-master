@@ -46,6 +46,22 @@ export function updateStatusApi(data: any) {
     data
   })
 }
+
+// 推送文章到百度
+export function pushBaiduApi(id: any) {
+  return request({
+    url: `/sys/article/pushBaidu/${id}`,
+    method: 'post'
+  })
+}
+
+// 批量推送最近文章到百度
+export function pushBaiduRecentApi() {
+  return request({
+    url: `/sys/article/pushBaiduRecent`,
+    method: 'post'
+  })
+}
 // 删除文章
 export function deleteArticleApi(ids: any) {
   return request({
