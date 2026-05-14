@@ -1,4 +1,4 @@
-﻿package com.boylu.common;
+package com.boylu.common;
 
 /**
  * Redis常量
@@ -142,4 +142,31 @@ public class RedisConstants {
      * 鏂囦欢璁块棶缂撳瓨
      */
     public static final String FILE_VIEW_CACHE_KEY = "file:view:";
+
+    /**
+     * 首页文章列表缓存
+     */
+    public static final String HOME_POSTS_CACHE_KEY = "home:posts:v1";
+
+    /**
+     * 文章详情缓存
+     */
+    public static final String ARTICLE_DETAIL_CACHE_KEY = "article:detail:v2:";
+
+    /**
+     * OAuth 账号绑定 state
+     */
+    public static final String OAUTH_BIND_STATE = "oauth:bind:state:";
+
+    /**
+     * 性能监控：文章详情加载
+     */
+    public static final String PERF_ARTICLE_LOAD_TOTAL = "perf:article:load:total:";
+    public static final String PERF_ARTICLE_LOAD_OVER_3S = "perf:article:load:over3s:";
+
+    /**
+     * 性能监控：上传成功率
+     */
+    public static final String PERF_UPLOAD_TOTAL = "perf:upload:total:";
+    public static final String PERF_UPLOAD_FAILED = "perf:upload:failed:";
 }

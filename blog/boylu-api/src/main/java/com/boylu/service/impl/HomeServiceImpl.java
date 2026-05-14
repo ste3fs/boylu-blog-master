@@ -1,6 +1,7 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import cn.hutool.http.HttpUtil;
+import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.boylu.common.Constants;
@@ -33,6 +34,28 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class HomeServiceImpl implements HomeService {
+
+    private static final int HOT_SEARCH_TIMEOUT = 8000;
+    private static final String HOT_SEARCH_CACHE_KEY_PREFIX = "hot_search:";
+    private static final long HOT_SEARCH_CACHE_TTL_MINUTES = 15L;
+
+    private static final Map<String, List<String>> HOT_SEARCH_FALLBACK_URLS;
+
+    static {
+        Map<String, List<String>> fallbackUrls = new HashMap<>();
+        fallbackUrls.put("weibo", Arrays.asList(
+                "https://api.zxz.ee/api/hot/?type=weibo",
+                "https://v2.xxapi.cn/api/weibohot"
+        ));
+        fallbackUrls.put("zhihu", Collections.singletonList("https://api.zxz.ee/api/hot/?type=zhihu"));
+        fallbackUrls.put("toutiao", Arrays.asList(
+                "https://api.zxz.ee/api/hot/?type=toutiao",
+                "https://dabenshi.cn/other/api/hot.php?type=toutiaoHot"
+        ));
+        fallbackUrls.put("baidu", Collections.singletonList("https://v2.xxapi.cn/api/baiduhot"));
+        fallbackUrls.put("csdn", Collections.singletonList("https://v2.xxapi.cn/api/csdnhot"));
+        HOT_SEARCH_FALLBACK_URLS = Collections.unmodifiableMap(fallbackUrls);
+    }
 
     private final SysWebConfigMapper sysWebConfigMapper;
 
@@ -89,21 +112,221 @@ public class HomeServiceImpl implements HomeService {
 
     @Override
     public JSONObject getHotSearch(String type) {
-        if (!StringUtils.hasText(coderutilAccessKey) || !StringUtils.hasText(coderutilSecretKey)) {
-            log.warn("CoderUtil hot search credentials are not configured.");
+        String normalizedType = normalizeHotSearchType(type);
+        String cacheKey = HOT_SEARCH_CACHE_KEY_PREFIX + normalizedType;
+        JSONObject cachedResult = getCachedHotSearch(cacheKey);
+        if (hasHotSearchData(cachedResult)) {
+            cachedResult.put("source", "cache");
+            return cachedResult;
+        }
+
+        if (StringUtils.hasText(coderutilAccessKey) && StringUtils.hasText(coderutilSecretKey)) {
+            HashMap<String, Object> paramMap = new HashMap<>();
+            paramMap.put("access-key", coderutilAccessKey);
+            paramMap.put("secret-key", coderutilSecretKey);
+            String url = "https://www.coderutil.com/api/resou/v1/" + normalizedType;
+            try {
+                JSONObject result = normalizeHotSearchResult(normalizedType, parseHotSearchResponse(HttpUtil.get(url, paramMap)));
+                if (hasHotSearchData(result)) {
+                    cacheHotSearch(cacheKey, result);
+                    return result;
+                }
+                log.warn("CoderUtil hot search returned empty data, type={}", normalizedType);
+            } catch (Exception e) {
+                log.warn("Failed to fetch CoderUtil hot search, type={}", normalizedType, e);
+            }
+        } else {
+            log.warn("CoderUtil hot search credentials are not configured, using fallback source.");
+        }
+
+        JSONObject fallbackResult = getFallbackHotSearch(normalizedType);
+        cacheHotSearch(cacheKey, fallbackResult);
+        return fallbackResult;
+    }
+
+    private JSONObject getCachedHotSearch(String cacheKey) {
+        try {
+            Object cached = redisUtil.get(cacheKey);
+            if (cached == null) {
+                return null;
+            }
+            if (cached instanceof JSONObject) {
+                return (JSONObject) cached;
+            }
+            return JSONObject.parseObject(cached.toString());
+        } catch (Exception e) {
+            redisUtil.delete(cacheKey);
+            log.warn("Failed to parse hot search cache, key={}", cacheKey, e);
+            return null;
+        }
+    }
+
+    private void cacheHotSearch(String cacheKey, JSONObject result) {
+        if (!hasHotSearchData(result)) {
+            return;
+        }
+        redisUtil.set(cacheKey, result.toJSONString(), HOT_SEARCH_CACHE_TTL_MINUTES, TimeUnit.MINUTES);
+    }
+
+    private JSONObject getFallbackHotSearch(String type) {
+        List<String> urls = HOT_SEARCH_FALLBACK_URLS.get(type);
+        if (urls == null || urls.isEmpty()) {
             return emptyHotSearchResult();
         }
 
-        HashMap<String, Object> paramMap = new HashMap<>();
-        paramMap.put("access-key", coderutilAccessKey);
-        paramMap.put("secret-key", coderutilSecretKey);
-        String url = "https://www.coderutil.com/api/resou/v1/" + type;
+        for (String url : urls) {
+            try {
+                JSONObject result = normalizeHotSearchResult(type, parseHotSearchResponse(HttpUtil.get(url, HOT_SEARCH_TIMEOUT)));
+                if (hasHotSearchData(result)) {
+                    result.put("source", "fallback");
+                    return result;
+                }
+                log.warn("Fallback hot search returned empty data, type={}, url={}", type, url);
+            } catch (Exception e) {
+                log.warn("Failed to fetch fallback hot search, type={}, url={}", type, url, e);
+            }
+        }
+
+        return emptyHotSearchResult();
+    }
+
+    private JSONObject parseHotSearchResponse(String response) {
+        if (!StringUtils.hasText(response)) {
+            return new JSONObject();
+        }
+        int jsonStart = response.indexOf('{');
+        if (jsonStart > 0) {
+            response = response.substring(jsonStart);
+        }
+        return JSONObject.parseObject(response);
+    }
+
+    private JSONObject normalizeHotSearchResult(String type, JSONObject source) {
+        JSONArray rawList = getHotSearchArray(source);
+        JSONArray normalizedList = new JSONArray();
+        for (int i = 0; i < rawList.size(); i++) {
+            JSONObject rawItem = rawList.getJSONObject(i);
+            if (rawItem == null) {
+                continue;
+            }
+
+            String keyword = firstNonBlank(rawItem, "keyword", "title", "word", "name");
+            if (!StringUtils.hasText(keyword)) {
+                continue;
+            }
+
+            JSONObject item = new JSONObject();
+            item.put("keyword", keyword);
+            item.put("title", keyword);
+            item.put("url", firstNonBlank(rawItem, "url", "link", "mobileUrl", "mobilUrl"));
+            if (!StringUtils.hasText(item.getString("url"))) {
+                item.put("url", buildHotSearchUrl(type, keyword));
+            }
+            item.put("summary", firstNonBlank(rawItem, "summary", "desc", "description"));
+            item.put("tag", firstNonBlank(rawItem, "tag", "label", "label_desc", "status"));
+            item.put("type", type);
+            item.put("trend", firstNonBlank(rawItem, "trend", "status"));
+            item.put("hotValue", parseHotValue(firstNonBlank(rawItem, "hotValue", "hot", "hot_value", "num", "extra", "viewCount")));
+            item.put("rank", rawItem.getOrDefault("rank", rawItem.getOrDefault("index", i + 1)));
+            normalizedList.add(item);
+        }
+
+        JSONObject result = new JSONObject();
+        result.put("data", normalizedList);
+        return result;
+    }
+
+    private JSONArray getHotSearchArray(JSONObject source) {
+        if (source == null) {
+            return new JSONArray();
+        }
+
+        Object data = source.get("data");
+        if (data instanceof JSONArray) {
+            return (JSONArray) data;
+        }
+        if (data instanceof JSONObject) {
+            JSONObject dataObject = (JSONObject) data;
+            JSONArray nestedData = dataObject.getJSONArray("data");
+            if (nestedData != null) {
+                return nestedData;
+            }
+            JSONArray list = dataObject.getJSONArray("list");
+            if (list != null) {
+                return list;
+            }
+        }
+
+        JSONArray list = source.getJSONArray("list");
+        return list == null ? new JSONArray() : list;
+    }
+
+    private boolean hasHotSearchData(JSONObject result) {
+        JSONArray data = result == null ? null : result.getJSONArray("data");
+        return data != null && !data.isEmpty();
+    }
+
+    private String normalizeHotSearchType(String type) {
+        if (!StringUtils.hasText(type)) {
+            return "weibo";
+        }
+        String normalizedType = type.trim().toLowerCase(Locale.ROOT);
+        return HOT_SEARCH_FALLBACK_URLS.containsKey(normalizedType) ? normalizedType : "weibo";
+    }
+
+    private String firstNonBlank(JSONObject object, String... fields) {
+        for (String field : fields) {
+            String value = object.getString(field);
+            if (StringUtils.hasText(value)) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private long parseHotValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return 0L;
+        }
+
+        String normalized = value.replace(",", "").replace(" ", "").trim();
+        double multiplier = 1D;
+        if (normalized.contains("亿")) {
+            multiplier = 100000000D;
+        } else if (normalized.contains("万")) {
+            multiplier = 10000D;
+        }
+
+        String number = normalized.replaceAll("[^0-9.]", "");
+        if (!StringUtils.hasText(number)) {
+            return 0L;
+        }
+
         try {
-            String result = HttpUtil.get(url, paramMap);
-            return JSONObject.parseObject(result);
+            return Math.round(Double.parseDouble(number) * multiplier);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private String buildHotSearchUrl(String type, String keyword) {
+        try {
+            String encodedKeyword = java.net.URLEncoder.encode(keyword, "UTF-8");
+            if ("weibo".equals(type)) {
+                return "https://s.weibo.com/weibo?q=" + encodedKeyword;
+            }
+            if ("zhihu".equals(type)) {
+                return "https://www.zhihu.com/search?type=content&q=" + encodedKeyword;
+            }
+            if ("toutiao".equals(type)) {
+                return "https://so.toutiao.com/search?keyword=" + encodedKeyword;
+            }
+            if ("csdn".equals(type)) {
+                return "https://so.csdn.net/so/search?q=" + encodedKeyword;
+            }
+            return "https://www.baidu.com/s?wd=" + encodedKeyword;
         } catch (Exception e) {
-            log.warn("Failed to fetch CoderUtil hot search, type={}", type, e);
-            return emptyHotSearchResult();
+            return "https://www.baidu.com";
         }
     }
 

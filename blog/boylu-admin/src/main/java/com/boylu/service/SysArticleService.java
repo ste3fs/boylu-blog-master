@@ -1,4 +1,4 @@
-﻿package com.boylu.service;
+package com.boylu.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -46,6 +46,20 @@ public interface SysArticleService extends IService<SysArticle> {
      * @return
      */
     Boolean delete(List<Long> ids);
+
+    /**
+     * 手动推送单篇文章URL到百度
+     * @param articleId 文章ID
+     * @return 是否已触发推送
+     */
+    Boolean pushToBaidu(Long articleId);
+
+    /**
+     * 手动批量推送最近发布文章URL到百度
+     * @param limit 推送数量
+     * @return 实际触发数量
+     */
+    Integer pushRecentPublishedToBaidu(Integer limit);
 
     /**
      * 爬取文章

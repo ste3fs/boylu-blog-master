@@ -1,7 +1,7 @@
 <template>
   <div class="about-page">
     <el-card>
-      <div class="about-content" v-html="$store.state.webSiteInfo.aboutMe" ref="content">
+      <div class="about-content" v-html="$sanitizeHtml($store.state.webSiteInfo.aboutMe)" ref="content">
       </div>
       <mj-image-preview ref="imagePreview" />
     </el-card>

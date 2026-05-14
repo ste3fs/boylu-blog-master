@@ -86,6 +86,7 @@
 <script>
 import { getArticlesApi } from '@/api/article'
 import { getTagsApi } from '@/api/tags'
+import { escapeHtml } from '@/utils/htmlSanitizer'
 export default {
   name: 'SearchDialog',
   
@@ -141,7 +142,10 @@ export default {
           this.searchResults = res.data.records.map(item => ({
             ...item,
             title: this.truncateText(item.title, 50),
-            summary: this.truncateText(item.summary || item.content, 150)
+            createTime: item.createdAt || item.createTime,
+            summary: this.truncateText(item.excerpt || item.summary || item.content, 150),
+            categoryName: item.category || item.categoryName,
+            quantity: item.views || item.quantity || 0
           }))
           this.hasSearched = true
         } catch (error) {
@@ -163,9 +167,9 @@ export default {
      * 高亮关键词
      */
     highlightKeyword(text) {
-      if (!this.params.keyword || !text) return text
+      if (!this.params.keyword || !text) return escapeHtml(text || '')
       const keywords = this.params.keyword.split(/\s+/).filter(k => k)
-      let highlightedText = text
+      let highlightedText = escapeHtml(text)
       
       keywords.forEach(keyword => {
         const regex = new RegExp(`(${this.escapeRegExp(keyword)})`, 'gi')
@@ -223,6 +227,7 @@ export default {
      * 格式化日期
      */
     formatDate(date) {
+      if (!date) return ''
       return new Date(date).toLocaleDateString('zh-CN', {
         year: 'numeric',
         month: 'long',
@@ -469,4 +474,4 @@ export default {
     transform: rotate(360deg);
   }
 }
-</style> 
+</style>

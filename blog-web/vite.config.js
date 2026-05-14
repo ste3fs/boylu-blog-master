@@ -24,6 +24,14 @@ export default defineConfig(({ command, mode }) => {
                 rewrite: (path) =>
                   path.replace(new RegExp("^" + env.VITE_APP_BASE_API), ""),
               },
+              '/localFile': {
+                changeOrigin: true,
+                target: env.VITE_APP_API_URL,
+              },
+              '/img': {
+                changeOrigin: true,
+                target: env.VITE_APP_API_URL,
+              },
             },
         },
         plugins: [

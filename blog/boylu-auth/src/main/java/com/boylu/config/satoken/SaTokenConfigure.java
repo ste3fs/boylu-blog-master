@@ -1,4 +1,4 @@
-﻿package com.boylu.config.satoken;
+package com.boylu.config.satoken;
 
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.stp.StpUtil;
@@ -8,27 +8,72 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class SaTokenConfigure implements WebMvcConfigurer {
-    // 注册拦截器
+
+    private static final String[] PUBLIC_PATHS = new String[]{
+            "/auth/login",
+            "/auth/getCaptcha",
+            "/auth/verify",
+            "/swagger-ui/**",
+            "/webjars/**",
+            "/v3/api-docs/**",
+            "/doc.html",
+            "/favicon.ico",
+            "/swagger-resources",
+            "/api/auth/render/**",
+            "/api/auth/callback/**",
+            "/api/sendEmailCode",
+            "/api/email/register",
+            "/api/email/forgot",
+            "/api/wechat/getCode",
+            "/api/wechat/isLogin/**",
+            "/api/wechat/appletLogin/**",
+            "/api/webConfig",
+            "/api/getNotice",
+            "/api/getHotSearch/**",
+            "/api/report",
+            "/api/article/list",
+            "/api/article/home-list",
+            "/api/article/detail/**",
+            "/api/article/archive",
+            "/api/article/categories",
+            "/api/article/categorie-all",
+            "/api/article/getCarousels",
+            "/api/article/getRecommends",
+            "/api/album/list",
+            "/api/album/detail/**",
+            "/api/album/photos/**",
+            "/api/album/verify/**",
+            "/api/comment/list",
+            "/api/friend/list",
+            "/api/friend/apply",
+            "/api/message/list",
+            "/api/message/add",
+            "/api/moment/list",
+            "/api/tag/list",
+            "/api/resource/list",
+            "/api/resource/verify",
+            "/api/perf/report",
+            "/wechat/**",
+            "/img/**",
+            "/localFile/**",
+            "/file/content/**",
+            "/file/view/**",
+            "/file/by-url",
+            "/file/by-url/**",
+            "/boylu/file/content/**",
+            "/boylu/file/view/**",
+            "/boylu/file/by-url",
+            "/boylu/file/by-url/**",
+            "/mojian/file/content/**",
+            "/mojian/file/view/**",
+            "/mojian/file/by-url",
+            "/mojian/file/by-url/**"
+    };
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 注册 Sa-Token 拦截器，定义详细的拦截路由
         registry.addInterceptor(new SaInterceptor(handle -> StpUtil.checkLogin()))
                 .addPathPatterns("/**")
-                .excludePathPatterns(
-                        "/auth/login",
-                        "/auth/logout",
-                        "/auth/verify",
-                        "/swagger-ui/**",          // knife4j接口文档
-                        "/webjars/**",        // knife4j相关资源
-                        "/v3/api-docs/**",     // openapi接口文档
-                        "/doc.html",     // openapi接口文档
-                        "/favicon.ico",     // openapi接口文档
-                        "/swagger-resources",
-                        "/api/**",
-                        "/wechat/**",
-                        "/localFile/**",
-                        "/file/content/**",
-                        "/file/view/**"
-                );
+                .excludePathPatterns(PUBLIC_PATHS);
     }
 }

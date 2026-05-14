@@ -51,7 +51,7 @@
         <div class="friends-grid">
           <div v-for="friend in friends" :key="friend.id" class="friend-card" @click="visitFriend(friend.url)">
             <div class="friend-avatar">
-              <img v-lazy="friend.avatar" :key="friend.avatar" :alt="friend.name">
+              <img v-lazy="resolveImage(friend.avatar)" :key="resolveImage(friend.avatar)" :alt="friend.name">
               <div class="status" :class="{ online: friend.online }"></div>
             </div>
             <div class="friend-info">
@@ -135,6 +135,7 @@
 
 <script>
 import { getFriendsApi, applyFriendApi } from '@/api/friends'
+import { resolveImageUrl } from '@/utils/image'
 
 export default {
   name: 'Friends',
@@ -179,6 +180,9 @@ export default {
   methods: {
     visitFriend(url) {
       window.open(url, '_blank')
+    },
+    resolveImage(url) {
+      return resolveImageUrl(url, this.$store.state.defaultImage)
     },
     handleApply() {
       this.form = {

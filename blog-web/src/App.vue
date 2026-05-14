@@ -1,92 +1,143 @@
 <template>
   <div id="app">
-    <MobileMenu />
-    <SearchDialog />
+    <div v-if="!siteBootstrapped" class="app-shell-skeleton" aria-hidden="true">
+      <div class="app-shell-skeleton__header"></div>
+      <div class="app-shell-skeleton__hero"></div>
+      <div class="app-shell-skeleton__cards">
+        <span v-for="n in 3" :key="n" class="app-shell-skeleton__card"></span>
+      </div>
+    </div>
+    <MobileMenu v-if="deferredUiReady" />
+    <SearchDialog v-if="deferredUiReady" />
     <TheHeader v-if="showShellUi" />
     <router-view :class="{ 'main-container': showShellUi }" />
     <TheFooter v-if="showShellUi" />
-    <FloatingButtons v-if="showShellUi" />
-    <AiFloatingAssistant v-if="showShellUi && showAiFloatingAssistant" />
-    <Lantern v-if="showShellUi" />
-    <RandomVideo v-if="showShellUi" />
+    <FloatingButtons v-if="showShellUi && deferredUiReady" />
+    <Lantern v-if="showShellUi && ambientUiReady" />
+    <RandomVideo v-if="showShellUi && ambientUiReady" />
     <div class="cursor-container"></div>
-    <ContextMenu ref="contextMenuRef" />
+    <ContextMenu v-if="deferredUiReady" ref="contextMenuRef" />
   </div>
 </template>
 
 <script>
 import TheHeader from '@/layout/Header/index.vue'
 import TheFooter from '@/layout/Footer/index.vue'
-import FloatingButtons from '@/components/common/FloatingButtons.vue'
-import AiFloatingAssistant from '@/components/ai/AiFloatingAssistant.vue'
 import { getWebConfigApi, reportApi,getNoticeApi } from '@/api/site'
 import { mapActions } from 'vuex'
 import { initTheme } from '@/utils/theme'
-import SearchDialog from '@/components/Search/index.vue'
-import MobileMenu from '@/layout/MobileMenu/index.vue'
-import Lantern from '@/components/Lanterns/index.vue'
-import RandomVideo from '@/components/RandomVideo/index.vue'
-import { getCookie,removeCookie } from '@/utils/cookie'
-import ContextMenu from '@/components/ContextMenu/index.vue'
+import { getCookie, getToken, removeCookie } from '@/utils/cookie'
+import { setSeoMeta, setStructuredData } from '@/utils/seo'
 
 export default {
   name: 'App',
   components: {
     TheHeader,
     TheFooter,
-    FloatingButtons,
-    AiFloatingAssistant,
-    SearchDialog,
-    MobileMenu,
-    Lantern,
-    RandomVideo,
-    ContextMenu,
+    FloatingButtons: () => import('@/components/common/FloatingButtons.vue'),
+    SearchDialog: () => import('@/components/Search/index.vue'),
+    MobileMenu: () => import('@/layout/MobileMenu/index.vue'),
+    Lantern: () => import('@/components/Lanterns/index.vue'),
+    RandomVideo: () => import('@/components/RandomVideo/index.vue'),
+    ContextMenu: () => import('@/components/ContextMenu/index.vue'),
+  },
+  data() {
+    return {
+      deferredUiReady: false,
+      ambientUiReady: false,
+      siteBootstrapped: false
+    }
   },
 
   computed: {
     showShellUi() {
       return !(this.$route && this.$route.meta && this.$route.meta.fullscreen)
-    },
-    showAiFloatingAssistant() {
-      return this.$route && this.$route.name === 'Home'
     }
   },
 
   async created() {
-    await reportApi()
-    const res = await getWebConfigApi()
-    this.setSiteInfo(res.data)
-    this.$store.commit('setVisitorAccess', res.extra.visitorCount)
-    this.$store.commit('setSiteAccess', res.extra.blogViewsCount)
-    this.$store.commit(
-      'setDailyVisitorAccess',
-      Object.prototype.hasOwnProperty.call(res.extra || {}, 'dailyVisitorCount')
-        ? res.extra.dailyVisitorCount
-        : null
-    )
-    this.$store.commit(
-      'setDailySiteAccess',
-      Object.prototype.hasOwnProperty.call(res.extra || {}, 'dailyBlogViewsCount')
-        ? res.extra.dailyBlogViewsCount
-        : null
-    )
-
-    const noticeRes = await getNoticeApi()
-    this.$store.commit('SET_NOTICE', noticeRes.data)
     initTheme()
+    this.initWebsiteSeo()
     await this.handleThirdPartyLogin()
-    //这里等待第三方登录处理完成在获取用户信息
-    await this.getUserInfo();
-
-    //跳转到缓存地址
     const url = this.resolveRedirectTarget(getCookie('redirectUrl'))
     if (url) {
       removeCookie('redirectUrl')
       this.$router.replace(url).catch(() => {})
     }
+    this.bootstrapAppData()
   },
   methods: {
     ...mapActions(['setSiteInfo','getUserInfo']),
+    scheduleIdleTask(callback, timeout = 1200) {
+      if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(callback, { timeout })
+        return
+      }
+      window.setTimeout(callback, Math.min(timeout, 1200))
+    },
+    bootstrapAppData() {
+      getWebConfigApi()
+        .then(res => {
+          this.setSiteInfo(res.data)
+          this.$store.commit('setVisitorAccess', res.extra.visitorCount)
+          this.$store.commit('setSiteAccess', res.extra.blogViewsCount)
+          this.$store.commit(
+            'setDailyVisitorAccess',
+            Object.prototype.hasOwnProperty.call(res.extra || {}, 'dailyVisitorCount')
+              ? res.extra.dailyVisitorCount
+              : null
+          )
+          this.$store.commit(
+            'setDailySiteAccess',
+            Object.prototype.hasOwnProperty.call(res.extra || {}, 'dailyBlogViewsCount')
+              ? res.extra.dailyBlogViewsCount
+              : null
+          )
+          this.initWebsiteSeo(res.data)
+          this.siteBootstrapped = true
+        })
+        .catch(() => {
+          this.siteBootstrapped = true
+        })
+
+      getNoticeApi()
+        .then(noticeRes => {
+          this.$store.commit('SET_NOTICE', noticeRes.data)
+        })
+        .catch(() => {})
+
+      this.scheduleIdleTask(() => {
+        reportApi().catch(() => {})
+        if (getToken()) {
+          this.getUserInfo().catch(() => {})
+        }
+      }, 1800)
+    },
+    initWebsiteSeo(siteInfo = {}) {
+      const title = siteInfo.name || 'boylu博客-一个专注于技术分享的博客平台'
+      const description = siteInfo.authorInfo || 'boylu 的个人技术博客，记录开发实践与学习笔记'
+      const keywords = siteInfo.keyword || siteInfo.keywords || 'boylu博客,技术博客,编程学习'
+      setSeoMeta({
+        title,
+        description,
+        keywords,
+        canonicalUrl: window.location.pathname + window.location.search
+      })
+      setStructuredData('schema-website', {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: siteInfo.name || 'boylu博客',
+        url: window.location.origin,
+        description
+      })
+      setStructuredData('schema-person', {
+        '@context': 'https://schema.org',
+        '@type': 'Person',
+        name: siteInfo.author || 'boylu',
+        url: window.location.origin,
+        image: siteInfo.authorAvatar || `${window.location.origin}/boylu-avatar.jpg`
+      })
+    },
 
     /**
      * 处理第三方登录用回调逻辑
@@ -138,6 +189,9 @@ export default {
     },
 
     initContextMenu() {
+      if (!this.$refs.contextMenuRef) {
+        return
+      }
       const handleContextMenu = (e) => {
         this.$refs.contextMenuRef.show(e)
       }
@@ -157,20 +211,69 @@ export default {
     }
   },
   mounted() {
-    this.initCursorEffect()
-    this.initContextMenu()
+    this.scheduleIdleTask(() => {
+      this.deferredUiReady = true
+      this.$nextTick(() => {
+        this.initContextMenu()
+      })
+    }, 900)
+    this.scheduleIdleTask(() => {
+      this.ambientUiReady = true
+      this.initCursorEffect()
+    }, 2200)
   }
 }
 </script>
 
 <style lang="scss">
-
-@import 'animate.css';
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
 * {
   margin: 0;
   padding: 0;
-  font-family: "font";
+  font-family: var(--font-sans);
   box-sizing: border-box;
+}
+
+.app-shell-skeleton {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.app-shell-skeleton__header,
+.app-shell-skeleton__hero,
+.app-shell-skeleton__card {
+  background: linear-gradient(90deg, rgba(64, 158, 255, 0.08) 25%, rgba(64, 158, 255, 0.18) 37%, rgba(64, 158, 255, 0.08) 63%);
+  background-size: 400% 100%;
+  animation: appSkeletonShimmer 1.4s ease infinite;
+  border-radius: 14px;
+}
+
+.app-shell-skeleton__header {
+  height: 64px;
+  margin-bottom: 16px;
+}
+
+.app-shell-skeleton__hero {
+  height: 220px;
+  margin-bottom: 16px;
+}
+
+.app-shell-skeleton__cards {
+  display: grid;
+  gap: 16px;
+}
+
+.app-shell-skeleton__card {
+  display: block;
+  height: 140px;
+}
+
+@keyframes appSkeletonShimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
 }
 </style> 

@@ -1,4 +1,4 @@
-﻿package com.boylu.dto;
+package com.boylu.dto;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -21,9 +21,7 @@ public class LoginDTO {
     @ApiModelProperty(value = "登录来源 PC ADMIN")
     private String source;
 
-    @NotBlank(message = "验证码nonceStr不能为空")
     private String nonceStr;
 
-    @NotBlank(message = "验证码value不能为空")
     private String value;
 }

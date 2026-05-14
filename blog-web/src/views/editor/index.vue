@@ -40,7 +40,7 @@
 
                     <div class="content-card flex-card">
                         <el-form-item label="文章内容" prop="contentMd" class="mb-20">
-                            <mavon-editor
+                            <LazyMavonEditor
                                 placeholder="输入文章内容..."
                                 style="height: 500px; width: 100%"
                                 ref="mdRef"
@@ -126,17 +126,26 @@
 </template>
 
 <script>
+import Option from 'element-ui/lib/option'
+import Select from 'element-ui/lib/select'
+import Switch from 'element-ui/lib/switch'
+import 'element-ui/lib/theme-chalk/option.css'
+import 'element-ui/lib/theme-chalk/select.css'
+import 'element-ui/lib/theme-chalk/select-dropdown.css'
+import 'element-ui/lib/theme-chalk/switch.css'
 import { uploadFileApi, deleteFileApi } from '@/api/file'
 import { createArticleApi, updateArticleApi, getArticleInfoApi } from '@/api/article'
 import { getTagsApi,getCategoriesApi } from '@/api/tags'
 import { getDictDataApi } from '@/api/dict'
-import { mavonEditor } from 'mavon-editor'
-import 'mavon-editor/dist/css/index.css'
+import LazyMavonEditor from '@/components/editor/LazyMavonEditor.vue'
 
 export default {
     name: 'Editor',
     components: {
-        mavonEditor
+        ElOption: Option,
+        ElSelect: Select,
+        ElSwitch: Switch,
+        LazyMavonEditor
     },
     data() {
         return {
@@ -284,6 +293,10 @@ export default {
             if (this.isSubmitting) return
             this.$refs.articleForm.validate(valid => {
                 if (!valid) return
+                if (!this.$refs.mdRef) {
+                    this.$message.warning('编辑器仍在加载，请稍后再试')
+                    return
+                }
                 this.isSubmitting = true
                 this.articleForm.content = this.$refs.mdRef.d_render;
                 const api = this.articleForm.id ? updateArticleApi : createArticleApi

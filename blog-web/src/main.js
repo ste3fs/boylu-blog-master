@@ -4,31 +4,29 @@ import router from './router'
 import store from './store'
 import '@/styles/global.scss'
 import '@/styles/element-ui.scss'
-import gsap from 'gsap'
-import 'animate.css'
 import VueLazyload from 'vue-lazyload'
 import { setupElementUI } from '@/plugins/element-ui'
-
-import ScrollTrigger from 'gsap/ScrollTrigger'
-gsap.registerPlugin(ScrollTrigger)
+import { sanitizeHtml } from '@/utils/htmlSanitizer'
+import { registerServiceWorker } from '@/utils/sw'
 
 const lazyErrorImage = new URL('./assets/img-error.svg', import.meta.url).href
 const lazyLoadingImage = new URL('./assets/loading.svg', import.meta.url).href
 
 // 配置 vue-lazyload
 Vue.use(VueLazyload, {
-  preLoad: 1.3,
+  preLoad: 1.8,
   error: lazyErrorImage,
   loading: lazyLoadingImage,
-  attempt: 1,
+  attempt: 2,
   observer: true,
   observerOptions: {
-    rootMargin: '0px',
-    threshold: 0.1
+    rootMargin: '320px 0px',
+    threshold: 0.01
   }
 })
 
 setupElementUI(Vue)
+Vue.prototype.$sanitizeHtml = sanitizeHtml
 
 
 //表情组件
@@ -44,8 +42,6 @@ Vue.directive('click-outside', ClickOutside)
 import loading from './directives/loading'
 Vue.directive('loading', loading)
 
-//高亮
-import 'highlight.js/styles/atom-one-dark.css'
 import { animateOnScroll } from './directives/animate'
 Vue.directive('animate-on-scroll', animateOnScroll)
 
@@ -72,4 +68,6 @@ new Vue({
   router,
   store,
   render: h => h(App)
-}).$mount('#app') 
+}).$mount('#app')
+
+registerServiceWorker()

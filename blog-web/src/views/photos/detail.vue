@@ -41,7 +41,12 @@
           </div>
 
           <div class="album-hero__cover">
-            <img :src="heroCover" :data-origin="heroCover" :alt="album.name || 'album cover'" @error="handleHeroCoverError">
+            <SmartImage
+              class="album-hero__image"
+              :image="buildPhotoImage(heroCover, album.name || 'album cover', 1600, 1000)"
+              priority
+              sizes="(max-width: 900px) 100vw, 560px"
+            />
           </div>
         </div>
       </section>
@@ -57,12 +62,12 @@
         <div v-if="photos.length" class="photo-grid">
           <article v-for="(photo, index) in photos" :key="photo.url || index" class="photo-item">
             <button type="button" class="photo-card" @click="previewImage(index)">
-              <img
-                :src="resolvePhotoUrl(photo.url)"
-                :data-origin="resolvePhotoUrl(photo.url)"
-                :alt="photo.description || `photo-${index + 1}`"
-                @error="handlePhotoError"
-              >
+              <SmartImage
+                class="photo-card__image"
+                :image="buildPhotoImage(resolvePhotoUrl(photo.url), photo.description || `photo-${index + 1}`, 1200, 1200)"
+                :priority="index < 6"
+                sizes="(max-width: 768px) 50vw, 33vw"
+              />
               <div class="photo-card__overlay">
                 <div class="photo-card__info">
                   <h3>{{ photo.description || `照片 ${index + 1}` }}</h3>
@@ -111,13 +116,15 @@
 <script>
 import { getAlbumPhotosApi, verifyAlbumPasswordApi, getAlbumDetailApi } from '@/api/album'
 import AlbumPasswordDialog from '@/views/photos/components/password.vue'
-import { resolveImageUrl, retryImageLoad } from '@/utils/image'
+import SmartImage from '@/components/common/SmartImage.vue'
+import { resolveImageUrl } from '@/utils/image'
 import { formatDate } from '@/utils/time'
 
 export default {
   name: 'AlbumDetail',
   components: {
-    AlbumPasswordDialog
+    AlbumPasswordDialog,
+    SmartImage
   },
   data() {
     return {
@@ -150,11 +157,14 @@ export default {
     resolvePhotoUrl(url) {
       return resolveImageUrl(url, this.album.cover || this.$store.state.defaultImage)
     },
-    handleHeroCoverError(event) {
-      retryImageLoad(event.target, this.$store.state.defaultImage)
-    },
-    handlePhotoError(event) {
-      retryImageLoad(event.target, this.album.cover || this.$store.state.defaultImage)
+    buildPhotoImage(url, alt, width, height) {
+      return {
+        alt,
+        width,
+        height,
+        dominantColor: '#eef4ff',
+        fallback: resolveImageUrl(url, this.$store.state.defaultImage)
+      }
     },
     previewImage(index) {
       if (!this.images.length) {
@@ -332,10 +342,9 @@ export default {
   aspect-ratio: 16 / 10;
   background: rgba(255, 255, 255, 0.72);
 
-  img {
+  .album-hero__image {
     width: 100%;
     height: 100%;
-    object-fit: cover;
     display: block;
   }
 }
@@ -375,10 +384,9 @@ export default {
   box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
   cursor: pointer;
 
-  img {
+  .photo-card__image {
     width: 100%;
     aspect-ratio: 1;
-    object-fit: cover;
     display: block;
   }
 }

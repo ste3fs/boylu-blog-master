@@ -13,6 +13,7 @@
             ref="commentInput"
             :placeholder="`写下你的评论...`"
             @input="handleCommentInput"
+            @paste.prevent="handleEditorPaste"
           ></div>
           <div class="editor-footer">
             <div class="editor-tools">
@@ -72,7 +73,7 @@
                 </button>
               </div>
             </div>
-            <div class="comment-text markdown-body" v-html="comment.content"></div>
+            <div class="comment-text markdown-body" v-html="$sanitizeHtml(comment.content)"></div>
 
             <!-- 回复列表 -->
             <div v-if="comment.children?.length" class="replies-list">
@@ -103,7 +104,7 @@
                       </button>
                     </div>
                   </div>
-                  <div class="reply-text markdown-body" v-html="reply.content"></div>
+                  <div class="reply-text markdown-body" v-html="$sanitizeHtml(reply.content)"></div>
 
                   <!-- 添加子评论的回复框 -->
                   <div  v-if="showReplyBox && activeReplyId === reply.id" class="reply-box">
@@ -112,6 +113,7 @@
                       contenteditable="true"
                       ref="childReplyInput"
                       @input="handleChildReplyInput"
+                      @paste.prevent="handleEditorPaste"
                       :placeholder="`回复 @${reply.nickname}`"
                     ></div>
                     <div class="editor-footer">
@@ -139,6 +141,7 @@
                 contenteditable="true"
                 ref="replyInput"
                 @input="handleReplyInput"
+                @paste.prevent="handleEditorPaste"
                 :placeholder="`回复 @${comment.nickname}`"
               ></div>
               <div class="editor-footer">
@@ -176,6 +179,8 @@ import { mapState } from "vuex";
 import { getCommentsApi, addCommentApi } from "@/api/article";
 import { formatTime } from "@/utils/time.js";
 import { getBrowserInfo } from "@/utils/browser.js";
+import { sanitizeCommentHtml } from "@/utils/htmlSanitizer";
+import { getToken } from "@/utils/cookie";
 
 export default {
   name: "Comment",
@@ -258,21 +263,34 @@ export default {
      * 处理主评论输入
      */
     handleCommentInput(e) {
-      this.commentContent = e.target.innerHTML;
+      this.commentContent = this.normalizeEditorHtml(e.target);
     },
 
     /**
      * 处理回复输入
      */
     handleReplyInput(e) {
-      this.replyContent = e.target.innerHTML;
+      this.replyContent = this.normalizeEditorHtml(e.target);
     },
 
     /**
      * 处理子回复输入
      */
     handleChildReplyInput(e) {
-      this.replyContent = e.target.innerHTML;
+      this.replyContent = this.normalizeEditorHtml(e.target);
+    },
+
+    normalizeEditorHtml(editor) {
+      const safeContent = sanitizeCommentHtml(editor?.innerHTML || "");
+      if (editor && editor.innerHTML !== safeContent) {
+        editor.innerHTML = safeContent;
+      }
+      return safeContent;
+    },
+
+    handleEditorPaste(event) {
+      const text = event.clipboardData?.getData("text/plain") || "";
+      document.execCommand("insertText", false, text);
     },
 
     /**
@@ -284,14 +302,20 @@ export default {
         this.$message.warning('评论内容不能为空');
         return;
       }
-      if (!this.userInfo) {
-        this.$message.error('请先登录');
+      if (!this.canSubmitAsLoginUser()) {
+        this.showLoginRequired();
         return;
       }
 
       try {
+        const safeContent = sanitizeCommentHtml(this.commentContent);
+        if (!safeContent) {
+          this.$message.warning('评论内容不能为空');
+          return;
+        }
+
         const newComment = {
-          content: this.commentContent,
+          content: safeContent,
           articleId: this.articleId,
           browser: this.browserInfo?.name + " " + this.browserInfo?.version,
         };
@@ -313,6 +337,10 @@ export default {
           }
         });
       } catch (error) {
+        if (this.isLoginError(error)) {
+          this.showLoginRequired();
+          return;
+        }
         this.$message.error(error.message || "评论失败");
       }
     },
@@ -327,14 +355,20 @@ export default {
         this.$message.warning('回复内容不能为空');
         return;
       }
-      if (!this.userInfo) {
-        this.$message.error('请先登录');
+      if (!this.canSubmitAsLoginUser()) {
+        this.showLoginRequired();
         return;
       }
       try {
         // 创建新回复对象
+        const safeContent = sanitizeCommentHtml(this.replyContent);
+        if (!safeContent) {
+          this.$message.warning('回复内容不能为空');
+          return;
+        }
+
         const newReply = {
-          content: this.replyContent,
+          content: safeContent,
           replyUserId: comment.userId,
           parentId: comment.id,
           articleId: this.articleId,
@@ -361,6 +395,10 @@ export default {
           }
         });
       } catch (error) {
+        if (this.isLoginError(error)) {
+          this.showLoginRequired();
+          return;
+        }
         this.$message.error(error.message || "回复失败");
       }
     },
@@ -431,34 +469,34 @@ export default {
      * 插入表情到主评论框
      */
     insertEmoji(emojiUrl) {
-      const img = `<img src="${emojiUrl}" class="emoji" style="width: 30px; height: 30px; vertical-align: middle;">`;
+      const img = sanitizeCommentHtml(`<img src="${emojiUrl}" class="emoji" alt="emoji">`);
       const editor = this.$refs.commentInput;
       editor.focus();
       document.execCommand('insertHTML', false, img);
-      this.commentContent = editor.innerHTML;
+      this.commentContent = this.normalizeEditorHtml(editor);
     },
 
     /**
      * 插入表情到回复框
      */
     insertReplyEmoji(emojiUrl) {
-      const img = `<img src="${emojiUrl}" class="emoji" style="width: 22px; height: 22px; vertical-align: middle;">`;
+      const img = sanitizeCommentHtml(`<img src="${emojiUrl}" class="emoji" alt="emoji">`);
       const editor = this.$refs.replyInput[0];
       editor.focus();
       document.execCommand('insertHTML', false, img);
-      this.replyContent = editor.innerHTML;
+      this.replyContent = this.normalizeEditorHtml(editor);
     },
     /**
      * 插入表情到子回复框
      */
     insertChildReplyEmoji(emojiUrl) {
-      const img = `<img src="${emojiUrl}" class="emoji" style="width: 22px; height: 22px; vertical-align: middle;">`;
+      const img = sanitizeCommentHtml(`<img src="${emojiUrl}" class="emoji" alt="emoji">`);
       const editor = this.$refs.childReplyInput[0];
       if (!editor) return;
       
       editor.focus();
       document.execCommand('insertHTML', false, img);
-      this.replyContent = editor.innerHTML;
+      this.replyContent = this.normalizeEditorHtml(editor);
     },
     /**
      * 格式化时间
@@ -476,8 +514,8 @@ export default {
      * 回复子评论
      */
     handleReplyChild(reply) {
-      if (!this.userInfo) {
-        this.$message.error("请先登录");
+      if (!this.canSubmitAsLoginUser()) {
+        this.showLoginRequired();
         return;
       }
       this.replyingTo = null;
@@ -498,10 +536,21 @@ export default {
         return;
       }
 
+      if (!this.canSubmitAsLoginUser()) {
+        this.showLoginRequired();
+        return;
+      }
+
       try {
+        const safeContent = sanitizeCommentHtml(this.replyContent);
+        if (!safeContent) {
+          this.$message.warning('回复内容不能为空');
+          return;
+        }
+
         const params = {
           articleId: this.articleId,
-          content: this.replyContent,
+          content: safeContent,
           parentId: reply.parentId || reply.id,
           replyUserId: reply.userId,
         };
@@ -515,9 +564,24 @@ export default {
         this.cancelReply();
         this.getComments();
       } catch (error) {
+        if (this.isLoginError(error)) {
+          this.showLoginRequired();
+          return;
+        }
         console.error("回复失败:", error);
         this.$message.error("回复失败，请重试");
       }
+    },
+    canSubmitAsLoginUser() {
+      return Boolean(this.userInfo && getToken());
+    },
+    showLoginRequired() {
+      this.$message.error("\u8bf7\u5148\u767b\u5f55\u540e\u8bc4\u8bba");
+    },
+    isLoginError(error) {
+      const message = String(error && error.message ? error.message : "");
+      return !getToken()
+        || /401|token|login|\u767b\u5f55|\u767b\u9646|\u672a\u767b\u5f55|\u8fc7\u671f|\u91cd\u65b0\u767b\u5f55/i.test(message);
     },
   },
   created() {
@@ -1216,6 +1280,12 @@ export default {
 .reply-text {
   color: var(--text-primary);
   line-height: 1.6;
+
+  :deep(img.emoji) {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+  }
 
   :deep(img) {
     // 使用 :deep 来处理 v-html 渲染的内容

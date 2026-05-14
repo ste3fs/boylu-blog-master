@@ -1,4 +1,4 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.thread.ThreadUtil;
@@ -47,7 +47,14 @@ public class ChatServiceImpl implements ChatService {
 
         //如果是文字类型的，就先敏感词过滤
         if (ChatTypeEnum.TEXT.getType().equals(chatSendMsgVo.getType())){
-            chatSendMsgVo.setContent(SensitiveUtil.filter(chatSendMsgVo.getContent()));
+            String sanitizedContent = HtmlSanitizerUtil.sanitizeUserRichText(chatSendMsgVo.getContent());
+            if (StringUtils.isBlank(sanitizedContent)) {
+                throw new ServiceException("消息内容不能为空");
+            }
+            chatSendMsgVo.setContent(SensitiveUtil.filter(sanitizedContent));
+            if (StringUtils.isNotBlank(chatSendMsgVo.getReplyContent())) {
+                chatSendMsgVo.setReplyContent(HtmlSanitizerUtil.sanitizeUserRichText(chatSendMsgVo.getReplyContent()));
+            }
         }
 
         ChatMsg chatMsg = BeanCopyUtil.copyObj(chatSendMsgVo, ChatMsg.class);

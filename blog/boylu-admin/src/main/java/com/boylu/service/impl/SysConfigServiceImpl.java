@@ -1,8 +1,9 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import java.util.List;
 
 import com.boylu.exception.ServiceException;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -61,7 +62,7 @@ public class SysConfigServiceImpl extends ServiceImpl<SysConfigMapper, SysConfig
      * 修改参数配置表
      */
     @Override
-    @CachePut(cacheNames = "sys_config", key = "#sysConfig.configKey")
+    @CachePut(cacheNames = "sys_config_v2", key = "#sysConfig.configKey")
     public SysConfig update(SysConfig sysConfig) {
         SysConfig obj = baseMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
                 .eq(SysConfig::getConfigKey, sysConfig.getConfigKey()));
@@ -77,12 +78,13 @@ public class SysConfigServiceImpl extends ServiceImpl<SysConfigMapper, SysConfig
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(cacheNames = "sys_config_v2", allEntries = true)
     public boolean deleteByIds(List<Long> ids) {
         return removeByIds(ids);
     }
 
     @Override
-    @Cacheable(cacheNames = "sys_config", key = "#key")
+    @Cacheable(cacheNames = "sys_config_v2", key = "#key")
     public SysConfig selectConfigByKey(String key) {
         return baseMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
                 .eq(SysConfig::getConfigKey, key));

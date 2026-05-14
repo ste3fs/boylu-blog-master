@@ -256,6 +256,8 @@
 </template>
 
 <script>
+import Tag from 'element-ui/lib/tag'
+import 'element-ui/lib/theme-chalk/tag.css'
 import Add from './components/add.vue'
 import { getDictDataApi } from '@/api/dict'
 import { getResourcesApi, verifyCodeApi } from '@/api/resources'
@@ -279,6 +281,7 @@ const CATEGORY_ICON_MAP = {
 export default {
   name: 'ResourcesView',
   components: {
+    ElTag: Tag,
     Add
   },
   data() {

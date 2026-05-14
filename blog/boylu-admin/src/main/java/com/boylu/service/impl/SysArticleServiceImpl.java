@@ -1,4 +1,4 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.thread.ThreadUtil;
@@ -16,9 +16,13 @@ import com.boylu.mapper.SysArticleMapper;
 import com.boylu.mapper.SysCategoryMapper;
 import com.boylu.mapper.SysTagMapper;
 import com.boylu.service.SysArticleService;
+import com.boylu.service.seo.BaiduPushService;
 import com.boylu.utils.AiUtil;
+import com.boylu.utils.CoverImageUtil;
+import com.boylu.utils.HtmlSanitizerUtil;
 import com.boylu.utils.LocalFileUrlNormalizeUtil;
 import com.boylu.utils.PageUtil;
+import com.boylu.utils.RedisUtil;
 import com.boylu.vo.article.ArticleListVo;
 import com.boylu.vo.article.SysArticleDetailVo;
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
@@ -47,6 +51,9 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
     private final AiUtil aiUtil;
     private final SysCategoryMapper sysCategoryMapper;
+    private final RedisUtil redisUtil;
+
+    private final BaiduPushService baiduPushService;
 
     @Override
     public IPage<ArticleListVo> selectPage(ArticleQueryDto articleQueryDto) {
@@ -59,6 +66,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
         SysArticleDetailVo sysArticleDetailVo = new SysArticleDetailVo();
         BeanUtils.copyProperties(sysArticle, sysArticleDetailVo);
+        sysArticleDetailVo.setCoverImage(CoverImageUtil.fromJson(sysArticle.getCoverImage(), sysArticle.getCover(), sysArticle.getTitle()));
         normalizeArticleDetail(sysArticleDetailVo);
 
         SysCategory sysCategory = sysCategoryMapper.selectById(sysArticle.getCategoryId());
@@ -76,14 +84,18 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
         SysArticle obj = new SysArticle();
         BeanUtils.copyProperties(sysArticle, obj);
+        obj.setCoverImage(resolveCoverImageJson(sysArticle));
         normalizeArticleFileUrls(obj);
         obj.setUserId(StpUtil.getLoginIdAsLong());
 
         //添加分类
         addCategory(sysArticle, obj);
         baseMapper.insert(obj);
+        clearHomePostsCache();
+        clearArticleDetailCache(obj.getId());
 
         addTags(sysArticle, obj);
+        triggerBaiduPushIfPublished(obj);
 
         ThreadUtil.execAsync(() -> {
             String res = aiUtil.send(obj.getContent() + "请提供一段简短的介绍描述该文章的内容");
@@ -104,6 +116,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
         SysArticle obj = new SysArticle();
         BeanUtils.copyProperties(sysArticle, obj);
+        obj.setCoverImage(resolveCoverImageJson(sysArticle));
         normalizeArticleFileUrls(obj);
 
         //没有管理员权限就只能修改自己的文章
@@ -116,10 +129,13 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
         addCategory(sysArticle, obj);
         baseMapper.updateById(obj);
+        clearHomePostsCache();
+        clearArticleDetailCache(obj.getId());
 
         //先删除标签在新增标签
         sysTagMapper.deleteArticleTagsByArticleIds(Collections.singletonList(obj.getId()));
         addTags(sysArticle, obj);
+        triggerBaiduPushIfPublished(obj);
         return true;
     }
 
@@ -139,7 +155,72 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
         baseMapper.deleteBatchIds(ids);
         sysTagMapper.deleteArticleTagsByArticleIds(ids);
+        clearHomePostsCache();
+        clearArticleDetailCache(ids);
         return true;
+    }
+
+    @Override
+    public boolean updateById(SysArticle entity) {
+        boolean updated = super.updateById(entity);
+        if (updated) {
+            clearHomePostsCache();
+            clearArticleDetailCache(entity.getId());
+            triggerBaiduPushIfPublished(entity);
+        }
+        return updated;
+    }
+
+    @Override
+    public Boolean pushToBaidu(Long articleId) {
+        if (articleId == null || articleId <= 0) {
+            throw new ServiceException("文章ID不合法");
+        }
+        SysArticle article = baseMapper.selectById(articleId);
+        if (article == null) {
+            throw new ServiceException("文章不存在");
+        }
+        if (article.getStatus() != Constants.YES) {
+            throw new ServiceException("仅已发布文章支持推送");
+        }
+        ThreadUtil.execAsync(() -> {
+            baiduPushService.pushArticleUrl(articleId);
+            SysArticle updateEntity = new SysArticle();
+            updateEntity.setId(articleId);
+            updateEntity.setIsBaiduPushed(1);
+            baseMapper.updateById(updateEntity);
+        });
+        return true;
+    }
+
+    @Override
+    public Integer pushRecentPublishedToBaidu(Integer limit) {
+        int safeLimit = Math.max(1, Math.min(limit == null ? 200 : limit, 500));
+        List<SysArticle> articles = baseMapper.selectList(new LambdaQueryWrapper<SysArticle>()
+                .select(SysArticle::getId, SysArticle::getStatus, SysArticle::getCreateTime)
+                .eq(SysArticle::getStatus, Constants.YES)
+                .eq(SysArticle::getIsBaiduPushed, 0)
+                .orderByDesc(SysArticle::getCreateTime)
+                .last("limit " + safeLimit));
+        if (articles == null || articles.isEmpty()) {
+            return 0;
+        }
+        List<String> urls = new ArrayList<String>();
+        List<Long> ids = new ArrayList<>();
+        for (SysArticle article : articles) {
+            if (article == null || article.getId() == null) {
+                continue;
+            }
+            urls.add("https://boylu.cn/article/" + article.getId());
+            ids.add(article.getId());
+        }
+        ThreadUtil.execAsync(() -> {
+            baiduPushService.pushUrls(urls, "manual-recent-" + safeLimit);
+            SysArticle updateEntity = new SysArticle();
+            updateEntity.setIsBaiduPushed(1);
+            baseMapper.update(updateEntity, new LambdaQueryWrapper<SysArticle>().in(SysArticle::getId, ids));
+        });
+        return urls.size();
     }
 
 
@@ -165,6 +246,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             normalizeArticleFileUrls(entity);
 
             baseMapper.insert(entity);
+            clearHomePostsCache();
             //为该文章添加标签
             List<Integer> tagIds = new ArrayList<>();
             tags.forEach(item ->{
@@ -213,7 +295,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             return;
         }
         article.setCover(LocalFileUrlNormalizeUtil.normalizeUrl(article.getCover()));
-        article.setContent(LocalFileUrlNormalizeUtil.normalizeText(article.getContent()));
+        article.setContent(HtmlSanitizerUtil.sanitizeUserRichText(LocalFileUrlNormalizeUtil.normalizeText(article.getContent())));
         article.setContentMd(LocalFileUrlNormalizeUtil.normalizeText(article.getContentMd()));
     }
 
@@ -224,5 +306,51 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         article.setCover(LocalFileUrlNormalizeUtil.normalizeUrl(article.getCover()));
         article.setContent(LocalFileUrlNormalizeUtil.normalizeText(article.getContent()));
         article.setContentMd(LocalFileUrlNormalizeUtil.normalizeText(article.getContentMd()));
+    }
+
+    private void clearHomePostsCache() {
+        redisUtil.delete(com.boylu.common.RedisConstants.HOME_POSTS_CACHE_KEY);
+    }
+
+    private void clearArticleDetailCache(Long articleId) {
+        if (articleId == null) {
+            return;
+        }
+        redisUtil.delete(com.boylu.common.RedisConstants.ARTICLE_DETAIL_CACHE_KEY + articleId);
+    }
+
+    private void clearArticleDetailCache(List<Long> articleIds) {
+        if (articleIds == null || articleIds.isEmpty()) {
+            return;
+        }
+        for (Long articleId : articleIds) {
+            clearArticleDetailCache(articleId);
+        }
+    }
+
+    private void triggerBaiduPushIfPublished(SysArticle article) {
+        if (article == null || article.getId() == null) {
+            return;
+        }
+        if (article.getStatus() != Constants.YES) {
+            return;
+        }
+        ThreadUtil.execAsync(() -> {
+            baiduPushService.pushArticleUrl(article.getId());
+            SysArticle updateEntity = new SysArticle();
+            updateEntity.setId(article.getId());
+            updateEntity.setIsBaiduPushed(1);
+            baseMapper.updateById(updateEntity);
+        });
+    }
+
+    private String resolveCoverImageJson(SysArticleDetailVo article) {
+        if (article == null) {
+            return null;
+        }
+        if (article.getCoverImage() != null) {
+            return CoverImageUtil.toJson(article.getCoverImage());
+        }
+        return CoverImageUtil.toJson(CoverImageUtil.fromJson(null, article.getCover(), article.getTitle()));
     }
 }

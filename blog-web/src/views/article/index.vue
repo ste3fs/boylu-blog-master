@@ -119,11 +119,11 @@
         <!-- 文章内容 -->
         <article class="article-content">
           <!-- 免费内容 -->
-          <div v-if="article.readType === 1" v-html="article.content"></div>
+          <div v-if="article.readType === 1" v-html="$sanitizeHtml(article.content)"></div>
           
           <!-- 会员内容 -->
           <div v-else-if="article.readType === 2" class="locked-content member">
-            <div class="preview-content" v-html="getPreviewContent(article.content)"></div>
+            <div class="preview-content" v-html="$sanitizeHtml(getPreviewContent(article.content))"></div>
             <div class="content-locker">
               <div class="locker-icon">
                 <i class="fas fa-crown"></i>
@@ -136,7 +136,7 @@
           
           <!-- 付费内容 -->
           <div v-else-if="article.readType === 3" class="locked-content paid">
-            <div class="preview-content" v-html="getPreviewContent(article.content)"></div>
+            <div class="preview-content" v-html="$sanitizeHtml(getPreviewContent(article.content))"></div>
             <div class="content-locker">
               <div class="locker-icon">
                 <i class="fas fa-lock"></i>
@@ -163,7 +163,7 @@
               </div>
               <div v-else class="notice-item">
                 <i class="fas fa-share-alt"></i>
-                <span>本文转载自：<a :href="article.originalUrl" target="_blank" rel="noopener noreferrer">{{ article.originalUrl || '未知来源' }}</a></span>
+                <span>本文转载自：<a :href="safeOriginalUrl" target="_blank" rel="noopener noreferrer">{{ article.originalUrl || '未知来源' }}</a></span>
               </div>
               <div class="notice-item">
                 <i class="fas fa-calendar-alt"></i>
@@ -260,7 +260,9 @@
         </footer>
 
         <!-- 添加评论组件 -->
+        <div ref="commentMountAnchor" class="comment-anchor" aria-hidden="true"></div>
         <Comment 
+          v-if="showCommentComponent"
           :article-id="$route.params.id" 
           :comment-count="article.commentNum || 0"
           :article-author-id="article.userId || ''" 
@@ -309,24 +311,41 @@
 </template>
 
 <script>
+import Badge from 'element-ui/lib/badge'
+import Tooltip from 'element-ui/lib/tooltip'
+import 'element-ui/lib/theme-chalk/badge.css'
+import 'element-ui/lib/theme-chalk/tooltip.css'
 import { getArticleDetailApi, likeArticleApi } from '@/api/article'
-import Comment from '@/components/Comment/index.vue'
-import PaymentDialog from '@/components/PaymentDialog/index.vue'
-import MembershipDialog from '@/components/MembershipDialog/index.vue'
-import { highlightCodeBlocks, renderMarkdown } from '@/utils/markdown'
+import { reportPerfApi } from '@/api/perf'
+import { sanitizeHtml, sanitizeUrl } from '@/utils/htmlSanitizer'
 import { copyText } from '@/utils/contact'
 import { normalizeLocalFileText, normalizeLocalFileUrl } from '@/utils/localFileUrl'
+import { buildLocalImageSrcset, buildLocalImageStyleUrl, prewarmImageUrls } from '@/utils/image'
 import { estimateReadMinutes } from '@/utils/readTime'
+import { removeStructuredData, setSeoMeta, setStructuredData } from '@/utils/seo'
 
 const loadingPlaceholder = new URL('../../assets/loading.svg', import.meta.url).href
 const imageErrorPlaceholder = new URL('../../assets/img-error.svg', import.meta.url).href
+let markdownUtilsPromise = null
+const ARTICLE_SCHEMA_ID = 'schema-article-detail'
+const ARTICLE_FIRST_SCREEN_IMAGE_LIMIT = 2
+const ARTICLE_OBSERVE_BATCH_SIZE = 10
+
+function loadMarkdownUtils() {
+  if (!markdownUtilsPromise) {
+    markdownUtilsPromise = import('@/utils/markdown')
+  }
+  return markdownUtilsPromise
+}
 
 export default {
   name: 'Article',
   components: {
-    Comment,
-    PaymentDialog,
-    MembershipDialog
+    ElBadge: Badge,
+    ElTooltip: Tooltip,
+    Comment: () => import('@/components/Comment/index.vue'),
+    PaymentDialog: () => import('@/components/PaymentDialog/index.vue'),
+    MembershipDialog: () => import('@/components/MembershipDialog/index.vue')
   },
   data() {
     return {
@@ -360,11 +379,22 @@ export default {
       showPaymentDialog: false,
       showMembershipDialog: false,
       isAiDescriptionExpanded: true,
+      postRenderTaskId: null,
+      activeHeadingRaf: null,
+      lazyImageObserver: null,
+      lazyObserveQueue: [],
+      lazyObserveTimer: null,
+      commentObserver: null,
+      commentFallbackTimer: null,
+      showCommentComponent: false
     }
   },
   computed: {
     currentUrl() {
       return window.location.href
+    },
+    safeOriginalUrl() {
+      return sanitizeUrl(this.article.originalUrl)
     }
   },
   methods: {
@@ -372,47 +402,47 @@ export default {
      * 获取文章详情
      */
     async getArticle() {
+      const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now()
+      let loadSuccess = false
       this.loading = true
       try {
         const res = await getArticleDetailApi(this.$route.params.id)
+        const originContent = normalizeLocalFileText(res.data.content || '')
+        const markdownContent = normalizeLocalFileText(res.data.contentMd || '')
+        const renderedContent = await this.buildArticleContent(originContent, markdownContent)
+        this.prewarmArticleCriticalImages(this.extractContentImageSources(renderedContent))
         this.article = {
           ...res.data,
           avatar: normalizeLocalFileUrl(res.data.avatar || ''),
-          content: res.data.content ? this.addLazyLoadToImages(normalizeLocalFileText(res.data.content)) : ''
+          content: renderedContent
+            ? this.addLazyLoadToImages(this.redactSensitiveText(renderedContent))
+            : ''
         }
 
         // 等待下一个 tick，确保文章内容渲染完成
         await this.$nextTick()
         
-        // 使用 setTimeout 确保 DOM 完全渲染
-        setTimeout(() => {
-          this.generateToc()
-          highlightCodeBlocks()
-          this.addCopyButtons()
-          this.addLineNumbers()
-          this.initImagePreview()
-          this.updateActionBarPosition()
-          
-          // 添加一个额外的延时来处理代码块的展开/折叠
-          this.initializeCodeBlocks()
-          
-          // AI摘要
-          if (this.article.aiDescribe) {
-            const typingText = this.$refs.typingText
-            if (!typingText) return
-            // 使用marked解析Markdown文本
-            const htmlContent = renderMarkdown(this.article.aiDescribe || '')
-            typingText.innerHTML = htmlContent
-          }
-        }, 100)
+        this.runDeferredEnhancements()
 
         // 计算阅读时间
         this.readTime = estimateReadMinutes(this.article.contentMd || this.article.content || '')
+        this.updateArticleSeo()
+        this.$nextTick(() => {
+          this.initCommentObserver()
+        })
+        loadSuccess = true
 
       } catch (error) {
         this.$message.error('获取文章详情失败')
       } finally {
         this.loading = false
+        const endTime = typeof performance !== 'undefined' ? performance.now() : Date.now()
+        const durationMs = Math.max(1, Math.round(endTime - startTime))
+        reportPerfApi({
+          eventType: 'article_detail',
+          durationMs,
+          success: loadSuccess
+        }).catch(() => {})
       }
     },
     /**
@@ -422,8 +452,167 @@ export default {
       // 使用data-src来存储实际图片地址，并添加lazy-image类用于识别
       return content.replace(
         /<img([^>]*)src="([^"]*)"([^>]*)>/gi,
-        '<img$1src="' + this.getLoadingImage() + '" data-src="$2" class="lazy-image"$3>'
+        (match, beforeSrc, src, afterSrc) => {
+          const actualSrc = normalizeLocalFileUrl(src)
+          const styledSrc = buildLocalImageStyleUrl(actualSrc, 960, 'webp')
+          const srcset = buildLocalImageSrcset(actualSrc, 'webp')
+          const srcsetAttr = srcset
+            ? ` data-srcset="${this.escapeHtmlAttribute(srcset)}" data-sizes="(max-width: 768px) 100vw, 960px"`
+            : ''
+          if (this.isInlineDataImage(actualSrc)) {
+            const hasAlt = /\salt\s*=/.test((beforeSrc || '') + (afterSrc || ''))
+            const altAttr = hasAlt ? '' : ` alt="${this.escapeHtmlAttribute(this.article.title || '文章配图')}"`
+            return `<img${beforeSrc}src="${this.escapeHtmlAttribute(actualSrc)}" data-origin="${this.escapeHtmlAttribute(actualSrc)}" class="article-inline-image"${altAttr}${afterSrc}>`
+          }
+          const hasAlt = /\salt\s*=/.test((beforeSrc || '') + (afterSrc || ''))
+          const altAttr = hasAlt ? '' : ` alt="${this.escapeHtmlAttribute(this.article.title || '文章配图')}"`
+          return `<img${beforeSrc}src="${this.getLoadingImage()}" data-src="${this.escapeHtmlAttribute(styledSrc || actualSrc)}" data-origin="${this.escapeHtmlAttribute(actualSrc)}"${srcsetAttr} class="lazy-image"${altAttr}${afterSrc}>`
+        }
       )
+    },
+    async buildArticleContent(originContent = '', markdownContent = '') {
+      const normalizedHtml = normalizeLocalFileText(originContent || '')
+      const normalizedMarkdown = this.normalizeMarkdownImageRefs(markdownContent)
+      if (!this.shouldRenderMarkdownFallback(normalizedHtml, normalizedMarkdown)) {
+        return normalizedHtml
+      }
+      const { renderMarkdown } = await loadMarkdownUtils()
+      return normalizeLocalFileText(renderMarkdown(normalizedMarkdown))
+    },
+    shouldRenderMarkdownFallback(originContent = '', markdownContent = '') {
+      if (!markdownContent) {
+        return false
+      }
+      if (!originContent) {
+        return true
+      }
+      const looksLikeRawMarkdown = !/<[a-z][\s\S]*>/i.test(originContent)
+      if (looksLikeRawMarkdown) {
+        return true
+      }
+      const hasMarkdownImageRef = /!\[[^\]]*\]\((?:\d+|[^)]+)\)|<img[^>]*src=(["'])\d+\1/gi.test(markdownContent)
+      const hasHtmlImageTag = /<img[^>]*src=/i.test(originContent)
+      if (hasMarkdownImageRef && !hasHtmlImageTag) {
+        return true
+      }
+      return /data:image\/[^;]+;base64,/i.test(originContent) || originContent.length > 300000
+    },
+    isInlineDataImage(url = '') {
+      return /^data:image\/[^;]+;base64,/i.test(String(url || '').trim())
+    },
+    normalizeMarkdownImageRefs(content = '') {
+      return String(content || '')
+    },
+    extractContentImageSources(content = '') {
+      const matches = String(content || '').matchAll(/<img[^>]*src="([^"]+)"[^>]*>/gi)
+      return Array.from(matches)
+        .map(match => normalizeLocalFileUrl(match[1] || ''))
+        .filter(Boolean)
+    },
+    prewarmArticleCriticalImages(sources = []) {
+      const warmupUrls = (Array.isArray(sources) ? sources : [])
+        .map(source => buildLocalImageStyleUrl(source, 960, 'webp') || source)
+        .slice(0, ARTICLE_FIRST_SCREEN_IMAGE_LIMIT)
+      prewarmImageUrls(warmupUrls, ARTICLE_FIRST_SCREEN_IMAGE_LIMIT)
+    },
+    redactSensitiveText(content = '') {
+      if (!content) {
+        return ''
+      }
+      let safe = String(content)
+      // 隐藏后台登录入口及后台管理路径，避免在公开页面暴露。
+      safe = safe.replace(/https?:\/\/[^\s"'<>]*\/boylu1107\/login/gi, '[后台地址已隐藏]')
+      safe = safe.replace(/https?:\/\/[^\s"'<>]*\/boylu1107\/?/gi, '[后台地址已隐藏]')
+      safe = safe.replace(/\/boylu1107\/login/gi, '[后台地址已隐藏]')
+      safe = safe.replace(/\/boylu1107\/?/gi, '[后台地址已隐藏]')
+      return safe
+    },
+    stripHtmlToText(html = '') {
+      const div = document.createElement('div')
+      div.innerHTML = html
+      return (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim()
+    },
+    updateArticleSeo() {
+      const plainText = this.stripHtmlToText(this.article.content || '')
+      const summary = (plainText || this.article.aiDescribe || this.article.title || '').slice(0, 160)
+      const tags = (this.article.tags || []).map(tag => tag.name).filter(Boolean)
+      const canonicalPath = `/article/${this.$route.params.id}`
+      setSeoMeta({
+        title: `${this.article.title || '文章详情'} - boylu博客`,
+        description: summary,
+        keywords: [...tags, '技术博客', '编程', '教程'],
+        canonicalUrl: canonicalPath,
+        image: this.article.cover || this.article.avatar || '',
+        type: 'article'
+      })
+      setStructuredData(ARTICLE_SCHEMA_ID, {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: this.article.title || '文章详情',
+        description: summary,
+        datePublished: this.article.createTime || '',
+        dateModified: this.article.createTime || '',
+        author: {
+          '@type': 'Person',
+          name: this.article.nickname || 'boylu'
+        },
+        image: this.article.cover ? [normalizeLocalFileUrl(this.article.cover)] : undefined,
+        mainEntityOfPage: {
+          '@type': 'WebPage',
+          '@id': `${window.location.origin}${canonicalPath}`
+        },
+        keywords: tags.join(',')
+      })
+    },
+    requestIdleTask(callback) {
+      if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+        this.postRenderTaskId = window.requestIdleCallback(callback, { timeout: 1200 })
+        return
+      }
+      this.postRenderTaskId = window.setTimeout(callback, 120)
+    },
+    cancelIdleTask() {
+      if (this.postRenderTaskId == null) {
+        return
+      }
+      if (typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(this.postRenderTaskId)
+      } else {
+        window.clearTimeout(this.postRenderTaskId)
+      }
+      this.postRenderTaskId = null
+    },
+    runDeferredEnhancements() {
+      this.cancelIdleTask()
+      this.requestIdleTask(async () => {
+        this.postRenderTaskId = null
+        const { highlightCodeBlocks, renderMarkdown } = await loadMarkdownUtils()
+        this.generateToc()
+        const hasCodeBlocks = document.querySelectorAll('.article-content pre').length > 0
+        if (hasCodeBlocks) {
+          highlightCodeBlocks()
+          this.addCopyButtons()
+          this.addLineNumbers()
+          this.initializeCodeBlocks()
+        }
+        this.initImagePreview()
+        this.updateActionBarPosition()
+
+        if (this.article.aiDescribe) {
+          const typingText = this.$refs.typingText
+          if (typingText) {
+            const htmlContent = renderMarkdown(this.article.aiDescribe || '')
+            typingText.innerHTML = htmlContent
+          }
+        }
+      })
+    },
+    escapeHtmlAttribute(value = '') {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
     },
     /**
      * 获取加载中的图片
@@ -640,44 +829,38 @@ export default {
      * 初始化图片预览
      */
     initImagePreview() {
+      if (this.lazyImageObserver) {
+        this.lazyImageObserver.disconnect()
+      }
+      this.stopObserveBatchTimer()
+      this.lazyObserveQueue = []
       // 使用 IntersectionObserver 监听图片
       const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
-            const img = entry.target
-            const actualSrc = img.getAttribute('data-src')
-            if (actualSrc) {
-              // 创建一个新的图片对象来预加载
-              const tempImg = new Image()
-              tempImg.onload = () => {
-                img.src = actualSrc
-                img.classList.add('loaded')
-              }
-              tempImg.onerror = () => {
-                img.src = imageErrorPlaceholder
-                img.classList.add('error')
-              }
-              tempImg.src = actualSrc
-              img.removeAttribute('data-src')
-              observer.unobserve(img)
-            }
+            this.loadLazyImage(entry.target)
+            observer.unobserve(entry.target)
           }
         })
       }, {
-        rootMargin: '50px 0px',
-        threshold: 0.1
+        rootMargin: '420px 0px',
+        threshold: 0.01
       })
+      this.lazyImageObserver = observer
 
       // 监听所有带有 lazy-image 类的图片
       setTimeout(() => {
-        const lazyImages = document.querySelectorAll('.lazy-image')
-        lazyImages.forEach(img => {
-          observer.observe(img)
+        const lazyImages = Array.from(document.querySelectorAll('.lazy-image'))
+        const criticalImages = lazyImages.slice(0, ARTICLE_FIRST_SCREEN_IMAGE_LIMIT)
+        criticalImages.forEach(img => {
+          this.loadLazyImage(img)
         })
+        const lazyQueue = lazyImages.slice(ARTICLE_FIRST_SCREEN_IMAGE_LIMIT)
+        this.observeLazyImagesInBatches(lazyQueue)
 
         // 收集所有图片URL用于预览
-        this.images = Array.from(document.querySelectorAll('.article-content img')).map(img => 
-          img.getAttribute('data-src') || img.getAttribute('src')
+        this.images = Array.from(document.querySelectorAll('.article-content img')).map(img =>
+          normalizeLocalFileUrl(img.getAttribute('data-origin') || img.getAttribute('data-src') || img.getAttribute('src') || '')
         )
 
         // 为图片添加点击事件
@@ -687,14 +870,141 @@ export default {
         })
       }, 200)
     },
+    loadLazyImage(img) {
+      if (!img || !img.getAttribute('data-src')) {
+        return
+      }
+      const actualSrc = normalizeLocalFileUrl(img.getAttribute('data-src') || '')
+      const originSrc = normalizeLocalFileUrl(img.getAttribute('data-origin') || actualSrc)
+      const srcset = img.getAttribute('data-srcset') || ''
+      const sizes = img.getAttribute('data-sizes') || ''
+      if (!actualSrc) {
+        return
+      }
+      const tempImg = new Image()
+      tempImg.onload = () => {
+        if (srcset) {
+          img.setAttribute('srcset', srcset)
+        }
+        if (sizes) {
+          img.setAttribute('sizes', sizes)
+        }
+        img.src = actualSrc
+        img.classList.add('loaded')
+      }
+      tempImg.onerror = () => {
+        if (originSrc && originSrc !== actualSrc) {
+          const fallbackImg = new Image()
+          fallbackImg.onload = () => {
+            img.src = originSrc
+            img.classList.add('loaded')
+          }
+          fallbackImg.onerror = () => {
+            img.src = imageErrorPlaceholder
+            img.classList.add('error')
+          }
+          fallbackImg.src = originSrc
+          return
+        }
+        img.src = imageErrorPlaceholder
+        img.classList.add('error')
+      }
+      tempImg.src = actualSrc
+      img.removeAttribute('data-src')
+    },
+    observeLazyImagesInBatches(images = []) {
+      this.lazyObserveQueue = Array.isArray(images) ? images.slice() : []
+      this.observeNextImageBatch()
+    },
+    observeNextImageBatch() {
+      if (!this.lazyImageObserver || !this.lazyObserveQueue.length) {
+        this.stopObserveBatchTimer()
+        return
+      }
+      const batch = this.lazyObserveQueue.splice(0, ARTICLE_OBSERVE_BATCH_SIZE)
+      batch.forEach(img => {
+        this.lazyImageObserver.observe(img)
+      })
+      if (!this.lazyObserveQueue.length) {
+        this.stopObserveBatchTimer()
+        return
+      }
+      this.lazyObserveTimer = window.setTimeout(() => {
+        this.observeNextImageBatch()
+      }, 140)
+    },
+    stopObserveBatchTimer() {
+      if (this.lazyObserveTimer != null) {
+        window.clearTimeout(this.lazyObserveTimer)
+        this.lazyObserveTimer = null
+      }
+    },
+    clearCommentFallbackTimer() {
+      if (this.commentFallbackTimer != null) {
+        window.clearTimeout(this.commentFallbackTimer)
+        this.commentFallbackTimer = null
+      }
+    },
+    initCommentObserver() {
+      this.clearCommentFallbackTimer()
+      if (this.commentObserver) {
+        this.commentObserver.disconnect()
+        this.commentObserver = null
+      }
+      const anchor = this.$refs.commentMountAnchor
+      if (!anchor) {
+        return
+      }
+      if (typeof IntersectionObserver === 'undefined') {
+        this.showCommentComponent = true
+        return
+      }
+      this.commentObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            this.showCommentComponent = true
+            this.clearCommentFallbackTimer()
+            if (this.commentObserver) {
+              this.commentObserver.disconnect()
+              this.commentObserver = null
+            }
+          }
+        })
+      }, {
+        rootMargin: '720px 0px',
+        threshold: 0.01
+      })
+      this.commentObserver.observe(anchor)
+      this.commentFallbackTimer = window.setTimeout(() => {
+        if (!this.showCommentComponent) {
+          this.showCommentComponent = true
+          if (this.commentObserver) {
+            this.commentObserver.disconnect()
+            this.commentObserver = null
+          }
+        }
+        this.commentFallbackTimer = null
+      }, 2500)
+    },
     /**
      * 处理图片点击
      */
     handleImageClick(e) {
       const img = e.target
       if (img.tagName === 'IMG') {
-        this.$refs.imagePreview.show(this.images, this.images.indexOf(img.src))
+        const currentSrc = normalizeLocalFileUrl(img.getAttribute('data-origin') || img.getAttribute('data-src') || img.getAttribute('src') || img.src)
+        const index = Math.max(this.images.indexOf(currentSrc), 0)
+        this.$refs.imagePreview.show(this.images, index)
       }
+    },
+    handleScrollEvent() {
+      if (this.activeHeadingRaf != null) {
+        return
+      }
+      this.activeHeadingRaf = window.requestAnimationFrame(() => {
+        this.activeHeadingRaf = null
+        this.updateActiveHeading()
+      })
     },
     toggleDislike() {
       // 实现点踩功能
@@ -820,7 +1130,7 @@ export default {
     getPreviewContent(content) {
       // 返回内容的前300个字符，并确保HTML标签完整
       const div = document.createElement('div')
-      div.innerHTML = content
+      div.innerHTML = sanitizeHtml(content)
       const text = div.textContent || div.innerText
       return text.substring(0, 300) + '...'
     },
@@ -892,14 +1202,28 @@ export default {
     window.addEventListener('resize', this.updateActionBarPosition)
   },
   mounted() {
-    window.addEventListener('scroll', this.updateActiveHeading)
-    this.$nextTick(() => {
-      this.initImagePreview()
-    })
+    window.addEventListener('scroll', this.handleScrollEvent, { passive: true })
   },
   beforeDestroy() {
-    window.removeEventListener('scroll', this.updateActiveHeading)
+    window.removeEventListener('scroll', this.handleScrollEvent)
     window.removeEventListener('resize', this.updateActionBarPosition)
+    this.cancelIdleTask()
+    if (this.activeHeadingRaf != null) {
+      window.cancelAnimationFrame(this.activeHeadingRaf)
+      this.activeHeadingRaf = null
+    }
+    if (this.lazyImageObserver) {
+      this.lazyImageObserver.disconnect()
+      this.lazyImageObserver = null
+    }
+    if (this.commentObserver) {
+      this.commentObserver.disconnect()
+      this.commentObserver = null
+    }
+    this.clearCommentFallbackTimer()
+    this.stopObserveBatchTimer()
+    this.lazyObserveQueue = []
+    removeStructuredData(ARTICLE_SCHEMA_ID)
     // 清理图片点击事件监听器
     const images = document.querySelectorAll('.article-content img')
     images.forEach(img => {
@@ -911,7 +1235,8 @@ export default {
     '$route'(to, from) {
       if (to.params.id !== from.params.id) {
         // 重新获取文章数据
-        this.getArticleData() 
+        this.showCommentComponent = false
+        this.getArticle()
       }
     }
   }
@@ -1315,7 +1640,7 @@ export default {
   }
 
   :deep(img.lazy-image) {
-    opacity: 0;
+    opacity: 0.72;
   
     
     &.loaded {
@@ -1468,6 +1793,8 @@ export default {
 }
 
 .article-footer {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 1200px;
   padding: $spacing-md * 2;
   border-top: 1px solid var(--border-color);
 
@@ -1694,7 +2021,14 @@ export default {
   }
 }
 
+.comment-anchor {
+  width: 100%;
+  height: 1px;
+}
+
 .article-sidebar {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 800px;
   .toc-container {
     position: sticky;
     top: 90px;

@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.message;
+package com.boylu.controller.message;
 
 import java.util.List;
 
@@ -34,7 +34,6 @@ public class SysFeedbackController {
 
     @PostMapping("/add")
     @ApiOperation(value = "添加反馈")
-    @SaCheckPermission("sys:feedback:add")
     public Result<Object> add(@RequestBody SysFeedback sysFeedback) {
         return Result.success(sysFeedbackService.insert(sysFeedback));
     }

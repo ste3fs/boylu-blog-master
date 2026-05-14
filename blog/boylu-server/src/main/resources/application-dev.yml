@@ -1,9 +1,16 @@
-﻿server:
+server:
   port: 8800
+
+site:
+  frontend-url: http://localhost:3000
 
 app:
   file:
     public-prefix: /boylu/file/content/
+    chunk-size-mb: 2
+    chunk-expire-hours: 24
+    max-image-width: 6000
+    max-image-height: 6000
 
 spring:
   servlet:
@@ -85,18 +92,27 @@ mail:
 qq:
   app-id:
   app-secret:
-  redirect-url: http://localhost:8800/mojian/api/auth/callback/qq
+  redirect-url: http://localhost:8800/boylu/api/auth/callback/qq
 weibo:
   app-id:
   app-secret:
-  redirect-url: http://localhost:8800/mojian/api/auth/weibo
+  redirect-url: http://localhost:8800/boylu/api/auth/callback/weibo
 
 gitee:
   app-id:
   app-secret:
-  redirect-url: http://localhost:8800/mojian/api/auth/callback/gitee
+  redirect-url: http://localhost:8800/boylu/api/auth/callback/gitee
 
 github:
   app-id:
   app-secret:
-  redirect-url: http://localhost:8800/mojian/api/auth/callback/github
+  redirect-url: http://localhost:8800/boylu/api/auth/callback/github
+
+seo:
+  baidu:
+    push:
+      enabled: false
+      endpoint: https://data.zz.baidu.com/urls
+      site: https://boylu.cn
+      token:
+      article-path: /article/%d

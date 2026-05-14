@@ -39,9 +39,6 @@ function splitVendorChunk(id: string) {
   if (normalizedId.includes('/@wangeditor/')) {
     return 'vendor-rich-editor'
   }
-  if (normalizedId.includes('/mavon-editor/')) {
-    return 'vendor-markdown-editor'
-  }
   if (normalizedId.includes('/highlight.js/')) {
     return 'vendor-highlight'
   }
@@ -143,6 +140,14 @@ export default defineConfig(({ command, mode }: ConfigEnv): UserConfig => {
               }
             })
           }
+        },
+        '/localFile': {
+          target: env.VITE_APP_API_URL,
+          changeOrigin: true
+        },
+        '/img': {
+          target: env.VITE_APP_API_URL,
+          changeOrigin: true
         }
       }
     }

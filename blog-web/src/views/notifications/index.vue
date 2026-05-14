@@ -59,7 +59,7 @@
                     {{ notification.fromNickname }} 评论了你的文章
                   </span>
 
-                  <div v-html="notification.message"></div>
+                  <div v-html="$sanitizeHtml(notification.message)"></div>
                 </span>
 
                 <span v-if="notification.type === 'like'">

@@ -30,7 +30,7 @@
             </span>
           </div>
           <div class="moment-content-wrapper">
-            <div class="moment-content" v-html="moment.content"></div>
+            <div class="moment-content" v-html="$sanitizeHtml(moment.content)"></div>
             <div class="moment-images" v-if="moment.images?.length">
               <img
                 v-for="(img, index) in moment.images"
@@ -59,7 +59,7 @@
 <script>
 import { formatDateTime } from '@/utils/time'
 import { getMoments } from '@/api/moments'
-import { resolveImageUrl, retryImageLoad } from '@/utils/image'
+import { getLazyImageOptions, resolveImageUrl, retryImageLoad } from '@/utils/image'
 
 export default {
   name: 'Moments',
@@ -122,13 +122,7 @@ export default {
     },
 
     getLazyImage(url) {
-      const src = this.resolveImage(url)
-      const fallback = this.resolveImage(this.$store.state.defaultImage)
-      return {
-        src,
-        error: fallback,
-        loading: fallback
-      }
+      return getLazyImageOptions(url, this.$store.state.defaultImage)
     },
 
     handleImageError(e) {

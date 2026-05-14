@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.boylu.mapper.SysArticleMapper">
 
@@ -11,6 +11,7 @@
         <result property="categoryId" column="category_id"/>
         <result property="summary" column="summary"/>
         <result property="cover" column="cover"/>
+        <result property="coverImageJson" column="cover_image"/>
         <result property="contentMd" column="content_md"/>
         <result property="quantity" column="quantity"/>
         <result property="isStick" column="is_stick"/>
@@ -20,6 +21,20 @@
         <result property="likeNum" column="likeNum"/>
         <result property="commentNum" column="commentNum"/>
         <result property="categoryName" column="categoryName"/>
+        <collection property="tags" ofType="com.boylu.vo.tag.TagListVo" column="id" select="com.boylu.mapper.SysTagMapper.getTagByArticleId" />
+    </resultMap>
+
+    <resultMap id="homeArticleResultMap" type="com.boylu.vo.article.HomeArticleVo">
+        <id property="id" column="id"/>
+        <result property="title" column="title"/>
+        <result property="slug" column="slug"/>
+        <result property="excerpt" column="excerpt"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="category" column="category"/>
+        <result property="coverImageJson" column="cover_image"/>
+        <result property="legacyCover" column="cover"/>
+        <result property="readingTime" column="reading_time"/>
+        <result property="views" column="views"/>
         <collection property="tags" ofType="com.boylu.vo.tag.TagListVo" column="id" select="com.boylu.mapper.SysTagMapper.getTagByArticleId" />
     </resultMap>
 
@@ -80,6 +95,7 @@
             a.title,
             a.summary,
             a.cover,
+            a.cover_image,
             a.content_md,
             a.quantity,
             a.is_stick,
@@ -90,6 +106,36 @@
         FROM sys_article a
         LEFT JOIN sys_category c ON a.category_id = c.id
         LEFT JOIN sys_user u ON a.user_id = u.id
+        WHERE a.status = 1
+        <if test="tagId != null">
+            AND a.id in (SELECT article_id FROM sys_article_tag WHERE tag_id = #{tagId})
+        </if>
+        <if test="categoryId != null">
+            AND a.category_id = #{categoryId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND a.title like concat('%',#{keyword},'%')
+        </if>
+        order by a.is_stick desc, a.create_time desc
+    </select>
+
+    <select id="getHomeArticleListApi" resultMap="homeArticleResultMap">
+        SELECT
+            a.id,
+            a.title,
+            CAST(a.id AS CHAR) AS slug,
+            a.summary AS excerpt,
+            a.cover,
+            a.cover_image,
+            a.create_time AS created_at,
+            c.name AS category,
+            a.quantity AS views,
+            GREATEST(
+                1,
+                CEIL(CHAR_LENGTH(COALESCE(NULLIF(a.content_md, ''), NULLIF(a.content, ''), a.summary, '')) / 450)
+            ) AS reading_time
+        FROM sys_article a
+        LEFT JOIN sys_category c ON a.category_id = c.id
         WHERE a.status = 1
         <if test="tagId != null">
             AND a.id in (SELECT article_id FROM sys_article_tag WHERE tag_id = #{tagId})
@@ -123,12 +169,23 @@
             c.name AS categoryName,
             u.nickname,
             u.avatar,
-            (SELECT COUNT(sc.id) FROM sys_comment sc WHERE sc.article_id = a.id) AS commentNum,
-            (SELECT COUNT(sal.id) FROM sys_article_like sal WHERE sal.article_id = a.id) AS likeNum
+            IFNULL(sc.comment_num, 0) AS commentNum,
+            IFNULL(sal.like_num, 0) AS likeNum
         FROM sys_article a
         LEFT JOIN sys_category c ON a.category_id = c.id
         LEFT JOIN sys_user u ON a.user_id = u.id
-        where a.id = #{id}
+        LEFT JOIN (
+            SELECT article_id, COUNT(1) AS comment_num
+            FROM sys_comment
+            GROUP BY article_id
+        ) sc ON sc.article_id = a.id
+        LEFT JOIN (
+            SELECT article_id, COUNT(1) AS like_num
+            FROM sys_article_like
+            GROUP BY article_id
+        ) sal ON sal.article_id = a.id
+        WHERE a.id = #{id}
+          AND a.status = 1
     </select>
 
     <select id="getArticleArchive" resultType="java.lang.Integer">
@@ -154,6 +211,7 @@
             a.title,
             a.summary,
             a.cover,
+            a.cover_image,
             a.is_stick,
             a.is_recommend,
             a.quantity,
@@ -220,6 +278,7 @@
             a.title,
             a.summary,
             a.cover,
+            a.cover_image,
             a.content_md,
             a.quantity,
             a.is_stick,
@@ -237,6 +296,7 @@
             a.title,
             a.summary,
             a.cover,
+            a.cover_image,
             a.content_md,
             a.quantity,
             a.is_stick,

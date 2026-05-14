@@ -1,9 +1,13 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.thread.ThreadUtil;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.boylu.common.RedisConstants;
 import com.boylu.entity.SysArticle;
@@ -13,13 +17,16 @@ import com.boylu.mapper.SysArticleMapper;
 import com.boylu.mapper.SysCategoryMapper;
 import com.boylu.service.ArticleService;
 import com.boylu.utils.IpUtil;
+import com.boylu.utils.CoverImageUtil;
 import com.boylu.utils.NotificationsUtil;
+import com.boylu.common.PageQuery;
 import com.boylu.utils.PageUtil;
 import com.boylu.utils.RedisUtil;
 import com.boylu.vo.article.ArchiveListVo;
 import com.boylu.vo.article.ArticleDetailVo;
 import com.boylu.vo.article.ArticleListVo;
 import com.boylu.vo.article.CategoryListVo;
+import com.boylu.vo.article.HomeArticleVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
@@ -69,12 +76,41 @@ public class ArticleServiceImpl implements ArticleService {
     public IPage<ArticleListVo> getArticleList(Integer tagId, Integer categoryId, String keyword) {
         IPage<ArticleListVo> page = sysArticleMapper.getArticleListApi(PageUtil.getPage(), tagId, categoryId, keyword);
         applyRealtimeQuantity(page.getRecords());
+        hydrateArticleListCovers(page.getRecords());
         return page;
     }
 
     @Override
+    public IPage<HomeArticleVo> getHomeArticleList(Integer tagId, Integer categoryId, String keyword) {
+        PageQuery pageQuery = PageUtil.getPageQuery();
+        boolean cacheable = isHomePostsCacheable(pageQuery, tagId, categoryId, keyword);
+
+        if (cacheable) {
+            Page<HomeArticleVo> cachedPage = getCachedHomePosts();
+            if (cachedPage != null) {
+                try {
+                    hydrateHomeArticles(cachedPage.getRecords());
+                    return cachedPage;
+                } catch (Exception ex) {
+                    redisUtil.delete(RedisConstants.HOME_POSTS_CACHE_KEY);
+                }
+            }
+        }
+
+        Page<Object> page = new Page<Object>(pageQuery.getPageNum(), pageQuery.getPageSize());
+        IPage<HomeArticleVo> result = sysArticleMapper.getHomeArticleListApi(page, tagId, categoryId, keyword);
+        hydrateHomeArticles(result.getRecords());
+
+        if (cacheable) {
+            redisUtil.set(RedisConstants.HOME_POSTS_CACHE_KEY, JSON.toJSONString(result), 300, TimeUnit.SECONDS);
+        }
+
+        return result;
+    }
+
+    @Override
     public ArticleDetailVo getArticleDetail(Long id) {
-        ArticleDetailVo detailVo = sysArticleMapper.getArticleDetail(id);
+        ArticleDetailVo detailVo = getCachedArticleDetail(id);
         if (detailVo == null) {
             return null;
         }
@@ -86,6 +122,45 @@ public class ArticleServiceImpl implements ArticleService {
 
         detailVo.setQuantity(recordRealtimeQuantity(id, detailVo.getQuantity(), userId));
         return detailVo;
+    }
+
+    private ArticleDetailVo getCachedArticleDetail(Long id) {
+        if (id == null) {
+            return null;
+        }
+        String cacheKey = RedisConstants.ARTICLE_DETAIL_CACHE_KEY + id;
+        try {
+            Object cached = redisUtil.get(cacheKey);
+            if (cached != null) {
+                ArticleDetailVo cachedVo = parseCachedArticleDetail(cached);
+                if (cachedVo != null) {
+                    return cachedVo;
+                }
+            }
+        } catch (Exception ex) {
+            redisUtil.delete(cacheKey);
+        }
+
+        ArticleDetailVo loaded = sysArticleMapper.getArticleDetail(id);
+        if (loaded == null) {
+            return null;
+        }
+        try {
+            redisUtil.set(cacheKey, JSON.toJSONString(loaded), 120, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+            redisUtil.delete(cacheKey);
+        }
+        return loaded;
+    }
+
+    private ArticleDetailVo parseCachedArticleDetail(Object cached) {
+        if (cached == null) {
+            return null;
+        }
+        if (cached instanceof ArticleDetailVo) {
+            return JSON.parseObject(JSON.toJSONString(cached), ArticleDetailVo.class);
+        }
+        return JSON.parseObject(String.valueOf(cached), ArticleDetailVo.class);
     }
 
     @Override
@@ -145,6 +220,109 @@ public class ArticleServiceImpl implements ArticleService {
                 .orderByAsc(SysCategory::getSort));
     }
 
+    private boolean isHomePostsCacheable(PageQuery pageQuery, Integer tagId, Integer categoryId, String keyword) {
+        return pageQuery != null
+                && pageQuery.getPageNum() != null
+                && pageQuery.getPageSize() != null
+                && pageQuery.getPageNum() == 1
+                && pageQuery.getPageSize() == 10
+                && tagId == null
+                && categoryId == null
+                && !StringUtils.hasText(keyword);
+    }
+
+    private Page<HomeArticleVo> getCachedHomePosts() {
+        try {
+            Object cached = redisUtil.get(RedisConstants.HOME_POSTS_CACHE_KEY);
+            if (cached == null) {
+                return null;
+            }
+            return parseCachedHomePosts(cached);
+        } catch (Exception ex) {
+            redisUtil.delete(RedisConstants.HOME_POSTS_CACHE_KEY);
+            return null;
+        }
+    }
+
+    private Page<HomeArticleVo> parseCachedHomePosts(Object cached) {
+        JSONObject object = cached instanceof JSONObject
+                ? (JSONObject) cached
+                : JSON.parseObject(String.valueOf(cached));
+        if (object == null || object.isEmpty()) {
+            return null;
+        }
+
+        long current = object.getLongValue("current");
+        long size = object.getLongValue("size");
+        Page<HomeArticleVo> page = new Page<HomeArticleVo>(current <= 0 ? 1 : current, size <= 0 ? 10 : size);
+        page.setTotal(object.getLongValue("total"));
+        page.setPages(object.getLongValue("pages"));
+
+        JSONArray records = object.getJSONArray("records");
+        List<HomeArticleVo> articles = new ArrayList<HomeArticleVo>();
+        if (records != null) {
+            for (Object record : records) {
+                if (record == null) {
+                    continue;
+                }
+                articles.add(record instanceof HomeArticleVo
+                        ? (HomeArticleVo) record
+                        : JSON.parseObject(JSON.toJSONString(record), HomeArticleVo.class));
+            }
+        }
+        page.setRecords(articles);
+        return page;
+    }
+
+    private void hydrateHomeArticles(List<HomeArticleVo> articles) {
+        if (articles == null || articles.isEmpty()) {
+            return;
+        }
+        Map<Object, Object> quantityMap = redisUtil.hGetAll(RedisConstants.ARTICLE_QUANTITY);
+        for (HomeArticleVo article : articles) {
+            if (article == null) {
+                continue;
+            }
+            if (!StringUtils.hasText(article.getSlug()) && article.getId() != null) {
+                article.setSlug(String.valueOf(article.getId()));
+            }
+            if (article.getCoverImage() == null
+                    || StringUtils.hasText(article.getCoverImageJson())
+                    || StringUtils.hasText(article.getLegacyCover())) {
+                article.setCoverImage(CoverImageUtil.fromJson(article.getCoverImageJson(), article.getLegacyCover(), article.getTitle()));
+            }
+            if (article.getReadingTime() == null || article.getReadingTime() <= 0) {
+                article.setReadingTime(estimateReadingTime(article.getExcerpt()));
+            }
+            if (article.getId() != null) {
+                Object redisValue = quantityMap.get(article.getId().toString());
+                article.setViews(resolveQuantity(article.getViews(), redisValue));
+            } else if (article.getViews() == null) {
+                article.setViews(0);
+            }
+        }
+    }
+
+    private void hydrateArticleListCovers(List<ArticleListVo> articles) {
+        if (articles == null || articles.isEmpty()) {
+            return;
+        }
+        for (ArticleListVo article : articles) {
+            if (article == null) {
+                continue;
+            }
+            article.setCoverImage(CoverImageUtil.fromJson(article.getCoverImageJson(), article.getCover(), article.getTitle()));
+        }
+    }
+
+    private int estimateReadingTime(String text) {
+        String source = text == null ? "" : text.trim();
+        if (source.isEmpty()) {
+            return 1;
+        }
+        return Math.max(1, (int) Math.ceil(source.length() / 180.0));
+    }
+
     private void applyRealtimeQuantity(List<ArticleListVo> articles) {
         if (articles == null || articles.isEmpty()) {
             return;
@@ -166,19 +344,6 @@ public class ArticleServiceImpl implements ArticleService {
         String hashKey = articleId.toString();
         Object cachedValue = redisUtil.hGet(RedisConstants.ARTICLE_QUANTITY, hashKey);
         int currentQuantity = resolveQuantity(dbQuantity, cachedValue);
-        List<String> viewerKeys = resolveViewerKeys(userId);
-        if (viewerKeys.isEmpty()) {
-            return currentQuantity;
-        }
-
-        String today = LocalDate.now(ZoneId.of("Asia/Shanghai")).format(DateTimeFormatter.BASIC_ISO_DATE);
-        String viewedKey = RedisConstants.ARTICLE_DAILY_VIEWED_USER + hashKey + ":" + today;
-        if (hasAnyViewerKey(viewedKey, viewerKeys)) {
-            return currentQuantity;
-        }
-
-        redisUtil.sAdd(viewedKey, viewerKeys.toArray(new Object[0]));
-        redisUtil.expire(viewedKey, RedisConstants.DAY_EXPIRE * 2, TimeUnit.SECONDS);
         int nextQuantity = currentQuantity + 1;
         redisUtil.hSet(RedisConstants.ARTICLE_QUANTITY, hashKey, nextQuantity);
         return nextQuantity;
@@ -324,7 +489,7 @@ public class ArticleServiceImpl implements ArticleService {
 
     private List<ArticleListVo> getArticlesByCondition(SFunction<SysArticle, Object> conditionField) {
         LambdaQueryWrapper<SysArticle> wrapper = new LambdaQueryWrapper<SysArticle>()
-                .select(SysArticle::getId, SysArticle::getTitle, SysArticle::getCover, SysArticle::getCreateTime)
+                .select(SysArticle::getId, SysArticle::getTitle, SysArticle::getCover, SysArticle::getCoverImage, SysArticle::getCreateTime)
                 .orderByDesc(SysArticle::getCreateTime)
                 .eq(conditionField, 1);
 
@@ -337,6 +502,7 @@ public class ArticleServiceImpl implements ArticleService {
         return sysArticles.stream().map(item -> ArticleListVo.builder()
                 .id(item.getId())
                 .cover(item.getCover())
+                .coverImage(CoverImageUtil.fromJson(item.getCoverImage(), item.getCover(), item.getTitle()))
                 .title(item.getTitle())
                 .createTime(item.getCreateTime())
                 .build()).collect(Collectors.toList());

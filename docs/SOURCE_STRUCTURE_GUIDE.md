@@ -41,19 +41,19 @@
 
 `blog` 是 Spring Boot 多模块后端，模块边界如下：
 
-- `mojian-server`：启动模块和资源配置。
-- `mojian-api`：前台公开接口。
-- `mojian-admin`：管理后台接口。
-- `mojian-auth`：登录、鉴权、Sa-Token 相关逻辑。
-- `mojian-commom`：公共实体、DTO、VO、工具类、Mapper。
-- `mojian-file`：文件上传和存储。
-- `mojian-quartz`：定时任务。
+- `boylu-server`：启动模块和资源配置。
+- `boylu-api`：前台公开接口。
+- `boylu-admin`：管理后台接口。
+- `boylu-auth`：登录、鉴权、Sa-Token 相关逻辑。
+- `boylu-commom`：公共实体、DTO、VO、工具类、Mapper。
+- `boylu-file`：文件上传和存储。
+- `boylu-quartz`：定时任务。
 
 后端维护规则：
 
 - 控制器按业务域放到对应模块的 `controller/<domain>`。
 - 服务实现放到 `service/impl`，接口放到 `service`。
-- 公共 DTO、VO、Entity、Mapper 继续放在 `mojian-commom`。
+- 公共 DTO、VO、Entity、Mapper 继续放在 `boylu-commom`。
 - 不在生产代码里使用 `System.out.println` 和普通 `printStackTrace()`。
 - 需要输出运行信息时使用日志框架，正常流程用 `info` 或 `debug`，异常用 `error`。
 

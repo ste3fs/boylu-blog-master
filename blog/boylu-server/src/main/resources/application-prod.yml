@@ -1,9 +1,16 @@
-﻿server:
+server:
   port: ${SERVER_PORT:8800}
+
+site:
+  frontend-url: ${FRONTEND_BASE_URL:https://boylu.cn}
 
 app:
   file:
     public-prefix: ${FILE_PUBLIC_PREFIX:/boylu/file/content/}
+    chunk-size-mb: ${APP_FILE_CHUNK_SIZE_MB:2}
+    chunk-expire-hours: ${APP_FILE_CHUNK_EXPIRE_HOURS:24}
+    max-image-width: ${APP_MAX_IMAGE_WIDTH:6000}
+    max-image-height: ${APP_MAX_IMAGE_HEIGHT:6000}
 
 spring:
   servlet:
@@ -70,19 +77,28 @@ mail:
 qq:
   app-id: ${QQ_APP_ID:}
   app-secret: ${QQ_APP_SECRET:}
-  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/callback/qq
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/boylu/api/auth/callback/qq
 
 weibo:
   app-id: ${WEIBO_APP_ID:}
   app-secret: ${WEIBO_APP_SECRET:}
-  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/weibo
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/boylu/api/auth/callback/weibo
 
 gitee:
   app-id: ${GITEE_APP_ID:}
   app-secret: ${GITEE_APP_SECRET:}
-  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/callback/gitee
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/boylu/api/auth/callback/gitee
 
 github:
   app-id: ${GITHUB_APP_ID:}
   app-secret: ${GITHUB_APP_SECRET:}
-  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/callback/github
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/boylu/api/auth/callback/github
+
+seo:
+  baidu:
+    push:
+      enabled: ${SEO_BAIDU_PUSH_ENABLED:false}
+      endpoint: ${SEO_BAIDU_PUSH_ENDPOINT:https://data.zz.baidu.com/urls}
+      site: ${SEO_BAIDU_PUSH_SITE:https://boylu.cn}
+      token: ${SEO_BAIDU_PUSH_TOKEN:}
+      article-path: ${SEO_BAIDU_ARTICLE_PATH:/article/%d}

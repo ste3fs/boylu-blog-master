@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.system;
+package com.boylu.controller.system;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -60,7 +60,6 @@ public class SysUserController {
 
     @PutMapping("/updatePwd")
     @ApiOperation(value = "修改密码")
-    @SaCheckPermission("sys:user:updatePwd")
     public Result<Void> updatePwd(@RequestBody UpdatePwdDTO updatePwdDTO) {
         sysUserService.updatePwd(updatePwdDTO);
         return Result.success();

@@ -33,6 +33,8 @@
         <PageToolbar>
           <PageToolbarGroup>
               <el-button type="primary" :icon="Plus" @click="handleAdd" v-permission="['sys:article:add']">新增文章</el-button>
+              <el-button type="success" plain :icon="Position" v-permission="['sys:article:update']"
+              @click="handlePushBaiduRecent">推送近期到百度</el-button>
               <el-button type="warning" plain :icon="Setting" v-permission="['sys:article:reptile']"
               @click="reptileDialog.visible = true">爬取文章</el-button>
           </PageToolbarGroup>
@@ -92,9 +94,11 @@
         </el-table-column>
         <el-table-column label="阅读量" align="center" prop="quantity" />
         <el-table-column label="发布时间" align="center" prop="createTime" width="180" />
-        <el-table-column label="操作" align="center" width="200" fixed="right">
+        <el-table-column label="操作" align="center" width="280" fixed="right">
           <template #default="scope">
             <PageTableActions>
+              <PageTableAction type="success" :icon="Position" @click="handlePushBaidu(scope.row)"
+                v-permission="['sys:article:update']">推送百度</PageTableAction>
               <PageTableAction type="primary" :icon="Edit" @click="handleUpdate(scope.row)"
                 v-permission="['sys:article:update']">编辑</PageTableAction>
               <PageTableAction type="danger" :icon="Delete" @click="handleDelete(scope.row)"
@@ -229,7 +233,12 @@
         </el-form-item>
 
         <el-form-item label="文章封面" prop="cover">
-          <UploadImage v-model="form.cover" :limit="1" :source="'article-cover'" />
+          <UploadImage
+            v-model="form.cover"
+            :limit="1"
+            :source="'article-cover'"
+            @metadata-change="handleCoverImageMetadataChange"
+          />
         </el-form-item>
 
         <el-form-item label="文章简介" prop="summary">
@@ -387,7 +396,7 @@
           </el-col>
         </el-row>
 
-        <el-form-item label="文章内容" prop="contentMd" class="mb-20">
+        <el-form-item label="文章内容" prop="content" class="mb-20">
           <div v-if="isMobile" class="article-editor__toolbar-actions">
             <div class="article-editor__meta">
               已输入 {{ articleContentStats.characters }} 字
@@ -396,55 +405,24 @@
             <el-button type="primary" size="large" @click="contentEditorDialogVisible = true">
               展开大编辑器
             </el-button>
-            <button
-              type="button"
-              class="article-editor__mobile-preview"
-              @click="contentEditorDialogVisible = true"
-            >
-              <span class="article-editor__mobile-preview-label">当前内容预览</span>
-              <span class="article-editor__mobile-preview-text">{{ articleContentPreview }}</span>
-            </button>
           </div>
-          <mavon-editor
-            v-else
-            placeholder="输入文章内容..."
-            :style="{ height: `${articleEditorHeight}px`, width: '100%' }"
-            :subfield="!isMobile"
-            :default-open="isMobile ? 'edit' : 'preview'"
-            :toolbars="articleEditorToolbars"
-            ref="mdRef"
-            v-model="form.contentMd"
-            @imgDel="imgDel" @imgAdd="imgAdd">
-            <template #left-toolbar-after>
-                  <el-dropdown>
-                    <span class="el-dropdown-link">
-                      <i title="上传视频"></i>
-                      <el-icon class="op-icon fa el-icon-video-camera"
-                        ><VideoPlay
-                      /></el-icon>
-                    </span>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item>
-                          <el-upload
-                            style="display: inline-block"
-                            :show-file-list="false"
-                            name="filedatas"
-                            action=""
-                            :http-request="uploadVideo"
-                            multiple
-                          >
-                            <span>上传视频</span>
-                          </el-upload>
-                        </el-dropdown-item>
-                        <el-dropdown-item>
-                          <div @click="dialogVisible = true">添加视频地址</div>
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                </template>
-              </mavon-editor>
+          <div v-else class="article-editor">
+            <Toolbar
+              class="article-editor__toolbar"
+              :editor="articleEditorRef"
+              :defaultConfig="articleToolbarConfig"
+              :mode="articleEditorMode"
+            />
+            <Editor
+              class="article-editor__body"
+              :style="{ height: `${articleEditorHeight}px` }"
+              v-model="form.content"
+              :defaultConfig="articleEditorConfig"
+              :mode="articleEditorMode"
+              @onCreated="handleArticleEditorCreated"
+              @onChange="handleEditorChange"
+            />
+          </div>
         </el-form-item>
       </el-form>
 
@@ -472,46 +450,23 @@
           <span v-if="articleContentStats.lines"> · {{ articleContentStats.lines }} 行</span>
         </div>
       </div>
-      <mavon-editor
-        v-if="contentEditorDialogVisible"
-        ref="fullscreenMdRef"
-        v-model="form.contentMd"
-        placeholder="输入文章内容..."
-        :style="{ height: `${fullscreenArticleEditorHeight}px`, width: '100%' }"
-        :subfield="false"
-        default-open="edit"
-        :toolbars="articleEditorToolbars"
-        @imgDel="imgDel"
-        @imgAdd="imgAdd"
-      >
-        <template #left-toolbar-after>
-          <el-dropdown>
-            <span class="el-dropdown-link">
-              <i title="上传视频"></i>
-              <el-icon class="op-icon fa el-icon-video-camera"><VideoPlay /></el-icon>
-            </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item>
-                  <el-upload
-                    style="display: inline-block"
-                    :show-file-list="false"
-                    name="filedatas"
-                    action=""
-                    :http-request="uploadVideo"
-                    multiple
-                  >
-                    <span>上传视频</span>
-                  </el-upload>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <div @click="dialogVisible = true">添加视频地址</div>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-      </mavon-editor>
+      <div v-if="contentEditorDialogVisible" class="article-editor article-editor--fullscreen">
+        <Toolbar
+          class="article-editor__toolbar"
+          :editor="fullscreenArticleEditorRef"
+          :defaultConfig="articleToolbarConfig"
+          :mode="articleEditorMode"
+        />
+        <Editor
+          class="article-editor__body"
+          :style="{ height: `${fullscreenArticleEditorHeight}px` }"
+          v-model="form.content"
+          :defaultConfig="articleEditorConfig"
+          :mode="articleEditorMode"
+          @onCreated="handleFullscreenArticleEditorCreated"
+          @onChange="handleEditorChange"
+        />
+      </div>
       <template #footer>
         <div class="dialog-footer article-content-dialog__footer">
           <el-button @click="contentEditorDialogVisible = false">完成编辑</el-button>
@@ -538,35 +493,25 @@
       </template>
     </el-dialog>
 
-    <!-- 添加视频地址对话框 -->
-    <el-dialog center title="添加视频" v-model="dialogVisible" :width="isMobile ? '100vw' : '30%'" :fullscreen="isMobile">
-      <el-input v-model="videoInput" placeholder="视频地址"></el-input>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button type="primary" @click="addVideo">确 定</el-button>
-          <el-button @click="dialogVisible = false">取 消</el-button>
-        </div>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox,ElLoading  } from 'element-plus'
-import { Delete, Edit, Plus, Refresh, Search, Setting } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, Edit, Plus, Setting, Position } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import mavonEditorLib from 'mavon-editor'
+import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
+import '@wangeditor/editor/dist/css/style.css'
 import UploadImage from '@/components/Upload/Image.vue'
+import { isManagedImageUrl } from '@/utils/image'
 import { getCategoryListApi } from '@/api/article/category'
 import { getTagListApi } from '@/api/article/tag'
 import {
   getArticleListApi, getDetailApi, deleteArticleApi,
-  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi
+  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi
 } from '@/api/article'
-import { uploadApi,deleteFileApi } from '@/api/file'
+import { uploadApi, deleteFileApi } from '@/api/file'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
-import { prepareImageFileForUpload } from '@/utils/upload-image'
 
 // 模拟数据
 const categoryOptions = ref<any>([])
@@ -588,8 +533,9 @@ const total = ref(0)
 const tableData = ref<any[]>([])
 const queryFormRef = ref<FormInstance>()
 const formRef = ref<FormInstance>()
-const mdRef = ref();
-const fullscreenMdRef = ref();
+const articleEditorRef = shallowRef()
+const fullscreenArticleEditorRef = shallowRef()
+const articleEditorMode = 'default'
 const submitLoading = ref(false)
 const isMobile = ref(false)
 const contentEditorDialogVisible = ref(false)
@@ -614,6 +560,7 @@ const form = reactive<any>({
   id: undefined,
   title: '',
   cover: '',
+  coverImage: undefined,
   summary: '',
   categoryName: '',
   tags: [],
@@ -636,9 +583,6 @@ const reptileForm = reactive({
 const statusOptions = ref<any>([])
 const yesNoOptions = ref<any>([])
 
-const dialogVisible = ref(false)
-const videoInput = ref('')
-
 const tagName = ref('')
 const categoryName = ref('')
 
@@ -647,21 +591,31 @@ const syncMobile = () => {
   viewportHeight.value = window.innerHeight || document.documentElement.clientHeight || 0
 }
 
-const mobileArticleToolbars = {
-  bold: true,
-  italic: true,
-  header: true,
-  quote: true,
-  ol: true,
-  ul: true,
-  link: true,
-  imagelink: true,
-  code: true,
-  undo: true,
-  redo: true
-}
+const MOBILE_ARTICLE_TOOLBAR_KEYS = [
+  'headerSelect',
+  'bold',
+  'italic',
+  'underline',
+  'color',
+  'bgColor',
+  '|',
+  'bulletedList',
+  'numberedList',
+  'blockquote',
+  '|',
+  'insertLink',
+  'insertImage',
+  'insertVideo',
+  '|',
+  'undo',
+  'redo'
+]
 
-const articleEditorToolbars = computed(() => (isMobile.value ? mobileArticleToolbars : undefined))
+const articleToolbarConfig = computed(() => (
+  isMobile.value
+    ? { toolbarKeys: MOBILE_ARTICLE_TOOLBAR_KEYS }
+    : {}
+))
 
 const articleEditorHeight = computed(() => {
   if (!isMobile.value) {
@@ -677,7 +631,10 @@ const fullscreenArticleEditorHeight = computed(() => {
 })
 
 const articleContentStats = computed(() => {
-  const content = String(form.contentMd || '').replace(/\r/g, '')
+  const content = String(form.content || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\r/g, '')
   if (!content) {
     return { characters: 0, lines: 0 }
   }
@@ -687,26 +644,77 @@ const articleContentStats = computed(() => {
   }
 })
 
-const articleContentPreview = computed(() => {
-  const content = String(form.contentMd || '').trim()
-  if (!content) {
-    return '点击进入大编辑器输入正文，手机端会使用更大的单栏编辑区。'
-  }
+// 用于追踪编辑器内图片变化，实现“删除图片即删服务器文件”
+const lastImages = ref<string[]>([])
 
-  return content
-    .replace(/\n{3,}/g, '\n\n')
-    .slice(0, 180)
-})
-
-const getActiveEditor = () => {
-  if (contentEditorDialogVisible.value && fullscreenMdRef.value) {
-    return fullscreenMdRef.value
+const extractImagesFromHtml = (html: string) => {
+  if (!html) return []
+  const urls: string[] = []
+  const imgReg = /<img [^>]*src=['"]([^'"]+)[^>]*>/gi
+  let match
+  while ((match = imgReg.exec(html)) !== null) {
+    urls.push(match[1])
   }
-  return mdRef.value
+  return urls
 }
 
-const renderArticleContent = (value: string) => {
-  return mavonEditorLib?.markdownIt?.render?.(value || '') || value || ''
+const handleEditorChange = (editor: any) => {
+  const currentHtml = editor.getHtml()
+  const currentImages = extractImagesFromHtml(currentHtml)
+
+  // 找出被删除的图片
+  const deletedImages = lastImages.value.filter(url => !currentImages.includes(url))
+
+  if (deletedImages.length > 0) {
+    deletedImages.forEach(url => {
+      // 只有托管在自己服务器上的图片才调用删除接口
+      if (isManagedImageUrl(url)) {
+        console.log('检测到编辑器内图片删除:', url)
+        deleteFileApi(url).catch(err => {
+          console.error('服务器文件删除失败:', url, err)
+        })
+      }
+    })
+  }
+
+  lastImages.value = currentImages
+}
+
+const buildUploadUrl = async (file: File) => {
+  const formdata = new FormData()
+  formdata.append('file', file)
+  const res = await uploadApi(formdata, 'article-content')
+  const uploadedUrl = extractUploadUrl(res)
+  if (!uploadedUrl) {
+    throw new Error('上传返回地址为空')
+  }
+  return uploadedUrl
+}
+
+const articleEditorConfig = computed(() => ({
+  placeholder: '输入文章内容...',
+  MENU_CONF: {
+    uploadImage: {
+      customUpload: async (file: File, insertFn: (url: string) => void) => {
+        const url = await buildUploadUrl(file)
+        insertFn(url)
+      }
+    },
+    uploadVideo: {
+      customUpload: async (file: File, insertFn: (url: string) => void) => {
+        const url = await buildUploadUrl(file)
+        insertFn(url)
+      }
+    }
+  }
+}))
+
+const handleArticleEditorCreated = (editor: any) => {
+  articleEditorRef.value = editor
+}
+
+const handleFullscreenArticleEditorCreated = (editor: any) => {
+  fullscreenArticleEditorRef.value = editor
 }
 
 const isArticleSelected = (id: string | number) => selectedIds.value.includes(id)
@@ -725,6 +733,27 @@ const resolveOptionMeta = (options: any[], value: string | number) => {
   return options.find(item => Number(item.value) === Number(value)) || {}
 }
 
+const handleCoverImageMetadataChange = (metadata: any) => {
+  form.coverImage = metadata || undefined
+}
+
+const extractUploadUrl = (payload: any) => {
+  if (!payload) {
+    return ''
+  }
+  if (typeof payload === 'string') {
+    return payload
+  }
+  const data = payload.data
+  if (typeof data === 'string') {
+    return data
+  }
+  if (data && typeof data === 'object') {
+    return String(data.fallback || data.url || data.src || '')
+  }
+  return String(payload.url || '')
+}
+
 
 
 
@@ -738,7 +767,7 @@ const rules = reactive<FormRules>({
   categoryName: [
     { required: true, message: '请选择文章分类', trigger: 'change' }
   ],
-  contentMd: [
+  content: [
     { required: true, message: '请输入文章内容', trigger: 'blur' }
   ],
   summary: [
@@ -809,74 +838,6 @@ const saveCategory = () => {
 }
 
 
-
-//删除图片
-function imgDel(pos: any, $file: any) {
-   deleteFileApi(pos[0]).then((res) => {
-     ElMessage.success('删除成功')
-   })
-}
-//添加图片
-async function imgAdd(pos: any, $file: File) {
-  try {
-    const file = await prepareImageFileForUpload($file)
-    const formdata = new FormData()
-    formdata.append('file', file)
-    const res = await uploadApi(formdata, 'article-content')
-    getActiveEditor()?.$img2Url(pos, res.data)
-  } catch (error: any) {
-    if (error?.message) {
-      ElMessage.error(error.message)
-    }
-  }
-}
-
-// 上传视频
-const uploadVideo = (param: any) => {
-  const loading = ElLoading.service({
-    lock: true,
-    text: 'Loading',
-    background: 'rgba(0, 0, 0, 0.7)',
-  })
-  var formData = new FormData();
-  formData.append("file", param.file);
-  return uploadApi(formData, 'article-content').then((res) => {
-    const $vm = getActiveEditor();
-    if (!$vm) {
-      return res;
-    }
-    $vm.insertText($vm.getTextareaDom(), {
-      prefix: `<video height=100% width=100% controls autoplay src="${res.data}"></video>`,
-      subfix: "",
-      str: "",
-    });
-    return res;
-  }).finally(() => {
-    loading.close();
-  });
-}
-
-/**
- * 添加网络视频地址
- */
- const addVideo = () => {
-  // 这里获取到的是mavon编辑器实例，上面挂载着很多方法
-  const $vm = getActiveEditor();
-  if (!$vm) {
-    dialogVisible.value = false;
-    videoInput.value = "";
-    return;
-  }
-  // 将文件名与文件路径插入当前光标位置，这是mavon-editor 内置的方法
-  $vm.insertText($vm.getTextareaDom(), {
-    prefix: `<video height=100% width=100% controls autoplay src="${videoInput.value}"></video>`,
-    subfix: "",
-    str: "",
-  });
-
-  dialogVisible.value = false;
-  videoInput.value = "";
-}
 
 // 获取分类列表
 const getList = async () => {
@@ -957,6 +918,23 @@ const handleChangeStatus = (row: any) => {
   })
 }
 
+// 推送百度
+const handlePushBaidu = (row: any) => {
+  pushBaiduApi(row.id).then((res) => {
+    ElMessage.success('推送任务已提交')
+  }).catch(() => {
+    ElMessage.error('推送失败，请检查百度收录配置')
+  })
+}
+
+const handlePushBaiduRecent = () => {
+  pushBaiduRecentApi().then((res: any) => {
+    ElMessage.success(`成功提交 ${res.data} 篇文章的推送任务`)
+  }).catch(() => {
+    ElMessage.error('推送失败，请检查百度收录配置')
+  })
+}
+
 // 搜索
 const handleQuery = () => {
   queryParams.pageNum = 1
@@ -974,6 +952,7 @@ const clearForm = () => {
   form.id = undefined
   form.title = ''
   form.cover = undefined
+  form.coverImage = undefined
   form.summary = ''
   form.categoryName = ''
   form.tags = []
@@ -985,6 +964,7 @@ const clearForm = () => {
   form.isCarousel = 0
   form.isRecommend = 0
   form.keywords = ''
+  lastImages.value = []
   contentEditorDialogVisible.value = false
 }
 
@@ -1004,6 +984,11 @@ const handleUpdate = (row: any) => {
   dialog.visible = true
   getDetailApi(row.id).then((res) => {
     Object.assign(form, res.data)
+    if (!form.content && form.contentMd) {
+      form.content = String(form.contentMd)
+    }
+    // 初始化编辑器图片列表，用于后续删除追踪
+    lastImages.value = extractImagesFromHtml(form.content)
   })
 }
 
@@ -1014,7 +999,7 @@ const submitForm = async () => {
   await formRef.value.validate(async (valid) => {
     if (valid) {
       submitLoading.value = true
-      form.content = getActiveEditor()?.d_render || renderArticleContent(String(form.contentMd || ''));
+      form.contentMd = String(form.contentMd || form.content || '')
       try {
         if (dialog.type === 'add') {
           await addArticleApi(form)
@@ -1071,28 +1056,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', syncMobile)
+  articleEditorRef.value?.destroy?.()
+  fullscreenArticleEditorRef.value?.destroy?.()
 })
 
-// 图片上传前的处理
-const beforeAvatarUpload = (file: File) => {
-  // 这里添加文件类型和大小限制
-  const isJPG = file.type === 'image/jpeg'
-  const isPNG = file.type === 'image/png'
-  const isLt2M = file.size / 1024 / 1024 < 2
-
-  if (!isJPG && !isPNG) {
-    ElMessage.error('上传头像图片只能是 JPG/PNG 格式!')
-    return false
-  }
-  if (!isLt2M) {
-    ElMessage.error('上传头像图片大小不能超过 2MB!')
-    return false
-  }
-
-  // 模拟上传
-  form.cover = URL.createObjectURL(file)
-  return false
-}
 </script>
 
 <style lang="scss" scoped>
@@ -1158,11 +1125,6 @@ const beforeAvatarUpload = (file: File) => {
       }
     }
 
-    .v-note-wrapper {
-      z-index: 1;
-      min-height: 500px;
-      margin-bottom: 20px;
-    }
   }
 
   .mb-20 {
@@ -1177,32 +1139,20 @@ const beforeAvatarUpload = (file: File) => {
     margin-bottom: 12px;
   }
 
-  .article-editor__mobile-preview {
-    display: flex;
+  .article-editor {
     width: 100%;
-    flex-direction: column;
-    gap: 10px;
-    padding: 16px;
-    border: 1px solid var(--el-border-color-lighter);
-    border-radius: 18px;
-    background: linear-gradient(180deg, rgba(64, 158, 255, 0.08), rgba(255, 255, 255, 0.98));
-    text-align: left;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    border: 1px solid var(--el-border-color);
+    border-radius: 12px;
+    background: var(--el-bg-color);
   }
 
-  .article-editor__mobile-preview-label {
-    color: var(--el-text-color-secondary);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+  .article-editor__toolbar {
+    border-bottom: 1px solid var(--el-border-color);
   }
 
-  .article-editor__mobile-preview-text {
-    color: var(--el-text-color-primary);
-    font-size: 14px;
-    line-height: 1.8;
-    white-space: pre-wrap;
-    word-break: break-word;
+  .article-editor__body {
+    overflow-y: hidden;
   }
 
   .article-editor__meta {
@@ -1223,7 +1173,7 @@ const beforeAvatarUpload = (file: File) => {
     padding: 14px !important;
   }
 
-  :deep(.article-content-dialog .v-note-wrapper) {
+  :deep(.article-content-dialog .article-editor) {
     margin-bottom: 0;
   }
 
@@ -1444,14 +1394,13 @@ const beforeAvatarUpload = (file: File) => {
         padding-right: 0 !important;
       }
 
-      .v-note-wrapper {
+      .article-editor {
         width: 100% !important;
         min-width: 0 !important;
-        min-height: 430px;
         margin-bottom: 0;
       }
 
-      .v-note-op {
+      .article-editor__toolbar {
         display: flex !important;
         flex-wrap: nowrap !important;
         height: auto !important;
@@ -1464,26 +1413,14 @@ const beforeAvatarUpload = (file: File) => {
           display: none;
         }
 
-        .op-icon,
-        .op-icon-divider {
+        :deep(.w-e-bar-item),
+        :deep(.w-e-bar-divider) {
           flex: 0 0 auto;
         }
       }
 
-      .content-input-wrapper,
-      .auto-textarea-wrapper,
-      .auto-textarea-input {
+      .article-editor__body {
         min-height: 340px !important;
-      }
-
-      .v-note-panel,
-      .v-note-edit {
-        width: 100% !important;
-        min-width: 0 !important;
-      }
-
-      .v-note-show {
-        display: none !important;
       }
     }
 

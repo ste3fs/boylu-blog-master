@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.article;
+package com.boylu.vo.article;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -21,6 +21,9 @@ public class SysArticleDetailVo {
 
     @ApiModelProperty(value = "文章封面地址")
     private String cover;
+
+    @ApiModelProperty(value = "文章封面图片元数据")
+    private CoverImageVo coverImage;
 
     @ApiModelProperty(value = "文章简介")
     private String summary;

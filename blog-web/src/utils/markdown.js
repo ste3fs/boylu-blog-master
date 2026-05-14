@@ -1,4 +1,5 @@
 import { marked } from 'marked'
+import 'highlight.js/styles/atom-one-dark.css'
 import hljs from 'highlight.js/lib/core'
 import bash from 'highlight.js/lib/languages/bash'
 import css from 'highlight.js/lib/languages/css'
@@ -14,6 +15,7 @@ import sql from 'highlight.js/lib/languages/sql'
 import typescript from 'highlight.js/lib/languages/typescript'
 import xml from 'highlight.js/lib/languages/xml'
 import yaml from 'highlight.js/lib/languages/yaml'
+import { sanitizeHtml } from '@/utils/htmlSanitizer'
 
 const registeredLanguages = [
   ['bash', bash, ['shell', 'sh', 'powershell', 'ps1']],
@@ -68,7 +70,7 @@ marked.setOptions({
 })
 
 export function renderMarkdown(content) {
-  return marked.parse(content || '')
+  return sanitizeHtml(marked.parse(content || ''))
 }
 
 export function highlightCodeBlocks(root = document) {

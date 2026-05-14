@@ -1,4 +1,4 @@
-﻿package com.boylu.controller;
+package com.boylu.controller;
 
 import cn.dev33.satoken.annotation.SaIgnore;
 import cn.dev33.satoken.stp.StpUtil;
@@ -30,6 +30,24 @@ public class AuthController {
     @ApiOperation(value = "获取第三方授权地址")
     public Result<String> renderAuth(HttpServletResponse response, @PathVariable String source) {
         return Result.success(authService.renderAuth(source));
+    }
+
+    @GetMapping("/api/auth/bind/render/{source}")
+    @ApiOperation(value = "获取第三方账号绑定授权地址")
+    public Result<String> renderBindAuth(@PathVariable String source) {
+        return Result.success(authService.renderBindAuth(source));
+    }
+
+    @GetMapping("/api/auth/bindings")
+    @ApiOperation(value = "获取第三方账号绑定列表")
+    public Result<?> listOauthBindings() {
+        return Result.success(authService.listOauthBindings());
+    }
+
+    @DeleteMapping("/api/auth/bind/{source}")
+    @ApiOperation(value = "解除第三方账号绑定")
+    public Result<Boolean> unbindOauth(@PathVariable String source) {
+        return Result.success(authService.unbindOauth(source));
     }
 
     @RequestMapping("/api/auth/callback/{source}")

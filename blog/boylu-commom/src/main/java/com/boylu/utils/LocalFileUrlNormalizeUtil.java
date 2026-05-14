@@ -1,7 +1,8 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -41,18 +42,28 @@ public final class LocalFileUrlNormalizeUtil {
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final Pattern MOJIAN_FILE_PREFIX = Pattern.compile(
-            "/mojian/file/(?:view|content)/",
+    private static final Pattern NAMESPACED_FILE_PREFIX = Pattern.compile(
+            "/(?:boylu|mojian)/file/(?:view|content)/",
             Pattern.CASE_INSENSITIVE
     );
 
-    private static final Pattern BOYLU_FILE_VIEW_PREFIX = Pattern.compile(
-            "/boylu/file/view/",
+    private static final Pattern NAMESPACED_FILE_VIEW_PREFIX = Pattern.compile(
+            "/(?:boylu|mojian)/file/view/",
             Pattern.CASE_INSENSITIVE
     );
 
     private static final Pattern ROOT_FILE_PREFIX = Pattern.compile(
             "([\"'\\s(=])/?file/(?:view|content)/",
+            Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern BASE64_IMAGE_PATTERN = Pattern.compile(
+            "(<img[^>]*src=(['\"])data:image/(?:png|jpe?g|gif|webp|bmp);base64,[^'\"]*\\2[^>]*>)",
+            Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern BASE64_DATA_URL_PATTERN = Pattern.compile(
+            "(src=(['\"])data:image/(?:png|jpe?g|gif|webp|bmp);base64,[^'\"]*\\2)",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -65,15 +76,36 @@ public final class LocalFileUrlNormalizeUtil {
         }
 
         String normalized = text;
+        normalized = filterBase64Images(normalized);
         normalized = ABSOLUTE_LOCAL_FILE_PREFIX.matcher(normalized).replaceAll(LOCAL_FILE_SEGMENT);
         normalized = PROTOCOL_RELATIVE_LOCAL_FILE_PREFIX.matcher(normalized).replaceAll(LOCAL_FILE_SEGMENT);
         normalized = ABSOLUTE_FILE_VIEW_PREFIX.matcher(normalized).replaceAll("/boylu/file/content/");
         normalized = PROTOCOL_RELATIVE_FILE_VIEW_PREFIX.matcher(normalized).replaceAll("/boylu/file/content/");
         normalized = DUPLICATED_NAMESPACE_FILE_PREFIX.matcher(normalized).replaceAll("/boylu$1");
-        normalized = BOYLU_FILE_VIEW_PREFIX.matcher(normalized).replaceAll("/boylu/file/content/");
-        normalized = MOJIAN_FILE_PREFIX.matcher(normalized).replaceAll("/boylu/file/content/");
+        normalized = NAMESPACED_FILE_VIEW_PREFIX.matcher(normalized).replaceAll("/boylu/file/content/");
+        normalized = NAMESPACED_FILE_PREFIX.matcher(normalized).replaceAll("/boylu/file/content/");
         normalized = ROOT_FILE_PREFIX.matcher(normalized).replaceAll("$1/boylu/file/content/");
         return normalized;
+    }
+
+    private static String filterBase64Images(String text) {
+        if (StringUtils.isBlank(text)) {
+            return text;
+        }
+        java.util.regex.Matcher matcher = BASE64_IMAGE_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String imgTag = matcher.group(1);
+            java.util.regex.Matcher srcMatcher = BASE64_DATA_URL_PATTERN.matcher(imgTag);
+            if (srcMatcher.find()) {
+                String filteredTag = srcMatcher.replaceAll("");
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(filteredTag));
+            } else {
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(imgTag));
+            }
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 
     public static String normalizeUrl(String url) {

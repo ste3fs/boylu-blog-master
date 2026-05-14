@@ -72,7 +72,7 @@
             </div>
             <div class="chat-info">
               <div class="name">{{ chat.name }}</div>
-              <div class="last-message" v-html="currentChat.lastMessage"></div>
+              <div class="last-message" v-html="$sanitizeHtml(currentChat.lastMessage)"></div>
             </div>
             <div class="meta">
               <div class="time">{{ currentChat.lastTime }}</div>
@@ -165,10 +165,10 @@
               
               <img
                 v-else-if="msg.type === 'image'"
-                v-lazy="msg.content"
+                v-lazy="resolveImage(msg.content)"
                 :key="'img-' + (msg.id || index)"
                 class="message-image"
-                @click="previewImage(msg.content)"
+                @click="previewImage(resolveImage(msg.content))"
                 @load="handleImageLoad"
                 @contextmenu.prevent="showMessageActions(msg, $event)"
               />
@@ -372,6 +372,8 @@ import { disableScroll, enableScroll } from "@/utils/scroll";
 import { showLoading, hideLoading } from "@/utils/loading";
 import { copyText } from "@/utils/contact";
 import { renderMarkdown } from '@/utils/markdown'
+import { sanitizeCommentHtml, sanitizeHtml } from '@/utils/htmlSanitizer'
+import { resolveImageUrl } from '@/utils/image'
 
 
 export default {
@@ -784,15 +786,21 @@ export default {
       try {
         // 发送文本消息
         if (this.messageText.trim()) {
+          const safeContent = sanitizeCommentHtml(this.messageText);
+          if (!safeContent) {
+            this.$message.warning('消息内容不能为空');
+            return;
+          }
+
           const textMessage = {
             type: "text",
-            content: this.messageText, // 直接发送包含 HTML 的内容
+            content: safeContent,
             name: this.$store.state.userInfo.nickname,
             userId: this.$store.state.userInfo.id,
             avatar: this.$store.state.userInfo.avatar,
             sex: this.$store.state.userInfo.sex,
             replyId: this.selectedReplyMessage?.id || null,
-            replyContent: this.selectedReplyMessage?.content || null,
+            replyContent: this.selectedReplyMessage?.content ? sanitizeCommentHtml(this.selectedReplyMessage.content) : null,
             replyUserId: this.selectedReplyMessage?.userId || null,
             replyUserName: this.selectedReplyMessage?.name || null,
           };
@@ -863,11 +871,11 @@ export default {
      * 插入表情
      */
     insertEmoji(emoji) {
-      const img = `<img src="${emoji}" class="emoji" style="width: 30px; height: 30px; vertical-align: middle;">`;
+      const img = sanitizeCommentHtml(`<img src="${emoji}" class="emoji" alt="emoji">`);
       const editor = this.$refs.messageInput;
       editor.focus();
       document.execCommand('insertHTML', false, img);
-      this.messageText = editor.innerHTML;
+      this.messageText = this.normalizeEditorHtml(editor);
     },
 
     /**
@@ -876,6 +884,9 @@ export default {
      */
     previewImage(src) {
       this.$refs.imagePreview.show(src);
+    },
+    resolveImage(src) {
+      return resolveImageUrl(src, this.$store.state.defaultImage);
     },
     /**
      * 显示消息操作菜单
@@ -1116,7 +1127,7 @@ export default {
      */
     handleInput(event) {
       const input = this.$refs.messageInput;
-      this.messageText = input.innerHTML; // 使用 innerHTML 而不是 innerText 来保留 HTML 标签
+      this.messageText = this.normalizeEditorHtml(input);
 
       // 处理 placeholder
       if (input.innerHTML.trim() === '') {
@@ -1305,7 +1316,9 @@ export default {
       this.messageText += mentionText;
       
       // 更新contenteditable div的内容
-      input.innerHTML += mentionText;
+      input.focus();
+      document.execCommand('insertText', false, mentionText);
+      this.messageText = this.normalizeEditorHtml(input);
 
       // 将光标移动到末尾
       const range = document.createRange();
@@ -1324,6 +1337,14 @@ export default {
 
       // 聚焦输入框
       input.focus();
+    },
+
+    normalizeEditorHtml(editor) {
+      const safeContent = sanitizeCommentHtml(editor?.innerHTML || '');
+      if (editor && editor.innerHTML !== safeContent) {
+        editor.innerHTML = safeContent;
+      }
+      return safeContent;
     },
 
     /**
@@ -1347,7 +1368,7 @@ export default {
         }
 
         // 处理普通文本中的@格式
-        return htmlContent.replace(/@(\S+)\s/g, "<mention>@$1</mention> ");
+        return sanitizeHtml(htmlContent.replace(/@(\S+)\s/g, "<mention>@$1</mention> "));
       }
 
       // 处理纯文本中的表情标记
@@ -1364,7 +1385,7 @@ export default {
         return htmlContent;
       }
 
-      return htmlContent.replace(/@(\S+)\s/g, "<mention>@$1</mention> ");
+      return sanitizeHtml(htmlContent.replace(/@(\S+)\s/g, "<mention>@$1</mention> "));
     },
 
     toggleList() {
@@ -1685,34 +1706,40 @@ export default {
      * @param {ClipboardEvent} event
      */
     async handlePaste(event) {
-      const items = event.clipboardData.items;
-      
-      for (let item of items) {
-        if (item.type.startsWith('image/')) {
-          //最多只能三张
-          if (this.pastedImages.length >= 3) {
-            this.$message.error("最多只能粘贴3张图片");
-            return;
-          }
-          event.preventDefault();
-          const file = item.getAsFile();
-          
-          if (file.size > 5 * 1024 * 1024) {
-            this.$message.error("图片大小不能超过5MB");
-            return;
-          }
+      const items = Array.from(event.clipboardData?.items || []);
+      const imageItem = items.find((item) => item.type.startsWith('image/'));
 
-          // 创建预览
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            this.pastedImages.push({
-              file: file,
-              preview: e.target.result
-            });
-          };
-          reader.readAsDataURL(file);
-          break;
+      if (imageItem) {
+        event.preventDefault();
+        if (this.pastedImages.length >= 3) {
+          this.$message.error("最多只能粘贴3张图片");
+          return;
         }
+
+        const file = imageItem.getAsFile();
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+          this.$message.error("图片大小不能超过5MB");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          this.pastedImages.push({
+            file: file,
+            preview: e.target.result
+          });
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      event.preventDefault();
+      const text = event.clipboardData?.getData('text/plain') || '';
+      if (text) {
+        document.execCommand('insertText', false, text);
+        this.messageText = this.normalizeEditorHtml(this.$refs.messageInput);
       }
     },
 

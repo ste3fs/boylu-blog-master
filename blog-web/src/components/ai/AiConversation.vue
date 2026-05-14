@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="ai-conversation" :class="[{ 'is-embedded': embedded, 'is-mobile-compact': isCompactMobile, 'is-home-mode': isHomeMode, 'without-sidebar': !shouldShowDesktopSidebar }, `theme-${theme}`]">
     <aside v-if="shouldShowDesktopSidebar" class="ai-sidebar" :class="{ 'is-open': mobileSidebarOpen }">
       <div class="ai-sidebar__header">
@@ -167,9 +167,9 @@
                   v-for="(file, index) in message.meta.attachments"
                   :key="`${message.localKey}-attachment-${index}`"
                   class="attachment-card"
-                  :href="file.url || 'javascript:void(0)'"
+                  :href="sanitizeAttachmentUrl(file.url)"
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                 >
                   <span class="attachment-card__icon">
                     <i :class="resolveAttachmentIcon(file)"></i>
@@ -350,6 +350,7 @@
 
 <script>
 import { renderMarkdown } from '@/utils/markdown'
+import { sanitizeUrl } from '@/utils/htmlSanitizer'
 import { uploadFileApi } from '@/api/file'
 import {
   deleteAiSessionApi,
@@ -1273,6 +1274,9 @@ export default {
     },
     renderMarkdown(content) {
       return renderMarkdown(this.formatAssistantContent(content || ''))
+    },
+    sanitizeAttachmentUrl(url) {
+      return sanitizeUrl(url)
     },
     formatAssistantContent(content) {
       if (!content) {

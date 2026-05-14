@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.article;
+package com.boylu.controller.article;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -55,6 +55,20 @@ public class SysArticleController {
     @SaCheckPermission("sys:article:updateStatus")
     public Result<Boolean> updateStatus(@RequestBody SysArticle sysArticle) {
         return Result.success(sysArticleService.updateById(sysArticle));
+    }
+
+    @PostMapping("/pushBaidu/{id}")
+    @ApiOperation(value = "手动推送文章到百度")
+    @SaCheckPermission("sys:article:update")
+    public Result<Boolean> pushBaidu(@PathVariable Long id) {
+        return Result.success(sysArticleService.pushToBaidu(id));
+    }
+
+    @PostMapping("/pushBaiduRecent")
+    @ApiOperation(value = "手动推送最近发布文章到百度")
+    @SaCheckPermission("sys:article:update")
+    public Result<Integer> pushBaiduRecent(@RequestParam(defaultValue = "200") Integer limit) {
+        return Result.success(sysArticleService.pushRecentPublishedToBaidu(limit));
     }
 
     @DeleteMapping("/delete/{ids}")

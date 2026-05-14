@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -32,9 +32,8 @@
         <package.version>1.0-SNAPSHOT</package.version>
     </properties>
 
-
     <build>
-        <!-- 注：maven默认是不编译，因此加上如下resources才会生产对应的xml文件 目的：解决mybatis映射关系不对应问题  start =============== -->
+        <!-- Include mapper XML files from src/main/java so MyBatis mappings are packaged. -->
         <resources>
             <resource>
                 <directory>src/main/java</directory>
@@ -56,20 +55,18 @@
                 <filtering>false</filtering>
             </testResource>
         </testResources>
-        <!-- 注：maven默认是不编译，因此加上如下resources才会生产对应的xml文件 目的：解决mybatis映射关系不对应问题  end =============== -->
 
         <plugins>
-            <!-- maven打包插件 -> 将整个工程打成一个 fatjar -->
+            <!-- Spring Boot executable jar packaging. -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <!-- 作用:项目打成jar，同时把本地jar包也引入进去 -->
                 <configuration>
                     <includeSystemScope>true</includeSystemScope>
                     <mainClass>com.boylu.NeatAdminApplication</mainClass>
                 </configuration>
             </plugin>
-            <!--添加配置跳过测试-->
+            <!-- Skip tests during packaging by default. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -80,7 +77,6 @@
             </plugin>
         </plugins>
 
-        <!-- 固定Jar包名字 -->
         <finalName>boylu-blog</finalName>
     </build>
-</project> 
+</project>

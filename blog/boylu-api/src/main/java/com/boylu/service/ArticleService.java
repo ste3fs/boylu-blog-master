@@ -1,4 +1,4 @@
-﻿package com.boylu.service;
+package com.boylu.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.boylu.entity.SysCategory;
@@ -6,6 +6,7 @@ import com.boylu.vo.article.ArchiveListVo;
 import com.boylu.vo.article.ArticleDetailVo;
 import com.boylu.vo.article.ArticleListVo;
 import com.boylu.vo.article.CategoryListVo;
+import com.boylu.vo.article.HomeArticleVo;
 
 import java.util.List;
 
@@ -17,6 +18,11 @@ public interface ArticleService {
      * @return
      */
     IPage<ArticleListVo> getArticleList(Integer tagId, Integer categoryId,String keyword);
+
+    /**
+     * 首页文章轻量列表
+     */
+    IPage<HomeArticleVo> getHomeArticleList(Integer tagId, Integer categoryId, String keyword);
 
     /**
      * 获取文章详情

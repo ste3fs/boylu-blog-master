@@ -1,4 +1,4 @@
-﻿package com.boylu.entity;
+package com.boylu.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -39,6 +39,9 @@ public class SysArticle implements Serializable {
     @ApiModelProperty(value = "文章封面地址")
     private String cover;
 
+    @ApiModelProperty(value = "文章封面图片元数据 JSON")
+    private String coverImage;
+
     @ApiModelProperty(value = "文章简介")
     private String summary;
 
@@ -78,6 +81,9 @@ public class SysArticle implements Serializable {
 
     @ApiModelProperty(value = "Ai生成的简短描述")
     private String aiDescribe;
+
+    @ApiModelProperty(value = "是否已推送百度 0否 1是")
+    private Integer isBaiduPushed;
 
     @ApiModelProperty(value = "创建时间")
     @TableField(fill = FieldFill.INSERT)

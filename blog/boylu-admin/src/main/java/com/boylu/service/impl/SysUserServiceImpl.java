@@ -1,4 +1,4 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -83,6 +83,15 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     @Override
     public void updatePwd(UpdatePwdDTO updatePwdDTO) {
+        if (updatePwdDTO == null
+                || StringUtils.isBlank(updatePwdDTO.getOldPassword())
+                || StringUtils.isBlank(updatePwdDTO.getNewPassword())) {
+            throw new ServiceException("密码不能为空");
+        }
+
+        if (updatePwdDTO.getNewPassword().length() < 6) {
+            throw new ServiceException("新密码长度不能小于6位");
+        }
 
         SysUser user = this.getById(StpUtil.getLoginIdAsInt());
         if (user == null) {

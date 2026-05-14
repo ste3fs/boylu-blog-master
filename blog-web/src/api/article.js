@@ -15,7 +15,7 @@ export function getArticleDetailApi(id) {
  */
 export function getArticlesApi(params) {
   return request({
-      url: '/api/article/list',
+      url: '/api/article/home-list',
       method: 'get',
       params: params
   })

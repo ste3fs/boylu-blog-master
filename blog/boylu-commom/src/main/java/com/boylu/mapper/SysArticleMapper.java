@@ -1,4 +1,4 @@
-﻿package com.boylu.mapper;
+package com.boylu.mapper;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -6,6 +6,7 @@ import com.boylu.vo.dashboard.ContributionData;
 import com.boylu.dto.article.ArticleQueryDto;
 import com.boylu.vo.article.ArticleDetailVo;
 import com.boylu.vo.article.ArticleListVo;
+import com.boylu.vo.article.HomeArticleVo;
 import com.boylu.entity.SysArticle;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.MapKey;
@@ -30,6 +31,9 @@ public interface SysArticleMapper extends BaseMapper<SysArticle> {
      */
     IPage<ArticleListVo> getArticleListApi(@Param("page") Page<Object> page,@Param("tagId") Integer tagId,
                                            @Param("categoryId")Integer categoryId, @Param("keyword")String keyword);
+
+    IPage<HomeArticleVo> getHomeArticleListApi(@Param("page") Page<Object> page, @Param("tagId") Integer tagId,
+                                               @Param("categoryId") Integer categoryId, @Param("keyword") String keyword);
 
     /**
      * 获取文章详情

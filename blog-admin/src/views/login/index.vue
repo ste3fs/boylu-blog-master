@@ -259,7 +259,8 @@ const login = () => {
       router.push("/");
       ElMessage.success("登录成功");
     })
-    .catch(() => {
+    .catch((error) => {
+      ElMessage.error(error?.message || "登录失败，请检查账号密码或稍后重试");
       refresh();
     })
     .finally(() => {
@@ -284,18 +285,22 @@ const toggleTheme = () => {
 
 const handleLogin = async () => {
   loginForm.rememberMe = rememberMe.value;
-  loginFormRef.value?.validate((flag) => {
+  loginFormRef.value?.validate(async (flag) => {
     if (!flag) {
       return;
     }
-    getCaptchaSwitchApi().then((res) => {
+    try {
+      const res = await getCaptchaSwitchApi();
       if (!res.data || res.data.configValue === "Y") {
         showSliderVerify.value = true;
         nextTick(() => refresh());
       } else {
         login();
       }
-    });
+    } catch (error) {
+      ElMessage.warning("验证码配置读取失败，已改用账号密码登录");
+      login();
+    }
   });
 };
 

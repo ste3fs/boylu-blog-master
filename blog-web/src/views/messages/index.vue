@@ -1,96 +1,63 @@
 <template>
-  <div class="message-page" :style="cover">
-    <section class="message-hero">
-      <div class="message-copy">
-        <span class="message-eyebrow">Message Board</span>
-        <h1>留言板</h1>
-        <p class="message-summary">
-          留下一句想说的话，留言会以弹幕的形式穿过页面。手机端输入区改成了更稳的双层结构，不再挤在标题下面。
-        </p>
-
-        <div class="message-stats">
-          <article class="message-stat">
-            <strong>{{ barrageList.length }}</strong>
-            <span>当前留言</span>
-          </article>
-          <article class="message-stat">
-            <strong>{{ countdownText }}</strong>
-            <span>下一次发送</span>
-          </article>
-          <article class="message-stat">
-            <strong>{{ identityLabel }}</strong>
-            <span>当前身份</span>
-          </article>
+  <div class="message-page">
+    <section class="message-board">
+      <div class="message-board__inner">
+        <div class="message-board__head">
+          <span class="message-board__eyebrow">Message Board</span>
+          <h1>留言板</h1>
         </div>
-      </div>
 
-      <div class="composer-card">
-        <label class="composer-label">说点什么</label>
-        <el-input
-          v-model="content"
-          class="composer-input"
-          type="textarea"
-          :autosize="{ minRows: 3, maxRows: 5 }"
-          resize="none"
-          placeholder="想分享一句日常、灵感或者路过的心情都可以"
-          @keyup.enter.native="handleTextareaEnter"
-        />
-        <div class="composer-footer">
-          <span class="composer-tip">
-            {{ count ? `${count} 秒后可再次发送` : '发送后会实时加入弹幕墙' }}
-          </span>
+        <div class="message-composer">
+          <el-input
+            v-model="content"
+            class="message-composer__input"
+            placeholder="说点什么吧"
+            maxlength="80"
+            show-word-limit
+            @keyup.enter.native="addToList"
+          />
           <el-button
+            class="message-composer__button"
             type="primary"
             round
             :disabled="submitDisabled"
             @click="addToList"
           >
-            发送留言
+            发送
           </el-button>
         </div>
-      </div>
-    </section>
 
-    <section class="barrage-panel">
-      <div class="panel-header">
-        <div>
-          <p class="panel-eyebrow">Live Wall</p>
-          <h2>实时弹幕</h2>
-        </div>
-        <div class="panel-status">
-          <span class="status-dot"></span>
-          <span>实时更新中</span>
-        </div>
+        <p class="message-board__meta">
+          <span>{{ identityLabel }}</span>
+          <span>{{ count ? `${count} 秒后可再次发送` : '发送后会实时加入留言墙' }}</span>
+        </p>
       </div>
 
-      <div v-if="!barrageList.length" class="empty-panel">
-        <i class="fas fa-comment-dots"></i>
-        <div>
-          <strong>还没有留言</strong>
-          <p>第一条留言会从这里开始出现。</p>
+      <div class="message-wall">
+        <div v-if="!barrageList.length" class="message-empty">
+          <i class="fas fa-comment-dots"></i>
+          <span>还没有留言，写下第一句吧</span>
         </div>
-      </div>
 
-      <div v-else class="barrage-stage">
         <vue-danmaku
-          class="danmaku"
+          v-else
+          class="message-danmaku"
           :danmus="barrageList"
-          style="height: 100%; width: 100%"
           useSlot
-          :speeds="130"
-          :channels="isMobile ? 10 : 14"
+          :speeds="isMobile ? 95 : 120"
+          :channels="isMobile ? 7 : 10"
         >
           <template v-slot:dm="{ danmu }">
-            <span class="barrage-item">
-              <img :src="resolveAvatar(danmu.avatar)" alt="avatar">
-              <span class="barrage-body">
-                <span class="barrage-meta">
-                  <span class="barrage-name">{{ danmu.nickname || '游客' }}</span>
-                  <time v-if="formatMessageTime(danmu.createTime)" class="barrage-time">
+            <span class="message-bubble">
+              <img :src="resolveAvatar(danmu.avatar)" :alt="danmu.nickname || '游客'">
+              <span class="message-bubble__main">
+                <span class="message-bubble__top">
+                  <strong>{{ danmu.nickname || '游客' }}</strong>
+                  <time v-if="formatMessageTime(danmu.createTime)">
                     {{ formatMessageTime(danmu.createTime) }}
                   </time>
                 </span>
-                <span class="barrage-content">{{ danmu.content }}</span>
+                <span class="message-bubble__content">{{ danmu.content }}</span>
               </span>
             </span>
           </template>
@@ -104,6 +71,7 @@
 import { getMessagesApi, addMessageApi } from '@/api/message'
 import { formatDateTime } from '@/utils/time'
 import { resolveImageUrl } from '@/utils/image'
+import { getBrowserInfo } from '@/utils/browser'
 import VueDanmaku from 'vue-danmaku'
 
 export default {
@@ -117,6 +85,7 @@ export default {
       count: null,
       timer: null,
       barrageList: [],
+      browserInfo: null,
       isMobile: typeof window !== 'undefined' ? window.innerWidth <= 768 : false
     }
   },
@@ -127,22 +96,12 @@ export default {
     submitDisabled() {
       return !this.content.trim() || Boolean(this.count)
     },
-    countdownText() {
-      return this.count ? `${this.count}s` : '可发送'
-    },
     identityLabel() {
       return this.user?.nickname || '游客'
-    },
-    cover() {
-      return {
-        background:
-          'radial-gradient(circle at 20% 20%, rgba(96, 165, 250, 0.16), transparent 24%), ' +
-          'radial-gradient(circle at 85% 8%, rgba(129, 140, 248, 0.18), transparent 28%), ' +
-          'linear-gradient(160deg, #0f172a 0%, #1d4ed8 52%, #38bdf8 100%)'
-      }
     }
   },
   mounted() {
+    this.browserInfo = getBrowserInfo()
     this.listMessage()
     window.addEventListener('resize', this.syncViewport)
   },
@@ -156,13 +115,6 @@ export default {
   methods: {
     syncViewport() {
       this.isMobile = window.innerWidth <= 768
-    },
-    handleTextareaEnter(event) {
-      if (event.shiftKey) {
-        return
-      }
-      event.preventDefault()
-      this.addToList()
     },
     startCooldown() {
       const timeCount = 30
@@ -195,18 +147,21 @@ export default {
       }
 
       const message = {
-        avatar: this.user ? this.user.avatar : this.$store.state.webSiteInfo.touristAvatar,
-        status: 1,
+        avatar: this.resolveAvatar(this.user ? this.user.avatar : this.$store.state.webSiteInfo.touristAvatar),
         nickname: this.user ? this.user.nickname : '游客',
         content: text,
-        createTime: new Date().toISOString()
+        browser: this.browserInfo ? `${this.browserInfo.name} ${this.browserInfo.version}` : ''
+      }
+      const localMessage = {
+        ...message,
+        createTime: formatDateTime(new Date()) || new Date().toLocaleString()
       }
 
       this.content = ''
 
       try {
         await addMessageApi(message)
-        this.barrageList.push(message)
+        this.barrageList = [...this.barrageList, localMessage]
         this.$message.success('留言成功')
         this.startCooldown()
       } catch (error) {
@@ -232,306 +187,299 @@ export default {
 
 <style lang="scss" scoped>
 .message-page {
-  min-height: calc(100vh - 80px);
-  padding: 24px 20px 88px;
+  min-height: calc(100vh - 64px);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(59, 130, 246, 0.34), transparent 30%),
+    linear-gradient(120deg, #0f2b78 0%, #1d4ed8 48%, #36b7ef 100%);
 }
 
-.message-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
-  gap: 24px;
-  max-width: 1240px;
-  margin: 0 auto 24px;
+.message-board {
+  position: relative;
+  min-height: calc(100vh - 64px);
+  overflow: hidden;
+  padding: 118px 24px 72px;
 }
 
-.message-copy,
-.composer-card,
-.barrage-panel {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 30px;
-  background: rgba(9, 18, 43, 0.42);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 22px 50px rgba(2, 8, 23, 0.28);
-}
-
-.message-copy,
-.composer-card,
-.barrage-panel {
+.message-board__inner {
+  position: relative;
+  z-index: 2;
+  width: min(520px, calc(100vw - 32px));
+  margin: 0 auto;
+  text-align: center;
   color: #fff;
 }
 
-.message-copy {
-  padding: 34px;
-}
-
-.message-eyebrow,
-.panel-eyebrow,
-.composer-label {
+.message-board__eyebrow {
   display: inline-flex;
-  color: rgba(191, 219, 254, 0.92);
+  margin-bottom: 14px;
+  color: rgba(219, 234, 254, 0.82);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
-.message-copy h1,
-.panel-header h2 {
-  margin: 14px 0 14px;
-  font-size: clamp(34px, 7vw, 60px);
+.message-board__head h1 {
+  margin: 0 0 28px;
+  color: #fff;
+  font-size: clamp(32px, 4vw, 46px);
   line-height: 1;
   font-weight: 800;
+  text-shadow: 0 10px 30px rgba(15, 23, 42, 0.22);
 }
 
-.message-summary {
-  max-width: 560px;
-  margin: 0;
-  color: rgba(226, 232, 240, 0.88);
-  font-size: 16px;
-  line-height: 1.85;
-}
-
-.message-stats {
+.message-composer {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 28px;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  gap: 10px;
+  align-items: center;
 }
 
-.message-stat {
-  padding: 18px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-
-  strong {
-    display: block;
-    margin-bottom: 8px;
-    color: #fff;
-    font-size: 28px;
-    font-weight: 800;
-  }
-
-  span {
-    color: rgba(191, 219, 254, 0.82);
-    font-size: 13px;
-    line-height: 1.6;
-  }
-}
-
-.composer-card {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 28px;
-}
-
-.composer-input {
-  :deep(.el-textarea__inner) {
-    min-height: 148px !important;
-    padding: 16px 18px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 22px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    font-size: 15px;
-    line-height: 1.8;
+.message-composer__input {
+  :deep(.el-input__inner) {
+    height: 46px;
+    padding: 0 78px 0 18px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.62);
+    color: #172554;
+    font-size: 14px;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.14);
 
     &::placeholder {
-      color: rgba(226, 232, 240, 0.62);
+      color: rgba(30, 58, 138, 0.48);
     }
 
     &:focus {
-      border-color: rgba(125, 211, 252, 0.46);
-      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.08);
+      border-color: rgba(255, 255, 255, 0.72);
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
     }
   }
-}
 
-.composer-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-
-  :deep(.el-button) {
-    min-width: 126px;
-    height: 44px;
+  :deep(.el-input__count) {
+    right: 16px;
+    color: rgba(30, 58, 138, 0.54);
+    background: transparent;
   }
 }
 
-.composer-tip {
-  color: rgba(191, 219, 254, 0.82);
-  font-size: 13px;
-  line-height: 1.6;
-}
+.message-composer__button {
+  height: 46px;
+  min-width: 78px;
+  padding: 0 20px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.62);
+  color: #1e40af;
+  font-weight: 700;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.14);
 
-.barrage-panel {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 28px;
-}
+  &:hover,
+  &:focus {
+    background: rgba(255, 255, 255, 0.86);
+    color: #1d4ed8;
+  }
 
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: end;
-  margin-bottom: 18px;
-
-  h2 {
-    margin: 10px 0 0;
-    font-size: clamp(24px, 4vw, 32px);
+  &.is-disabled {
+    background: rgba(255, 255, 255, 0.42);
+    color: rgba(30, 64, 175, 0.52);
   }
 }
 
-.panel-status {
+.message-board__meta {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: rgba(191, 219, 254, 0.86);
+  justify-content: center;
+  gap: 12px;
+  margin: 16px 0 0;
+  color: rgba(219, 234, 254, 0.84);
   font-size: 13px;
-}
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.12);
-}
-
-.empty-panel {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 22px;
-  border-radius: 24px;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
-  color: rgba(226, 232, 240, 0.86);
-
-  i {
-    font-size: 24px;
-    color: #93c5fd;
-  }
-
-  strong {
-    display: block;
-    margin-bottom: 4px;
-    color: #fff;
-  }
-
-  p {
-    margin: 0;
-    line-height: 1.6;
+  span + span::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    margin-right: 12px;
+    border-radius: 50%;
+    vertical-align: 2px;
+    background: rgba(219, 234, 254, 0.6);
   }
 }
 
-.barrage-stage {
-  height: 460px;
-  overflow: hidden;
-  border-radius: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background:
-    radial-gradient(circle at 50% 0%, rgba(125, 211, 252, 0.12), transparent 42%),
-    rgba(5, 11, 29, 0.3);
+.message-wall {
+  position: absolute;
+  z-index: 1;
+  inset: 64px 0 0;
+  pointer-events: none;
 }
 
-.barrage-item {
-  display: flex;
+.message-danmaku {
+  width: 100%;
+  height: 100%;
+}
+
+.message-empty {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
-  max-width: 440px;
-  margin-top: 10px;
-  padding: 8px 14px 8px 8px;
-  color: #fff;
-  background: rgba(15, 23, 42, 0.86);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24);
+  transform: translateX(-50%);
+  color: rgba(219, 234, 254, 0.82);
+  font-size: 14px;
 
-  img {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
+  i {
+    font-size: 18px;
   }
 }
 
-.barrage-body {
+.message-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 460px;
+  margin-top: 8px;
+  padding: 8px 14px 8px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex: 0 0 36px;
+    object-fit: contain;
+    background: rgba(255, 255, 255, 0.95);
+  }
+}
+
+.message-bubble__main {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.barrage-meta {
-  display: flex;
+.message-bubble__top {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+
+  strong {
+    max-width: 120px;
+    overflow: hidden;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  time {
+    color: rgba(191, 219, 254, 0.76);
+    font-size: 11px;
+    white-space: nowrap;
+  }
 }
 
-.barrage-name {
-  color: #fff;
+.message-bubble__content {
+  color: rgba(241, 245, 249, 0.95);
   font-size: 13px;
-  font-weight: 700;
-}
-
-.barrage-time {
-  color: rgba(191, 219, 254, 0.74);
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.barrage-content {
-  color: rgba(226, 232, 240, 0.92);
-  font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.38;
   word-break: break-word;
 }
 
-@media (max-width: 1024px) {
-  .message-hero {
-    grid-template-columns: 1fr;
+@media (max-width: 768px) {
+  .message-page,
+  .message-board {
+    min-height: calc(100vh - 58px);
+  }
+
+  .message-board {
+    padding: 118px 18px 56px;
+  }
+
+  .message-board__head h1 {
+    margin-bottom: 24px;
+    font-size: 34px;
+  }
+
+  .message-composer {
+    grid-template-columns: minmax(0, 1fr) 64px;
+    gap: 8px;
+  }
+
+  .message-composer__input {
+    :deep(.el-input__inner) {
+      height: 40px;
+      padding: 0 58px 0 15px;
+      font-size: 13px;
+    }
+
+    :deep(.el-input__count) {
+      right: 12px;
+      font-size: 11px;
+    }
+  }
+
+  .message-composer__button {
+    height: 40px;
+    min-width: 64px;
+    padding: 0 14px;
+  }
+
+  .message-board__meta {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .message-wall {
+    inset: 58px 0 0;
+  }
+
+  .message-bubble {
+    max-width: calc(100vw - 64px);
+    gap: 8px;
+    padding: 7px 12px 7px 7px;
+
+    img {
+      width: 31px;
+      height: 31px;
+      flex-basis: 31px;
+    }
+  }
+
+  .message-bubble__top strong,
+  .message-bubble__content {
+    font-size: 12px;
+  }
+
+  .message-bubble__top time {
+    font-size: 10px;
   }
 }
 
-@media (max-width: 768px) {
-  .message-page {
-    min-height: auto;
-    padding: 14px 12px 64px;
+@media (max-width: 390px) {
+  .message-board {
+    padding-left: 14px;
+    padding-right: 14px;
   }
 
-  .message-copy,
-  .composer-card,
-  .barrage-panel {
-    border-radius: 24px;
-    padding: 20px 16px;
-  }
-
-  .message-stats {
+  .message-composer {
     grid-template-columns: 1fr;
   }
 
-  .composer-footer,
-  .panel-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .composer-tip {
-    order: 2;
-  }
-
-  .barrage-stage {
-    height: 54vh;
-    min-height: 380px;
-  }
-
-  .barrage-item {
-    max-width: 320px;
+  .message-composer__button {
+    width: 100%;
   }
 }
 </style>

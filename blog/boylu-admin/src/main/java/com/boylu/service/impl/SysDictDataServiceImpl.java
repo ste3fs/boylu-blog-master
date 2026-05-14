@@ -1,4 +1,4 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import com.boylu.common.Constants;
 import com.boylu.entity.SysDict;
@@ -10,6 +10,7 @@ import com.boylu.mapper.SysDictDataMapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
@@ -37,11 +38,13 @@ public class SysDictDataServiceImpl extends ServiceImpl<SysDictDataMapper, SysDi
     }
 
     @Override
+    @CacheEvict(cacheNames = "sys_dict_v2", allEntries = true)
     public void addDictData(SysDictData sysDictData) {
         save(sysDictData);
     }
 
     @Override
+    @CacheEvict(cacheNames = "sys_dict_v2", allEntries = true)
     public void updateDictData(SysDictData sysDictData) {
         updateById(sysDictData);
     }
@@ -75,7 +78,7 @@ public class SysDictDataServiceImpl extends ServiceImpl<SysDictDataMapper, SysDi
     }
 
     @Override
-    @Cacheable(cacheNames = "sys_dict", key = "#dictType")
+    @Cacheable(cacheNames = "sys_dict_v2", key = "#dictType")
     public List<SysDictData> selectDataByDictTypeCache(String dictType) {
         return baseMapper.selectDataByDictType(dictType);
     }

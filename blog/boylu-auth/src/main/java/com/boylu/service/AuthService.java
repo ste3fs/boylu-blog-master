@@ -1,15 +1,17 @@
-﻿package com.boylu.service;
+package com.boylu.service;
 
 import com.boylu.dto.Captcha;
 import com.boylu.dto.EmailRegisterDto;
 import com.boylu.dto.LoginDTO;
 import com.boylu.dto.user.LoginUserInfo;
+import com.boylu.vo.user.OauthBindingVo;
 import me.chanjar.weixin.mp.bean.message.WxMpXmlMessage;
 import me.zhyd.oauth.model.AuthCallback;
 
 import javax.mail.MessagingException;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 
 public interface AuthService {
 
@@ -71,6 +73,21 @@ public interface AuthService {
      * @return
      */
     String renderAuth(String source);
+
+    /**
+     * 获取第三方账号绑定授权地址
+     */
+    String renderBindAuth(String source);
+
+    /**
+     * 获取当前用户第三方账号绑定列表
+     */
+    List<OauthBindingVo> listOauthBindings();
+
+    /**
+     * 解除第三方账号绑定
+     */
+    Boolean unbindOauth(String source);
 
     /**
      * 第三方授权登录

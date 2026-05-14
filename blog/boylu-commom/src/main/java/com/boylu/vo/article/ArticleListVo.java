@@ -1,6 +1,7 @@
-﻿package com.boylu.vo.article;
+package com.boylu.vo.article;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.boylu.utils.DateUtil;
 import com.boylu.vo.tag.TagListVo;
 import io.swagger.annotations.ApiModel;
@@ -43,6 +44,12 @@ public class ArticleListVo {
 
     @ApiModelProperty(value = "文章封面地址")
     private String cover;
+
+    @ApiModelProperty(value = "文章封面图片元数据")
+    private CoverImageVo coverImage;
+
+    @JsonIgnore
+    private String coverImageJson;
 
     @ApiModelProperty(value = "文章内容")
     private String contentMd;

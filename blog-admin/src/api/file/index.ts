@@ -10,14 +10,56 @@ export function getFileListApi(params: any) {
 }
 
 // 上传文件
-export function uploadApi(data: any, source: string) {
+export function uploadApi(data: any, source: string, config: Record<string, any> = {}) {
   return request({
     url: '/file/upload',
     method: 'post',
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60000,
     data,
-    params: { source }
+    params: { source },
+    ...config
+  })
+}
+
+export function initChunkUploadApi(params: {
+  fileName: string
+  totalSize: number
+  totalChunks: number
+  fileHash?: string
+  source?: string
+}) {
+  return request({
+    url: '/file/upload/chunk/init',
+    method: 'post',
+    params
+  })
+}
+
+export function uploadChunkPartApi(data: FormData, config: Record<string, any> = {}) {
+  return request({
+    url: '/file/upload/chunk/part',
+    method: 'post',
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+    data,
+    ...config
+  })
+}
+
+export function completeChunkUploadApi(uploadId: string) {
+  return request({
+    url: '/file/upload/chunk/complete',
+    method: 'post',
+    params: { uploadId }
+  })
+}
+
+export function abortChunkUploadApi(uploadId: string) {
+  return request({
+    url: '/file/upload/chunk/abort',
+    method: 'post',
+    params: { uploadId }
   })
 }
 
