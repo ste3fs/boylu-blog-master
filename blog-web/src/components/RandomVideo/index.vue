@@ -165,7 +165,7 @@ export default {
     position: fixed;
     left: 38px;
     top: 50%;
-    width: 360px;
+    width: clamp(420px, 30vw, 640px);
     max-width: calc(100vw - 54px);
     overflow: hidden;
     border: 1px solid rgba(120, 140, 170, 0.18);
@@ -289,6 +289,7 @@ export default {
         left: 36px;
         top: auto;
         bottom: 92px;
+        width: calc(100vw - 50px);
         max-width: calc(100vw - 50px);
         transform: none;
     }
