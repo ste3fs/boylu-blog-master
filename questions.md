@@ -4,13 +4,13 @@
 
 ## 2026-05-14 当前检查问题
 
-### P1：随机视频播放器位置和功能异常（已修复，待部署复核）
+### P1：随机视频播放器位置和功能异常（已修复并部署）
 
 - 线上表现：随机视频内容直接渲染到页面底部，遮挡页脚、右侧悬浮按钮和页面内容。
 - GitHub 旧版对比：旧版 `RandomVideo` 的意图是左侧箭头触发播放器抽屉，播放器不应该常驻底部横向铺满。
 - 根因判断：前台 Element UI 当前只按需注册了部分组件，`RandomVideo` 使用的 `el-drawer`、`el-tooltip` 没有全局注册，组件会被浏览器当成普通未知标签输出；同时视频源仍是 `http://`，在 HTTPS 站点存在混合内容拦截风险。
 - 修复方向：改为组件内部的左侧固定小播放器，默认只显示左侧箭头，点击后展开；关闭时暂停播放，切换视频时重新拉取；视频源改为 HTTPS。
-- 处理结果：`blog-web/src/components/RandomVideo/index.vue` 已改为自包含左侧小面板，不再依赖未注册的 `el-drawer/el-tooltip`；`npm run build` 已通过。
+- 处理结果：`blog-web/src/components/RandomVideo/index.vue` 已改为自包含左侧小面板，不再依赖未注册的 `el-drawer/el-tooltip`；`npm run build` 已通过，线上静态资源也已确认包含新播放器代码。
 
 ### P2：已复核的历史记录
 
@@ -86,6 +86,9 @@
 - `blog` Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
 - `blog-web` 构建已通过：`npm run build`。
 - 2026-05-14 随机视频播放器修复后，`blog-web` 构建再次通过：`npm run build`。
+- 2026-05-14 已同步 `blog-web/dist` 到服务器 `/var/www/boylu-blog/`，并保留 `/var/www/boylu-blog/admin/` 后台目录。
+- 服务器 `sudo nginx -t` 已通过，`https://boylu.cn/` 返回 200。
+- 线上资源已确认包含 `.random-video-panel` 样式和 `https://api.yujn.cn/api/zzxjj.php` 视频源。
 - `blog-admin` 构建已通过：`npm run build`。
 - `blog-web` 安装依赖时保留 npm audit 提示：20 个漏洞提示。
 - `blog-admin` 安装依赖时保留 npm audit 提示：11 个漏洞提示。
