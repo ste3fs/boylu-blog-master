@@ -1,0 +1,102 @@
+﻿server:
+  port: 8800
+
+app:
+  file:
+    public-prefix: /boylu/file/content/
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/blog?characterEncoding=UTF-8&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai&tinyInt1isBit=false&allowPublicKeyRetrieval=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: root
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    timeout: 3000
+    database: 8
+
+
+#==============================knife4j配置==============================
+knife4j:
+  enable: true
+  basic:
+    enable: true
+    username: test
+    password: 123456
+  openapi:
+    title: boylu博客接口文档
+    description: 一个专注于技术分享的博客平台
+    # aaa"
+    email: 3453619783@qq.com
+    concat: boylu
+    url: http://localhost:8800
+    version: v1.0
+    group:
+      test1:
+        group-name: 分组名称
+        api-rule: package
+        api-rule-resources:
+          - com.boylu
+
+#==============================公众号配置==============================
+wechat:
+  app-id:
+  # 公众号AppSecret
+  secret:
+  # 公众号Token
+  token:
+  # 公众号AES Key
+  aesKey:
+
+  appletAppId:
+  appletSecret:
+
+#==============================豆包推理AI配置=======================================
+ai:
+  # API Key
+  apiKey:
+  baseUrl: https://ark.cn-beijing.volces.com/api/v3
+  # 推理接入点ID
+  model:
+
+hot-search:
+  coderutil:
+    access-key: ${CODERUTIL_ACCESS_KEY:}
+    secret-key: ${CODERUTIL_SECRET_KEY:}
+
+#==============================邮箱配置=======================================
+mail:
+  smtp:
+    host: smtp.163.com
+    port: 25
+    email:
+    password:
+    ssl-enable: false
+    starttls-enable: false
+    debug: false
+
+#============================第三方登录配置信息===================================
+qq:
+  app-id:
+  app-secret:
+  redirect-url: http://localhost:8800/mojian/api/auth/callback/qq
+weibo:
+  app-id:
+  app-secret:
+  redirect-url: http://localhost:8800/mojian/api/auth/weibo
+
+gitee:
+  app-id:
+  app-secret:
+  redirect-url: http://localhost:8800/mojian/api/auth/callback/gitee
+
+github:
+  app-id:
+  app-secret:
+  redirect-url: http://localhost:8800/mojian/api/auth/callback/github

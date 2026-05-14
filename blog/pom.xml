@@ -1,22 +1,22 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.mojian</groupId>
+    <groupId>com.boylu</groupId>
     <artifactId>blog</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
-        <module>mojian-commom</module>
-        <module>mojian-admin</module>
-        <module>mojian-api</module>
-        <module>mojian-server</module>
-        <module>mojian-file</module>
-        <module>mojian-quartz</module>
-        <module>mojian-auth</module>
+        <module>boylu-commom</module>
+        <module>boylu-admin</module>
+        <module>boylu-api</module>
+        <module>boylu-server</module>
+        <module>boylu-file</module>
+        <module>boylu-quartz</module>
+        <module>boylu-auth</module>
     </modules>
 
     <parent>
@@ -66,7 +66,7 @@
                 <!-- 作用:项目打成jar，同时把本地jar包也引入进去 -->
                 <configuration>
                     <includeSystemScope>true</includeSystemScope>
-                    <mainClass>com.mojian.NeatAdminApplication</mainClass>
+                    <mainClass>com.boylu.NeatAdminApplication</mainClass>
                 </configuration>
             </plugin>
             <!--添加配置跳过测试-->
@@ -81,6 +81,6 @@
         </plugins>
 
         <!-- 固定Jar包名字 -->
-        <finalName>mojian-blog</finalName>
+        <finalName>boylu-blog</finalName>
     </build>
 </project> 

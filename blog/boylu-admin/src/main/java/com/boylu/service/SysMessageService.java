@@ -1,0 +1,22 @@
+﻿package com.boylu.service;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.boylu.entity.SysMessage;
+
+/**
+ * @author: boylu
+ * @date: 2025/1/2
+ * @description:
+ */
+public interface SysMessageService extends IService<SysMessage> {
+
+    /**
+     * 获取消息列表
+     * @return
+     */
+    Page<SysMessage> selectList();
+
+
+
+}

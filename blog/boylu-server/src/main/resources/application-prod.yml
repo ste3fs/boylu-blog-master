@@ -1,0 +1,88 @@
+﻿server:
+  port: ${SERVER_PORT:8800}
+
+app:
+  file:
+    public-prefix: ${FILE_PUBLIC_PREFIX:/boylu/file/content/}
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:blog}?characterEncoding=UTF-8&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai&tinyInt1isBit=false&allowPublicKeyRetrieval=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    timeout: 3000
+    database: ${REDIS_DATABASE:8}
+
+knife4j:
+  enable: false
+  basic:
+    enable: false
+  openapi:
+    title: boylu博客接口文档
+    description: 一个专注于技术分享的平台
+    email: 3453619783@qq.com
+    concat: boylu
+    url: ${PUBLIC_BASE_URL:http://111.229.123.234}
+    version: v1.0
+    group:
+      default:
+        group-name: default
+        api-rule: package
+        api-rule-resources:
+          - com.boylu
+
+wechat:
+  app-id: ${WECHAT_APP_ID:}
+  secret: ${WECHAT_SECRET:}
+  token: ${WECHAT_TOKEN:}
+  aesKey: ${WECHAT_AES_KEY:}
+  appletAppId: ${WECHAT_APPLET_APP_ID:}
+  appletSecret: ${WECHAT_APPLET_SECRET:}
+
+ai:
+  apiKey: ${AI_API_KEY:}
+  baseUrl: ${AI_BASE_URL:https://ark.cn-beijing.volces.com/api/v3}
+  model: ${AI_MODEL:}
+
+hot-search:
+  coderutil:
+    access-key: ${CODERUTIL_ACCESS_KEY:}
+    secret-key: ${CODERUTIL_SECRET_KEY:}
+
+mail:
+  smtp:
+    host: ${MAIL_HOST:smtp.163.com}
+    port: ${MAIL_PORT:25}
+    email: ${MAIL_EMAIL:}
+    password: ${MAIL_PASSWORD:}
+    ssl-enable: ${MAIL_SSL_ENABLE:false}
+    starttls-enable: ${MAIL_STARTTLS_ENABLE:false}
+    debug: ${MAIL_DEBUG:false}
+
+qq:
+  app-id: ${QQ_APP_ID:}
+  app-secret: ${QQ_APP_SECRET:}
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/callback/qq
+
+weibo:
+  app-id: ${WEIBO_APP_ID:}
+  app-secret: ${WEIBO_APP_SECRET:}
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/weibo
+
+gitee:
+  app-id: ${GITEE_APP_ID:}
+  app-secret: ${GITEE_APP_SECRET:}
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/callback/gitee
+
+github:
+  app-id: ${GITHUB_APP_ID:}
+  app-secret: ${GITHUB_APP_SECRET:}
+  redirect-url: ${PUBLIC_BASE_URL:http://111.229.123.234}/mojian/api/auth/callback/github

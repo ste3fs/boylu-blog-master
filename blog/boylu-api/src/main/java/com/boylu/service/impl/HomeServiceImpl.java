@@ -1,0 +1,161 @@
+﻿package com.boylu.service.impl;
+
+import cn.hutool.http.HttpUtil;
+import com.alibaba.fastjson2.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.boylu.common.Constants;
+import com.boylu.common.RedisConstants;
+import com.boylu.common.Result;
+import com.boylu.entity.SysNotice;
+import com.boylu.mapper.SysNoticeMapper;
+import com.boylu.service.HomeService;
+import com.boylu.entity.SysWebConfig;
+import com.boylu.mapper.SysWebConfigMapper;
+import com.boylu.utils.IpUtil;
+import com.boylu.utils.RedisUtil;
+import eu.bitwalker.useragentutils.Browser;
+import eu.bitwalker.useragentutils.OperatingSystem;
+import eu.bitwalker.useragentutils.UserAgent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class HomeServiceImpl implements HomeService {
+
+    private final SysWebConfigMapper sysWebConfigMapper;
+
+    private final RedisUtil redisUtil;
+
+    private final SysNoticeMapper noticeMapper;
+
+    @Value("${hot-search.coderutil.access-key:}")
+    private String coderutilAccessKey;
+
+    @Value("${hot-search.coderutil.secret-key:}")
+    private String coderutilSecretKey;
+
+    @Override
+    public Result<SysWebConfig> getWebConfig() {
+
+        SysWebConfig sysWebConfig = new SysWebConfig();
+        Object value = redisUtil.get(RedisConstants.WEB_CONFIG_KEY);
+        if (value == null) {
+            LambdaQueryWrapper<SysWebConfig> wrapper = new LambdaQueryWrapper<>();
+            wrapper.last("limit 1");
+            sysWebConfig = sysWebConfigMapper.selectOne(wrapper);
+        }else {
+            sysWebConfig = JSONObject.parseObject(value.toString(), SysWebConfig.class);
+        }
+
+        //获取浏览量和访问量
+        long blogViewsCount = 0;
+        long visitorCount = 0;
+        long dailyBlogViewsCount = 0;
+        long dailyVisitorCount = 0;
+        if (redisUtil.hasKey(RedisConstants.BLOG_VIEWS_COUNT)) {
+            blogViewsCount = Long.parseLong(redisUtil.get(RedisConstants.BLOG_VIEWS_COUNT).toString());
+        }
+        if (redisUtil.hasKey(RedisConstants.UNIQUE_VISITOR_COUNT)) {
+            visitorCount = Long.parseLong(redisUtil.get(RedisConstants.UNIQUE_VISITOR_COUNT).toString());
+        }
+        String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+        String dailyVisitorCountKey = RedisConstants.UNIQUE_VISITOR_DAILY + today;
+        String dailyViewCountKey = RedisConstants.BLOG_VIEWS_DAILY + today;
+        if (redisUtil.hasKey(dailyViewCountKey)) {
+            dailyBlogViewsCount = Long.parseLong(redisUtil.get(dailyViewCountKey).toString());
+        }
+        if (redisUtil.hasKey(dailyVisitorCountKey)) {
+            dailyVisitorCount = Long.parseLong(redisUtil.get(dailyVisitorCountKey).toString());
+        }
+
+        return Result.success(sysWebConfig)
+                .putExtra("blogViewsCount", blogViewsCount)
+                .putExtra("visitorCount", visitorCount)
+                .putExtra("dailyBlogViewsCount", dailyBlogViewsCount)
+                .putExtra("dailyVisitorCount", dailyVisitorCount);
+    }
+
+    @Override
+    public JSONObject getHotSearch(String type) {
+        if (!StringUtils.hasText(coderutilAccessKey) || !StringUtils.hasText(coderutilSecretKey)) {
+            log.warn("CoderUtil hot search credentials are not configured.");
+            return emptyHotSearchResult();
+        }
+
+        HashMap<String, Object> paramMap = new HashMap<>();
+        paramMap.put("access-key", coderutilAccessKey);
+        paramMap.put("secret-key", coderutilSecretKey);
+        String url = "https://www.coderutil.com/api/resou/v1/" + type;
+        try {
+            String result = HttpUtil.get(url, paramMap);
+            return JSONObject.parseObject(result);
+        } catch (Exception e) {
+            log.warn("Failed to fetch CoderUtil hot search, type={}", type, e);
+            return emptyHotSearchResult();
+        }
+    }
+
+    private JSONObject emptyHotSearchResult() {
+        JSONObject result = new JSONObject();
+        result.put("data", Collections.emptyList());
+        return result;
+    }
+
+    @Override
+    public void report() {
+        // 获取ip
+        String ipAddress = IpUtil.getIp();
+        // 通过浏览器解析工具类UserAgent获取访问设备信息
+        UserAgent userAgent = IpUtil.getUserAgent(Objects.requireNonNull(IpUtil.getRequest()));
+        Browser browser = userAgent.getBrowser();
+        OperatingSystem operatingSystem = userAgent.getOperatingSystem();
+        // 生成唯一用户标识
+        String uuid = ipAddress + browser.getName() + operatingSystem.getName();
+        String md5 = DigestUtils.md5DigestAsHex(uuid.getBytes());
+        // 判断是否访问
+        if (!redisUtil.sIsMember(RedisConstants.UNIQUE_VISITOR, md5)) {
+            // 访客量+1
+            redisUtil.increment(RedisConstants.UNIQUE_VISITOR_COUNT, 1);
+            // 保存唯一标识
+            redisUtil.sAdd(RedisConstants.UNIQUE_VISITOR, md5);
+        }
+
+        String today = LocalDate.now().format(DateTimeFormatter.ISO_DATE);
+        String dailyVisitorSetKey = RedisConstants.UNIQUE_VISITOR_DAILY_SET + today;
+        String dailyVisitorCountKey = RedisConstants.UNIQUE_VISITOR_DAILY + today;
+        String dailyViewCountKey = RedisConstants.BLOG_VIEWS_DAILY + today;
+
+        if (!Boolean.TRUE.equals(redisUtil.sIsMember(dailyVisitorSetKey, md5))) {
+            redisUtil.increment(dailyVisitorCountKey, 1);
+            redisUtil.sAdd(dailyVisitorSetKey, md5);
+            redisUtil.expire(dailyVisitorCountKey, 90, TimeUnit.DAYS);
+            redisUtil.expire(dailyVisitorSetKey, 90, TimeUnit.DAYS);
+        }
+
+        // 访问量+1
+        redisUtil.increment(RedisConstants.BLOG_VIEWS_COUNT, 1);
+        redisUtil.increment(dailyViewCountKey, 1);
+        redisUtil.expire(dailyViewCountKey, 90, TimeUnit.DAYS);
+    }
+
+    @Override
+    public Map<String, List<SysNotice>> getNotice() {
+
+        List<SysNotice> sysNotices = noticeMapper.selectList(new LambdaQueryWrapper<SysNotice>()
+                .eq(SysNotice::getIsShow, Constants.YES));
+        return sysNotices.stream()
+                .collect(Collectors.groupingBy(SysNotice::getPosition));
+    }
+}
