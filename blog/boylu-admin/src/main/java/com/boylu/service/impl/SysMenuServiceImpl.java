@@ -69,6 +69,7 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         if (StpUtil.hasRole(Constants.ADMIN)) {
             menus = baseMapper.selectList(new LambdaQueryWrapper<SysMenu>()
                     .ne(SysMenu::getType,MenuTypeEnum.BUTTON.getCode()));
+            ensureResourceApprovalMenu(menus);
         }else {
             menus = baseMapper.getMenusByUserId(StpUtil.getLoginIdAsInt(),MenuTypeEnum.BUTTON.getCode());
         }
@@ -141,4 +142,61 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
     {
         return menu.getParentId() != 0 && MenuTypeEnum.MENU.equals(menu.getType());
     }
-} 
+
+    private void ensureResourceApprovalMenu(List<SysMenu> menus) {
+        if (menus == null || hasMenuComponent(menus, "/site/resource/index")) {
+            return;
+        }
+
+        SysMenu siteMenu = findSiteMenu(menus);
+        if (siteMenu == null) {
+            siteMenu = new SysMenu();
+            siteMenu.setId(-9000);
+            siteMenu.setParentId(0);
+            siteMenu.setPath("/site");
+            siteMenu.setComponent("Layout");
+            siteMenu.setTitle("站点管理");
+            siteMenu.setSort(2);
+            siteMenu.setIcon("DeleteLocation");
+            siteMenu.setType(MenuTypeEnum.CATALOG);
+            siteMenu.setRedirect("/site/resource");
+            siteMenu.setHidden(0);
+            siteMenu.setIsExternal(0);
+            menus.add(siteMenu);
+        }
+
+        SysMenu resourceMenu = new SysMenu();
+        resourceMenu.setId(-9001);
+        resourceMenu.setParentId(siteMenu.getId());
+        resourceMenu.setPath("resource");
+        resourceMenu.setComponent("/site/resource/index");
+        resourceMenu.setTitle("资源审核");
+        resourceMenu.setSort(5);
+        resourceMenu.setIcon("FolderChecked");
+        resourceMenu.setType(MenuTypeEnum.MENU);
+        resourceMenu.setHidden(0);
+        resourceMenu.setIsExternal(0);
+        menus.add(resourceMenu);
+    }
+
+    private boolean hasMenuComponent(List<SysMenu> menus, String component) {
+        for (SysMenu menu : menus) {
+            if (menu != null && StringUtils.equals(menu.getComponent(), component)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private SysMenu findSiteMenu(List<SysMenu> menus) {
+        for (SysMenu menu : menus) {
+            if (menu == null) {
+                continue;
+            }
+            if (StringUtils.equals(menu.getPath(), "/site") || StringUtils.equals(menu.getTitle(), "站点管理")) {
+                return menu;
+            }
+        }
+        return null;
+    }
+}

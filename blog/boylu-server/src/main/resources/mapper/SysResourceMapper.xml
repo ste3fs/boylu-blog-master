@@ -12,6 +12,8 @@
             t.name,
             t.category,
             t.downloads,
+            t.is_free,
+            t.pay_type,
             t.create_time
         from sys_resource t
         left join sys_user u on t.user_id = u.id

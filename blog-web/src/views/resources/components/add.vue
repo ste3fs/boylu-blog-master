@@ -102,7 +102,7 @@ export default {
         category: [
           { required: true, message: '请选择资源分类', trigger: 'change' }
         ],
-        type: [
+        isFree: [
           { required: true, message: '请选择资源类型', trigger: 'change' }
         ],
         panPath: [
@@ -139,11 +139,17 @@ export default {
     submitUpload() {
       this.$refs.uploadForm.validate((valid) => {
         if (valid) {
-          addResourceApi(this.uploadForm).then(res => {
+          this.uploading = true
+          addResourceApi(this.uploadForm).then(() => {
             this.$message.success("资源上传成功，等待博主审核！");
+            this.$emit('success')
             // 重置表单
             this.$refs.uploadForm.resetFields();
             this.handleClose();
+          }).catch(error => {
+            this.$message.error(error.message || '资源上传失败')
+          }).finally(() => {
+            this.uploading = false
           })
         }
       });

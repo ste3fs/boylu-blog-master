@@ -193,7 +193,7 @@ export default {
     },
     resolveBestFallback(image) {
       const directFallback = resolveImageUrl(image && image.fallback)
-      if (directFallback) {
+      if (directFallback && directFallback !== DEFAULT_FALLBACK) {
         return directFallback
       }
 
@@ -205,7 +205,7 @@ export default {
           return src
         }
       }
-      return ''
+      return directFallback || ''
     },
     pickVariant(variants) {
       if (!variants || typeof variants !== 'object') {
@@ -245,6 +245,16 @@ export default {
         // Ignore storage failures; image loading should keep working.
       }
     },
+    forgetLoaded(src) {
+      if (!src || typeof window === 'undefined' || !window.localStorage) {
+        return
+      }
+      try {
+        window.localStorage.removeItem(this.cacheKey(src))
+      } catch (error) {
+        // Ignore storage failures; image loading should keep working.
+      }
+    },
     handleLoad(event) {
       this.loaded = true
       if (!this.fallbackSrc) {
@@ -257,6 +267,8 @@ export default {
     handleError(event) {
       const directFallback = this.resolveBestFallback(this.image)
       const currentSrc = event && event.target ? (event.target.currentSrc || event.target.src || '') : ''
+      this.forgetLoaded(currentSrc)
+      this.forgetLoaded(this.primarySrc)
 
       if (!this.fallbackSrc && directFallback && currentSrc !== directFallback) {
         this.failed = true

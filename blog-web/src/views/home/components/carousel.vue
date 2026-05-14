@@ -50,9 +50,16 @@ export default {
     },
     resolveSlideImage(slide) {
       if (slide.coverImage) {
+        const coverFallback = this.resolveImage(slide.coverImage.fallback || slide.coverImage.source)
+        const legacyCover = this.resolveImage(slide.cover)
+        const fallback = this.isDefaultCover(coverFallback) && legacyCover
+          ? legacyCover
+          : (coverFallback || legacyCover)
         return {
           ...slide.coverImage,
-          alt: slide.coverImage.alt || slide.title
+          alt: slide.coverImage.alt || slide.title,
+          fallback,
+          styleSource: fallback
         }
       }
       return {
@@ -62,6 +69,10 @@ export default {
         dominantColor: '#eef4ff',
         fallback: this.resolveImage(slide.cover)
       }
+    },
+    isDefaultCover(url) {
+      const defaultImage = this.resolveImage(this.$store.state.defaultImage)
+      return !!url && !!defaultImage && url === defaultImage
     }
   }
 }

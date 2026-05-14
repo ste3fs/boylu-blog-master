@@ -26,7 +26,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -35,6 +34,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
 
 @Service
 @RequiredArgsConstructor
@@ -44,46 +44,48 @@ public class ArticleCoverImageService {
     private static final int[] RESPONSIVE_WIDTHS = new int[]{320, 640, 960, 1280, 1600};
     private static final int[] JPG_WIDTHS = new int[]{640, 960, 1280};
     private static final String PUBLIC_FILE_CONTENT_PREFIX = "/boylu/file/content/";
+    private static final int MAX_CONCURRENT_COVER_PROCESSING = Math.max(
+            1,
+            Math.min(2, Runtime.getRuntime().availableProcessors() / 2)
+    );
 
     private final FileStorageService fileStorageService;
     private final FileDetailService fileDetailService;
-
-    public CoverImageVo process(MultipartFile file, String path, String source) {
-        return process(readAllBytes(file), file.getOriginalFilename(), file.getContentType(), path, source);
-    }
-
-    public CoverImageVo process(byte[] originalBytes, String originalFilename, String contentType, String path, String source) {
-        BufferedImage originalImage = readImage(originalBytes);
-        String hash = shortSha256(originalBytes);
-        String originalExtension = resolveOriginalExtension(originalFilename, contentType);
-        String normalizedPath = StringUtils.defaultIfBlank(path, DateUtil.parseDateToStr(DateUtil.YYYYMMDD, DateUtil.getNowDate()) + "/article-cover/");
-
-        uploadBytes(
-                originalBytes,
-                normalizedPath + "original/",
-                "cover-" + hash + "-original." + originalExtension,
-                StringUtils.defaultIfBlank(contentType, "image/" + originalExtension),
-                source
-        );
-
-        return buildCoverImage(originalImage, hash, normalizedPath, source);
-    }
+    private final Semaphore coverProcessingSemaphore = new Semaphore(MAX_CONCURRENT_COVER_PROCESSING);
 
     public CoverImageVo process(Path originalPath, String originalFilename, String contentType, String path, String source) {
-        BufferedImage originalImage = readImage(originalPath);
-        String hash = shortSha256(originalPath);
-        String originalExtension = resolveOriginalExtension(originalFilename, contentType);
-        String normalizedPath = StringUtils.defaultIfBlank(path, DateUtil.parseDateToStr(DateUtil.YYYYMMDD, DateUtil.getNowDate()) + "/article-cover/");
+        acquireCoverProcessingSlot();
+        BufferedImage originalImage = null;
+        try {
+            originalImage = readImage(originalPath);
+            String hash = shortSha256(originalPath);
+            String originalExtension = resolveOriginalExtension(originalFilename, contentType);
+            String normalizedPath = StringUtils.defaultIfBlank(path, DateUtil.parseDateToStr(DateUtil.YYYYMMDD, DateUtil.getNowDate()) + "/article-cover/");
 
-        uploadFile(
-                originalPath,
-                normalizedPath + "original/",
-                "cover-" + hash + "-original." + originalExtension,
-                StringUtils.defaultIfBlank(contentType, "image/" + originalExtension),
-                source
-        );
+            uploadFile(
+                    originalPath,
+                    normalizedPath + "original/",
+                    "cover-" + hash + "-original." + originalExtension,
+                    StringUtils.defaultIfBlank(contentType, "image/" + originalExtension),
+                    source
+            );
 
-        return buildCoverImage(originalImage, hash, normalizedPath, source);
+            return buildCoverImage(originalImage, hash, normalizedPath, source);
+        } finally {
+            if (originalImage != null) {
+                originalImage.flush();
+            }
+            coverProcessingSemaphore.release();
+        }
+    }
+
+    private void acquireCoverProcessingSlot() {
+        try {
+            coverProcessingSemaphore.acquire();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new ServiceException("文章封面处理被中断，请重试");
+        }
     }
 
     private CoverImageVo buildCoverImage(BufferedImage originalImage, String hash, String normalizedPath, String source) {
@@ -125,8 +127,9 @@ public class ArticleCoverImageService {
         }
 
         for (int width : widths) {
+            BufferedImage resized = null;
             try {
-                BufferedImage resized = resizeToWidth(originalImage, width);
+                resized = resizeToWidth(originalImage, width);
                 byte[] bytes = encodeImage(resized, format, quality);
                 if (bytes == null || bytes.length == 0) {
                     continue;
@@ -140,6 +143,10 @@ public class ArticleCoverImageService {
                 }
             } catch (Exception ex) {
                 log.warn("Failed to generate article cover variant, format={}, width={}", format, width, ex);
+            } finally {
+                if (resized != null) {
+                    resized.flush();
+                }
             }
         }
         return result;
@@ -260,26 +267,6 @@ public class ArticleCoverImageService {
         return null;
     }
 
-    private byte[] readAllBytes(MultipartFile file) {
-        try {
-            return file.getBytes();
-        } catch (IOException ex) {
-            throw new ServiceException("读取上传图片失败");
-        }
-    }
-
-    private BufferedImage readImage(byte[] bytes) {
-        try {
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-            if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0) {
-                throw new ServiceException("无法解析上传图片");
-            }
-            return image;
-        } catch (IOException ex) {
-            throw new ServiceException("无法解析上传图片");
-        }
-    }
-
     private BufferedImage readImage(Path path) {
         try {
             BufferedImage image = ImageIO.read(path.toFile());
@@ -290,10 +277,6 @@ public class ArticleCoverImageService {
         } catch (IOException ex) {
             throw new ServiceException("无法解析上传图片");
         }
-    }
-
-    private String resolveOriginalExtension(MultipartFile file) {
-        return resolveOriginalExtension(file.getOriginalFilename(), file.getContentType());
     }
 
     private String resolveOriginalExtension(String filename, String contentType) {
@@ -317,20 +300,6 @@ public class ArticleCoverImageService {
             return "gif";
         }
         return "jpg";
-    }
-
-    private String shortSha256(byte[] bytes) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(bytes);
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < 4; i++) {
-                builder.append(String.format("%02x", hash[i]));
-            }
-            return builder.toString();
-        } catch (Exception ex) {
-            return String.valueOf(Math.abs(new String(bytes, StandardCharsets.ISO_8859_1).hashCode()));
-        }
     }
 
     private String shortSha256(Path path) {

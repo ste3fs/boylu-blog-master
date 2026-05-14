@@ -108,9 +108,28 @@
         <el-table-column
           label="操作"
           align="center"
+          width="240"
           class-name="small-padding fixed-width"
         >
           <template #default="scope">
+            <el-button
+              v-if="scope.row.status === 1"
+              type="success"
+              link
+              :icon="Check"
+              v-permission="['sys:resource:update']"
+              @click="handleAudit(scope.row, 2)"
+              >通过
+            </el-button>
+            <el-button
+              v-if="scope.row.status === 1"
+              type="warning"
+              link
+              :icon="Close"
+              v-permission="['sys:resource:update']"
+              @click="handleAudit(scope.row, 0)"
+              >拒绝
+            </el-button>
             <el-button
               type="primary"
               link
@@ -184,7 +203,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Delete, Edit, Plus, Refresh, Search } from "@element-plus/icons-vue";
+import { Check, Close, Delete, Edit, Plus } from "@element-plus/icons-vue";
 import {
   listSysResourceApi,
   detailSysResourceApi,
@@ -213,7 +232,7 @@ const queryParams = reactive({
   name: undefined,
   category: undefined,
   isFree: undefined,
-  status: undefined,
+  status: 1,
 });
 
 const categoryList = ref<any[]>([]);
@@ -287,7 +306,8 @@ const cancel = () => {
 
 /** 表单重置 */
 const reset = () => {
-  form.value = {
+  Object.keys(form).forEach((key) => delete form[key]);
+  Object.assign(form, {
     id: undefined,
     userId: undefined,
     name: undefined,
@@ -297,8 +317,9 @@ const reset = () => {
     payType: undefined,
     panPath: undefined,
     panCode: undefined,
+    status: 2,
     createTime: undefined,
-  };
+  });
   formRef.value?.resetFields();
 };
 
@@ -333,6 +354,24 @@ const handleUpdate = (row: any) => {
     Object.assign(form, response.data);
     open.value = true;
     title.value = "修改资源表";
+  });
+};
+
+/** 审核资源 */
+const handleAudit = (row: any, status: number) => {
+  const actionText = status === 2 ? "通过" : "拒绝";
+  ElMessageBox.confirm(`确认${actionText}资源“${row.name || row.id}”？`, "审核确认", {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    type: status === 2 ? "success" : "warning",
+  }).then(() => {
+    return updateSysResourceApi({
+      ...row,
+      status,
+    });
+  }).then(() => {
+    ElMessage.success(`已${actionText}`);
+    getList();
   });
 };
 

@@ -36,7 +36,9 @@ public class SysResourceServiceImpl extends ServiceImpl<SysResourceMapper, SysRe
         wrapper.eq(sysResource.getPayType() != null, SysResource::getPayType, sysResource.getPayType());
         wrapper.eq(sysResource.getPanPath() != null, SysResource::getPanPath, sysResource.getPanPath());
         wrapper.eq(sysResource.getPanCode() != null, SysResource::getPanCode, sysResource.getPanCode());
+        wrapper.eq(sysResource.getStatus() != null, SysResource::getStatus, sysResource.getStatus());
         wrapper.eq(sysResource.getCreateTime() != null, SysResource::getCreateTime, sysResource.getCreateTime());
+        wrapper.orderByDesc(SysResource::getCreateTime);
         return page(PageUtil.getPage(), wrapper);
     }
 
@@ -47,6 +49,12 @@ public class SysResourceServiceImpl extends ServiceImpl<SysResourceMapper, SysRe
     @Override
     public boolean insert(SysResource sysResource) {
         sysResource.setUserId(StpUtil.getLoginIdAsLong());
+        if (sysResource.getDownloads() == null) {
+            sysResource.setDownloads(0);
+        }
+        if (sysResource.getStatus() == null) {
+            sysResource.setStatus(2);
+        }
         return save(sysResource);
     }
 

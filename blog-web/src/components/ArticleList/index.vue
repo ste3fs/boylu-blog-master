@@ -203,7 +203,11 @@ export default {
     },
     resolvePostImage(post) {
       if (post.coverImage) {
-        const fallback = this.resolveImage(post.coverImage.fallback || post.coverImage.source || post.cover)
+        const coverFallback = this.resolveImage(post.coverImage.fallback || post.coverImage.source)
+        const legacyCover = this.resolveImage(post.cover)
+        const fallback = this.isDefaultCover(coverFallback) && legacyCover
+          ? legacyCover
+          : (coverFallback || legacyCover)
         return {
           ...post.coverImage,
           alt: post.coverImage.alt || post.title,
@@ -218,6 +222,10 @@ export default {
         dominantColor: '#eef4ff',
         fallback: this.resolveImage(post.cover)
       }
+    },
+    isDefaultCover(url) {
+      const defaultImage = this.resolveImage(this.$store.state.defaultImage)
+      return !!url && !!defaultImage && url === defaultImage
     },
     resolvePostViews(post) {
       return post.views || post.quantity || 0

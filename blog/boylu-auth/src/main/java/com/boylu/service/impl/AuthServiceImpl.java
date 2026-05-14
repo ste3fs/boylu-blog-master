@@ -6,6 +6,7 @@ import cn.hutool.http.HttpUtil;
 import cn.hutool.json.JSONUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.boylu.common.BuiltinPermissions;
 import com.boylu.common.Constants;
 import com.boylu.common.RedisConstants;
 import com.boylu.config.properties.*;
@@ -166,7 +167,7 @@ public class AuthServiceImpl implements AuthService {
             List<String> permissions;
             List<String> roles = roleMapper.selectRolesCodeByUserId(userId);
             if (roles.contains(Constants.ADMIN)) {
-                permissions = menuMapper.getPermissionList(MenuTypeEnum.BUTTON.getCode());
+                permissions = BuiltinPermissions.mergeAdminPermissions(menuMapper.getPermissionList(MenuTypeEnum.BUTTON.getCode()));
             } else {
                 permissions = menuMapper.getPermissionListByUserId(userId, MenuTypeEnum.BUTTON.getCode());
             }

@@ -162,7 +162,7 @@
       </div>
     </section>
 
-    <Add :visible.sync="uploadDialogVisible" :categories="uploadCategories" />
+    <Add :visible.sync="uploadDialogVisible" :categories="uploadCategories" @success="handleUploadSuccess" />
 
     <el-dialog
       title="资源详情"
@@ -384,6 +384,10 @@ export default {
     },
     handlePageChange(page) {
       this.params.pageNum = page
+      this.fetchResources()
+    },
+    handleUploadSuccess() {
+      this.params.pageNum = 1
       this.fetchResources()
     },
     handleResourceClick(resource) {

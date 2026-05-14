@@ -56,10 +56,6 @@ export default defineConfig(({ command, mode }) => {
                   return
                 }
 
-                if (id.includes('mavon-editor')) {
-                  return 'vendor-editor'
-                }
-
                 if (id.includes('element-ui')) {
                   return 'vendor-element'
                 }

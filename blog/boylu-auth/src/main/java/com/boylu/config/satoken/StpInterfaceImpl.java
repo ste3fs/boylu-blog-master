@@ -1,6 +1,7 @@
 ﻿package com.boylu.config.satoken;
 
 import cn.dev33.satoken.stp.StpInterface;
+import com.boylu.common.BuiltinPermissions;
 import com.boylu.common.Constants;
 import com.boylu.enums.MenuTypeEnum;
 import com.boylu.mapper.SysMenuMapper;
@@ -27,7 +28,7 @@ public class StpInterfaceImpl implements StpInterface {
         List<String> roles = roleMapper.selectRolesCodeByUserId(loginId);
 
         if (roles.contains(Constants.ADMIN)) {
-            return menuMapper.getPermissionList(MenuTypeEnum.BUTTON.getCode());
+            return BuiltinPermissions.mergeAdminPermissions(menuMapper.getPermissionList(MenuTypeEnum.BUTTON.getCode()));
         }
         return menuMapper.getPermissionListByUserId(loginId,MenuTypeEnum.BUTTON.getCode());
     }

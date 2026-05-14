@@ -248,20 +248,32 @@ public class LocalImageStyleController {
                     return cachePath;
                 }
 
-                BufferedImage original = ImageIO.read(sourcePath.toFile());
-                if (original == null || original.getWidth() <= 0 || original.getHeight() <= 0) {
-                    throw new IOException("unsupported image");
-                }
+                BufferedImage original = null;
+                BufferedImage resized = null;
+                byte[] output;
+                try {
+                    original = ImageIO.read(sourcePath.toFile());
+                    if (original == null || original.getWidth() <= 0 || original.getHeight() <= 0) {
+                        throw new IOException("unsupported image");
+                    }
 
-                if (original.getColorModel().hasAlpha() && "jpg".equals(format)) {
-                    throw new IOException("transparent image should not be flattened to jpg");
-                }
+                    if (original.getColorModel().hasAlpha() && "jpg".equals(format)) {
+                        throw new IOException("transparent image should not be flattened to jpg");
+                    }
 
-                int targetWidth = Math.min(width, original.getWidth());
-                BufferedImage resized = resizeToWidth(original, targetWidth, "webp".equals(format));
-                byte[] output = encodeImage(resized, format, "webp".equals(format) ? WEBP_QUALITY : JPG_QUALITY);
-                if (output == null || output.length == 0) {
-                    throw new IOException("image writer missing");
+                    int targetWidth = Math.min(width, original.getWidth());
+                    resized = resizeToWidth(original, targetWidth, "webp".equals(format));
+                    output = encodeImage(resized, format, "webp".equals(format) ? WEBP_QUALITY : JPG_QUALITY);
+                    if (output == null || output.length == 0) {
+                        throw new IOException("image writer missing");
+                    }
+                } finally {
+                    if (resized != null) {
+                        resized.flush();
+                    }
+                    if (original != null) {
+                        original.flush();
+                    }
                 }
 
                 Files.createDirectories(cachePath.getParent());

@@ -40,7 +40,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.DirectoryStream;
@@ -50,6 +49,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.Arrays;
@@ -156,8 +156,12 @@ public class FileController {
     public Result<?> upload(MultipartFile file, String source) {
         validateUploadFile(file);
         String normalizedSource = normalizeSource(source);
-        byte[] bytes = readUploadBytes(file);
-        return Result.success(uploadImageBytes(bytes, file.getOriginalFilename(), file.getContentType(), normalizedSource));
+        Path tempPath = copyUploadToTempFile(file);
+        try {
+            return Result.success(uploadImageFile(tempPath, file.getOriginalFilename(), file.getContentType(), normalizedSource));
+        } finally {
+            deleteTempFileQuietly(tempPath);
+        }
     }
 
     @SaCheckLogin
@@ -639,43 +643,6 @@ public class FileController {
         return normalized.toLowerCase(Locale.ROOT);
     }
 
-    private DetectedImageType detectImageType(MultipartFile file) {
-        try (InputStream inputStream = file.getInputStream()) {
-            byte[] header = new byte[16];
-            int length = inputStream.read(header);
-            if (length < 12) {
-                throw new ServiceException("不支持的文件格式");
-            }
-
-            if (length >= 3
-                    && (header[0] & 0xFF) == 0xFF
-                    && (header[1] & 0xFF) == 0xD8
-                    && (header[2] & 0xFF) == 0xFF) {
-                return new DetectedImageType("jpg");
-            }
-
-            byte[] pngSignature = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-            if (length >= pngSignature.length && Arrays.equals(Arrays.copyOf(header, pngSignature.length), pngSignature)) {
-                return new DetectedImageType("png");
-            }
-
-            String gifHeader = new String(header, 0, Math.min(length, 6), StandardCharsets.US_ASCII);
-            if ("GIF87a".equals(gifHeader) || "GIF89a".equals(gifHeader)) {
-                return new DetectedImageType("gif");
-            }
-
-            String riffHeader = new String(header, 0, 4, StandardCharsets.US_ASCII);
-            String webpHeader = new String(header, 8, 4, StandardCharsets.US_ASCII);
-            if ("RIFF".equals(riffHeader) && "WEBP".equals(webpHeader)) {
-                return new DetectedImageType("webp");
-            }
-
-            throw new ServiceException("仅允许上传 jpg/png/gif/webp 图片");
-        } catch (IOException ex) {
-            throw new ServiceException("读取上传文件失败");
-        }
-    }
-
     private DetectedImageType detectImageType(byte[] bytes) {
         if (bytes == null || bytes.length < 12) {
             throw new ServiceException("不支持的文件格式");
@@ -712,43 +679,29 @@ public class FileController {
         }
     }
 
-    private byte[] readUploadBytes(MultipartFile file) {
+    private Path copyUploadToTempFile(MultipartFile file) {
+        Path tempPath = null;
         try {
-            return file.getBytes();
+            tempPath = Files.createTempFile("boylu-upload-", ".tmp");
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, tempPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return tempPath;
         } catch (IOException ex) {
-            throw new ServiceException("读取上传文件失败");
+            deleteTempFileQuietly(tempPath);
+            throw new ServiceException("Failed to read upload file");
         }
     }
 
-    private Object uploadImageBytes(byte[] bytes, String originalFilename, String contentType, String normalizedSource) {
-        if (bytes == null || bytes.length == 0) {
-            throw new ServiceException("上传文件不能为空");
+    private void deleteTempFileQuietly(Path tempPath) {
+        if (tempPath == null) {
+            return;
         }
-        long maxBytes = Math.max(1L, maxUploadSizeMb) * MB;
-        if (bytes.length > maxBytes) {
-            throw new ServiceException("上传文件大小不能超过 " + maxUploadSizeMb + "MB");
+        try {
+            Files.deleteIfExists(tempPath);
+        } catch (IOException ex) {
+            log.warn("Failed to delete temp upload file, path={}", tempPath, ex);
         }
-        validateImageDimensions(bytes);
-        DetectedImageType imageType = detectImageType(bytes);
-        String path = DateUtil.parseDateToStr(DateUtil.YYYYMMDD, DateUtil.getNowDate()) + "/";
-        if (StringUtils.isNotBlank(normalizedSource)) {
-            path = path + normalizedSource + "/";
-        }
-        if ("article-cover".equals(normalizedSource)) {
-            return articleCoverImageService.process(bytes, originalFilename, contentType, path, normalizedSource);
-        }
-        String saveFilename = UUID.randomUUID().toString().replace("-", "") + "." + imageType.getExtension();
-        MultipartFile multipartFile = new BytesMultipartFile("file", saveFilename,
-                StringUtils.defaultIfBlank(contentType, "image/" + imageType.getExtension()), bytes);
-        FileInfo fileInfo = fileStorageService.of(multipartFile)
-                .setPath(path)
-                .setSaveFilename(saveFilename)
-                .putAttr("source", normalizedSource)
-                .upload();
-        if (fileInfo == null) {
-            throw new ServiceException("上传文件失败");
-        }
-        return buildPublicContentUrl(fileInfo);
     }
 
     private Object uploadImageFile(Path filePath, String originalFilename, String contentType, String normalizedSource) {
@@ -820,21 +773,6 @@ public class FileController {
             }
         } finally {
             reader.dispose();
-        }
-    }
-
-    private void validateImageDimensions(byte[] bytes) {
-        try {
-            BufferedImage image = ImageIO.read(new java.io.ByteArrayInputStream(bytes));
-            if (image == null) {
-                throw new ServiceException("无法解析上传图片");
-            }
-            if (image.getWidth() > Math.max(1, maxImageWidth) || image.getHeight() > Math.max(1, maxImageHeight)) {
-                throw new ServiceException("图片分辨率超过限制，最大支持 "
-                        + Math.max(1, maxImageWidth) + "x" + Math.max(1, maxImageHeight));
-            }
-        } catch (IOException ex) {
-            throw new ServiceException("读取上传图片失败");
         }
     }
 
@@ -1253,60 +1191,6 @@ public class FileController {
             normalized = normalized.substring(0, normalized.length() - 1);
         }
         return normalized;
-    }
-
-    private static class BytesMultipartFile implements MultipartFile {
-        private final String name;
-        private final String originalFilename;
-        private final String contentType;
-        private final byte[] bytes;
-
-        private BytesMultipartFile(String name, String originalFilename, String contentType, byte[] bytes) {
-            this.name = name;
-            this.originalFilename = originalFilename;
-            this.contentType = contentType;
-            this.bytes = bytes == null ? new byte[0] : bytes;
-        }
-
-        @Override
-        public String getName() {
-            return name;
-        }
-
-        @Override
-        public String getOriginalFilename() {
-            return originalFilename;
-        }
-
-        @Override
-        public String getContentType() {
-            return contentType;
-        }
-
-        @Override
-        public boolean isEmpty() {
-            return bytes.length == 0;
-        }
-
-        @Override
-        public long getSize() {
-            return bytes.length;
-        }
-
-        @Override
-        public byte[] getBytes() {
-            return bytes;
-        }
-
-        @Override
-        public InputStream getInputStream() {
-            return new java.io.ByteArrayInputStream(bytes);
-        }
-
-        @Override
-        public void transferTo(java.io.File dest) throws IOException, IllegalStateException {
-            Files.write(dest.toPath(), bytes);
-        }
     }
 
     private static class DetectedImageType {
