@@ -1,6 +1,21 @@
 # 项目问题清单与处理进度（2026-05-14）
 
-本轮优先处理博客功能问题和仓库迁移提交，不处理服务器 SSH 连接问题。
+本轮优先检查线上可见功能问题，并先处理首页随机视频播放器位置和功能异常。
+
+## 2026-05-14 当前检查问题
+
+### P1：随机视频播放器位置和功能异常（已修复，待部署复核）
+
+- 线上表现：随机视频内容直接渲染到页面底部，遮挡页脚、右侧悬浮按钮和页面内容。
+- GitHub 旧版对比：旧版 `RandomVideo` 的意图是左侧箭头触发播放器抽屉，播放器不应该常驻底部横向铺满。
+- 根因判断：前台 Element UI 当前只按需注册了部分组件，`RandomVideo` 使用的 `el-drawer`、`el-tooltip` 没有全局注册，组件会被浏览器当成普通未知标签输出；同时视频源仍是 `http://`，在 HTTPS 站点存在混合内容拦截风险。
+- 修复方向：改为组件内部的左侧固定小播放器，默认只显示左侧箭头，点击后展开；关闭时暂停播放，切换视频时重新拉取；视频源改为 HTTPS。
+- 处理结果：`blog-web/src/components/RandomVideo/index.vue` 已改为自包含左侧小面板，不再依赖未注册的 `el-drawer/el-tooltip`；`npm run build` 已通过。
+
+### P2：已复核的历史记录
+
+- 普通上传流程已改为先写入临时文件，再读取文件头和图片元数据校验，不再通过 `MultipartFile#getBytes()` 读整图。
+- 本轮前台构建未再出现 `mavon-editor` eval 警告，该项不再作为待处理问题保留。
 
 ## 已修复
 
@@ -30,6 +45,7 @@
 
 - 分片上传完成后不再 `Files.readAllBytes(mergedPath)`，改为基于临时合并文件上传。
 - 分片上传完成后的图片类型识别和尺寸校验改为读取文件头和图片元数据。
+- 普通上传流程已改为 `copyUploadToTempFile`，通过 `MultipartFile#getInputStream()` 写入临时文件后再进入校验和上传。
 - 旧文章封面回填不再把源图读成 `byte[]` 再交给封面服务，改为传入 `Path`。
 - `ArticleCoverImageService` 新增 `Path` 处理入口，源图 hash 改为流式计算，原图上传走本地文件输入。
 - 封面变体生成仍需要解码为 `BufferedImage`，这是当前生成多尺寸 WebP/JPG/AVIF 的必要内存占用。
@@ -57,12 +73,11 @@
 
 ### 图片处理内存
 
-- 当前已避免分片完成后显式读取整图 byte[]，但普通小文件上传仍会通过 `MultipartFile#getBytes()` 进入现有校验流程。
 - 文章封面多尺寸生成仍需要将源图解码为 `BufferedImage`，如果后续图片量或并发继续增大，可以继续做更完整的流式/队列化处理。
 
 ### 前端构建体积
 
-- 前台构建存在 `mavon-editor` 自身 eval 警告。
+- 前台构建本轮已复核通过，未再出现 `mavon-editor` 自身 eval 警告。
 - 后台构建存在 Sass legacy API 和大 chunk 警告。
 - 这些目前不影响构建结果，后续可单独优化依赖拆分。
 
@@ -70,10 +85,11 @@
 
 - `blog` Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
 - `blog-web` 构建已通过：`npm run build`。
+- 2026-05-14 随机视频播放器修复后，`blog-web` 构建再次通过：`npm run build`。
 - `blog-admin` 构建已通过：`npm run build`。
 - `blog-web` 安装依赖时保留 npm audit 提示：20 个漏洞提示。
 - `blog-admin` 安装依赖时保留 npm audit 提示：11 个漏洞提示。
-- 前台构建保留 `mavon-editor` eval 警告；后台构建保留 Sass legacy API 和大 chunk 警告。
+- 前台构建本轮未再出现 `mavon-editor` eval 警告；后台构建保留 Sass legacy API 和大 chunk 警告。
 - 部署后检查：
   - `sudo systemctl status boylu-blog --no-pager`
   - `sudo nginx -t`
