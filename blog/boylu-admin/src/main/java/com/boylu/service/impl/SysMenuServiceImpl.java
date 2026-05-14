@@ -171,8 +171,9 @@ public class SysMenuServiceImpl extends ServiceImpl<SysMenuMapper, SysMenu> impl
         resourceMenu.setPath("resource");
         resourceMenu.setComponent("/site/resource/index");
         resourceMenu.setTitle("资源审核");
-        resourceMenu.setSort(5);
+        resourceMenu.setSort(6);
         resourceMenu.setIcon("FolderChecked");
+        resourceMenu.setName("SiteResource");
         resourceMenu.setType(MenuTypeEnum.MENU);
         resourceMenu.setHidden(0);
         resourceMenu.setIsExternal(0);
