@@ -1,4 +1,4 @@
-﻿package com.boylu.config;
+package com.boylu.config;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.boylu.config.interceptor.ApiAccessLogInterceptor;

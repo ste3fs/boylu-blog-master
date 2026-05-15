@@ -1,4 +1,4 @@
-﻿package com.boylu.exception;
+package com.boylu.exception;
 
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;

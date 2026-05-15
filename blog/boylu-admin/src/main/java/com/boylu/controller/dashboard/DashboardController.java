@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.dashboard;
+package com.boylu.controller.dashboard;
 
 
 import com.boylu.common.Result;

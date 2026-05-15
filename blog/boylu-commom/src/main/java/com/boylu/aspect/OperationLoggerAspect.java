@@ -1,4 +1,4 @@
-﻿package com.boylu.aspect;
+package com.boylu.aspect;
 
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.stp.StpUtil;

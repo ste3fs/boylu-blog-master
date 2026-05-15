@@ -1,4 +1,4 @@
-﻿package com.boylu.quartz;
+package com.boylu.quartz;
 
 import org.apache.velocity.app.Velocity;
 import org.springframework.context.annotation.Configuration;

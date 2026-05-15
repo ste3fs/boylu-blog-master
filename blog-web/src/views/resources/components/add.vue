@@ -75,7 +75,7 @@
         </el-form-item>
 
         <el-form-item label="提取码" prop="panCode">
-          <el-input v-model="uploadForm.panCode" placeholder="请输入提取码" />
+          <el-input v-model="uploadForm.panCode" placeholder="没有提取码可以不填" />
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
@@ -151,9 +151,7 @@ export default {
         panPath: [
           { required: true, message: '请输入网盘地址', trigger: 'blur' }
         ],
-        panCode: [
-          { required: true, message: '请输入提取码', trigger: 'blur' }
-        ]
+        panCode: []
       }
     };
   },

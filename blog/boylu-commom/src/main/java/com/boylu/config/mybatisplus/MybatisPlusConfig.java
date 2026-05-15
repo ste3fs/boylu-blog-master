@@ -1,4 +1,4 @@
-﻿package com.boylu.config.mybatisplus;
+package com.boylu.config.mybatisplus;
 
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;

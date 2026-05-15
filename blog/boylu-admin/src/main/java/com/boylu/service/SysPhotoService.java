@@ -1,4 +1,4 @@
-﻿package com.boylu.service;
+package com.boylu.service;
 
 import com.boylu.entity.SysPhoto;
 import com.baomidou.mybatisplus.extension.service.IService;

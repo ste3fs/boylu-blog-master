@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.resource;
+package com.boylu.vo.resource;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.annotations.ApiModelProperty;

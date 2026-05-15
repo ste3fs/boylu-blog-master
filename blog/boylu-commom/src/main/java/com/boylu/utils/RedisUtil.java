@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisCallback;

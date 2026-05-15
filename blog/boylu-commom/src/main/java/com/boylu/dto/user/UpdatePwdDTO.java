@@ -1,4 +1,4 @@
-﻿package com.boylu.dto.user;
+package com.boylu.dto.user;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;

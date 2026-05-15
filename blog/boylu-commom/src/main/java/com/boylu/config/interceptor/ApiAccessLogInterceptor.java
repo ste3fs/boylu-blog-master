@@ -1,4 +1,4 @@
-﻿package com.boylu.config.interceptor;
+package com.boylu.config.interceptor;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.resource.ResourceUtil;

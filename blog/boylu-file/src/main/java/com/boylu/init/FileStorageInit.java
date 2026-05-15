@@ -1,4 +1,4 @@
-﻿package com.boylu.init;
+package com.boylu.init;
 
 import com.boylu.entity.SysFileOss;
 import com.boylu.enums.FileOssEnum;

@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 public class UserAgentUtil {
 

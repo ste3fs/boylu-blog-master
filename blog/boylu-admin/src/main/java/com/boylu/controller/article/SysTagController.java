@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.article;
+package com.boylu.controller.article;
 
 import java.util.List;
 

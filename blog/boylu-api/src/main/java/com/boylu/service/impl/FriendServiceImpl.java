@@ -1,4 +1,4 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.boylu.service.FriendService;

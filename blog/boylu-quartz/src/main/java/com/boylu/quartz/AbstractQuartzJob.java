@@ -1,4 +1,4 @@
-﻿package com.boylu.quartz;
+package com.boylu.quartz;
 
 import com.boylu.common.Constants;
 import com.boylu.entity.SysJob;

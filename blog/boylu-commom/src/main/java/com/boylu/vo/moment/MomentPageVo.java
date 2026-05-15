@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.moment;
+package com.boylu.vo.moment;
 
 import com.boylu.entity.SysMoment;
 import lombok.Data;

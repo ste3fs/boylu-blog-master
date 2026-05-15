@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.friend;
+package com.boylu.controller.friend;
 
 import com.boylu.service.FriendService;
 import com.boylu.common.Result;

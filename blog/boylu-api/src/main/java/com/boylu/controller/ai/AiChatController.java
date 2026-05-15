@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.ai;
+package com.boylu.controller.ai;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.baomidou.mybatisplus.core.metadata.IPage;

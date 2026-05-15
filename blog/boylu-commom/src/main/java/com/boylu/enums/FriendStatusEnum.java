@@ -1,4 +1,4 @@
-﻿package com.boylu.enums;
+package com.boylu.enums;
 
 import lombok.Getter;
 

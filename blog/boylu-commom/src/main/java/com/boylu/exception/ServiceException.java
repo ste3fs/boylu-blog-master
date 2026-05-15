@@ -1,4 +1,4 @@
-﻿package com.boylu.exception;
+package com.boylu.exception;
 
 public class ServiceException extends RuntimeException {
     

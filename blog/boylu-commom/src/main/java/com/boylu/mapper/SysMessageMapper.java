@@ -1,4 +1,4 @@
-﻿package com.boylu.mapper;
+package com.boylu.mapper;
 
 import com.boylu.entity.SysMessage;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

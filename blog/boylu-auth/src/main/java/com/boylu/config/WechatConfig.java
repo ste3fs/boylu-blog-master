@@ -1,4 +1,4 @@
-﻿package com.boylu.config;
+package com.boylu.config;
 
 import com.boylu.config.properties.WechatProperties;
 import me.chanjar.weixin.mp.api.WxMpConfigStorage;

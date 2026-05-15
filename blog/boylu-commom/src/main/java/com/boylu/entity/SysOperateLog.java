@@ -1,4 +1,4 @@
-﻿package com.boylu.entity;
+package com.boylu.entity;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;

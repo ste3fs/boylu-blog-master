@@ -1,4 +1,4 @@
-﻿package com.boylu.dto.ai;
+package com.boylu.dto.ai;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;

@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.article;
+package com.boylu.controller.article;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.baomidou.mybatisplus.core.metadata.IPage;

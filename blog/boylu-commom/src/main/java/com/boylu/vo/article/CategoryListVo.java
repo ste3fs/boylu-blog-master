@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.article;
+package com.boylu.vo.article;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;

@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.album;
+package com.boylu.controller.album;
 
 import com.boylu.annotation.AccessLimit;
 import com.boylu.common.Result;

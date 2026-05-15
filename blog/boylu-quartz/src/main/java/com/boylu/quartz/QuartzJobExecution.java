@@ -1,4 +1,4 @@
-﻿package com.boylu.quartz;
+package com.boylu.quartz;
 
 import com.boylu.entity.SysJob;
 import com.boylu.utils.JobInvokeUtils;

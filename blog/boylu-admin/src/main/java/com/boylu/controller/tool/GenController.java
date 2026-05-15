@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.tool;
+package com.boylu.controller.tool;
 
 import com.boylu.common.Result;
 import com.boylu.entity.GenTable;

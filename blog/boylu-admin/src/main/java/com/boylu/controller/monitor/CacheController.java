@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.monitor;
+package com.boylu.controller.monitor;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.boylu.common.Result;

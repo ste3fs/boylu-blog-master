@@ -1,4 +1,4 @@
-﻿package com.boylu.service.ai;
+package com.boylu.service.ai;
 
 import com.boylu.dto.ai.AiTrainingChatDto;
 import com.boylu.dto.ai.AiTrainingChatMessageDto;

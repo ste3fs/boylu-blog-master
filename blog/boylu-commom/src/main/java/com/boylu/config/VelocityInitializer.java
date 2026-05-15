@@ -1,4 +1,4 @@
-﻿package com.boylu.config;
+package com.boylu.config;
 
 import com.boylu.common.Constants;
 import org.apache.velocity.app.Velocity;

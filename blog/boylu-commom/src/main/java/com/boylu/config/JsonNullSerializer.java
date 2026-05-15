@@ -1,4 +1,4 @@
-﻿package com.boylu.config;
+package com.boylu.config;
 
 import cn.hutool.json.JSONNull;
 import com.fasterxml.jackson.core.JsonGenerator;

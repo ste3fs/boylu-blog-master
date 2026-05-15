@@ -1,4 +1,4 @@
-﻿package com.boylu.dto.user;
+package com.boylu.dto.user;
 
 import com.boylu.entity.SysUser;
 import io.swagger.annotations.ApiModel;

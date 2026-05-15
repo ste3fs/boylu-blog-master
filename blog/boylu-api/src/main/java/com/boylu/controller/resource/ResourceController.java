@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.resource;
+package com.boylu.controller.resource;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;

@@ -1,4 +1,4 @@
-﻿package com.boylu.mapper;
+package com.boylu.mapper;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.boylu.entity.SysResource;

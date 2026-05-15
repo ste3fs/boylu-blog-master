@@ -1,4 +1,4 @@
-﻿package com.boylu.service;
+package com.boylu.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.boylu.entity.SysWebConfig;

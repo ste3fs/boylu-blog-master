@@ -1,4 +1,4 @@
-﻿package com.boylu.config.mybatisplus;
+package com.boylu.config.mybatisplus;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;

@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.article;
+package com.boylu.vo.article;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.boylu.utils.DateUtil;

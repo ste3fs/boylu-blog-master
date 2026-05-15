@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.message;
+package com.boylu.controller.message;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;

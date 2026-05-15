@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.monitor;
+package com.boylu.controller.monitor;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;

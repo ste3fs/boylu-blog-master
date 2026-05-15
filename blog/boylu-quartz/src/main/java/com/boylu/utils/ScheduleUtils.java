@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import com.boylu.entity.SysJob;
 import com.boylu.quartz.QuartzDisallowConcurrentExecution;

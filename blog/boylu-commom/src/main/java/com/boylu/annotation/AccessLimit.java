@@ -1,4 +1,4 @@
-﻿package com.boylu.annotation;
+package com.boylu.annotation;
 
 import io.swagger.annotations.ApiModelProperty;
 

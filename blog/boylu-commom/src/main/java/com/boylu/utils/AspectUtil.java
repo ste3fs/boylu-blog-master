@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import cn.hutool.json.JSONUtil;
 import org.apache.commons.lang3.StringUtils;

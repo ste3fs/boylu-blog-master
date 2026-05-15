@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.comment;
+package com.boylu.vo.comment;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.boylu.utils.DateUtil;

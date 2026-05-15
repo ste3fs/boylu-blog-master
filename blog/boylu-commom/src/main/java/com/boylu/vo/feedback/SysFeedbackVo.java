@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.feedback;
+package com.boylu.vo.feedback;
 
 import com.boylu.entity.SysFeedback;
 import io.swagger.annotations.ApiModel;

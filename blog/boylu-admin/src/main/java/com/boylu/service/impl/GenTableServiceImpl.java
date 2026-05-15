@@ -1,4 +1,4 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import com.boylu.config.VelocityInitializer;
 import com.boylu.service.GenTableService;

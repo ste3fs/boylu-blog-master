@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.system;
+package com.boylu.controller.system;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.annotation.SaIgnore;

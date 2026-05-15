@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.system;
+package com.boylu.controller.system;
 
 import java.util.List;
 

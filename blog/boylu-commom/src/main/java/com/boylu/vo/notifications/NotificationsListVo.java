@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.notifications;
+package com.boylu.vo.notifications;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.annotations.ApiModelProperty;

@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.sign;
+package com.boylu.controller.sign;
 
 import com.boylu.common.Result;
 import com.boylu.service.SignService;

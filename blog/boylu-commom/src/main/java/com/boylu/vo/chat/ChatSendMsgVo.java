@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.chat;
+package com.boylu.vo.chat;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.boylu.utils.DateUtil;

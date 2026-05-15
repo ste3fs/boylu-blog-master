@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.chat;
+package com.boylu.controller.chat;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.boylu.common.Result;

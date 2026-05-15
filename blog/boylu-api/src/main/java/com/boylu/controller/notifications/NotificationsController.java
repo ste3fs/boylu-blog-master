@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.notifications;
+package com.boylu.controller.notifications;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.boylu.common.Result;

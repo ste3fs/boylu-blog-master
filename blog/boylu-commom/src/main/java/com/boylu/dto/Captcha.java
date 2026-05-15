@@ -1,4 +1,4 @@
-﻿package com.boylu.dto;
+package com.boylu.dto;
 
 import lombok.Data;
 

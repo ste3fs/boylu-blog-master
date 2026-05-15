@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.message;
+package com.boylu.controller.message;
 
 import com.boylu.annotation.AccessLimit;
 import com.boylu.service.MessageService;

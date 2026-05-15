@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.home;
+package com.boylu.controller.home;
 
 import com.alibaba.fastjson2.JSONObject;
 import com.boylu.entity.SysNotice;

@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.moment;
+package com.boylu.controller.moment;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.boylu.common.Result;

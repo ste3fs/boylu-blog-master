@@ -1,4 +1,4 @@
-﻿package com.boylu.mapper;
+package com.boylu.mapper;
 
 import com.boylu.entity.GenTable;
 import com.boylu.entity.GenTableColumn;

@@ -1,4 +1,4 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.RandomUtil;
@@ -13,6 +13,7 @@ import com.boylu.utils.PageUtil;
 import com.boylu.utils.RedisUtil;
 import com.boylu.vo.resource.SysResourceVo;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
@@ -26,6 +27,13 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class ResourceServiceImpl implements ResourceService {
 
+    private static final int MAX_NAME_LENGTH = 50;
+    private static final int MAX_CATEGORY_LENGTH = 64;
+    private static final int MAX_COVER_LENGTH = 512;
+    private static final int MAX_DESCRIPTION_LENGTH = 500;
+    private static final int MAX_PAN_PATH_LENGTH = 255;
+    private static final int MAX_PAN_CODE_LENGTH = 64;
+
     private final SysResourceMapper baseMapper;
 
     private final RedisUtil redisUtil;
@@ -37,6 +45,7 @@ public class ResourceServiceImpl implements ResourceService {
 
     @Override
     public void add(SysResource sysResource) {
+        normalizeAndValidate(sysResource);
         sysResource.setUserId(StpUtil.getLoginIdAsLong());
         sysResource.setStatus(ResourceStatusEnum.AUDIT.getCode());
         sysResource.setDownloads(0);
@@ -83,5 +92,53 @@ public class ResourceServiceImpl implements ResourceService {
         baseMapper.updateById(sysResource);
 
         return sysResource;
+    }
+
+    private void normalizeAndValidate(SysResource sysResource) {
+        if (sysResource == null) {
+            throw new ServiceException("资源信息不能为空");
+        }
+
+        sysResource.setName(StringUtils.trimToEmpty(sysResource.getName()));
+        sysResource.setCategory(StringUtils.trimToEmpty(sysResource.getCategory()));
+        sysResource.setCover(StringUtils.trimToNull(sysResource.getCover()));
+        sysResource.setDescription(StringUtils.trimToNull(sysResource.getDescription()));
+        sysResource.setPanPath(StringUtils.trimToEmpty(sysResource.getPanPath()));
+        sysResource.setPanCode(StringUtils.trimToNull(sysResource.getPanCode()));
+
+        if (StringUtils.isBlank(sysResource.getName())) {
+            throw new ServiceException("资源名称不能为空");
+        }
+        if (sysResource.getName().length() > MAX_NAME_LENGTH) {
+            throw new ServiceException("资源名称不能超过 50 个字符");
+        }
+        if (StringUtils.isBlank(sysResource.getCategory())) {
+            throw new ServiceException("资源分类不能为空");
+        }
+        if (sysResource.getCategory().length() > MAX_CATEGORY_LENGTH) {
+            throw new ServiceException("资源分类过长");
+        }
+        if (StringUtils.isNotBlank(sysResource.getCover()) && sysResource.getCover().length() > MAX_COVER_LENGTH) {
+            throw new ServiceException("资源封面地址过长");
+        }
+        if (StringUtils.isNotBlank(sysResource.getDescription()) && sysResource.getDescription().length() > MAX_DESCRIPTION_LENGTH) {
+            throw new ServiceException("资源描述不能超过 500 个字符");
+        }
+        if (StringUtils.isBlank(sysResource.getPanPath())) {
+            throw new ServiceException("网盘地址不能为空");
+        }
+        if (sysResource.getPanPath().length() > MAX_PAN_PATH_LENGTH) {
+            throw new ServiceException("网盘地址过长");
+        }
+        if (StringUtils.isNotBlank(sysResource.getPanCode()) && sysResource.getPanCode().length() > MAX_PAN_CODE_LENGTH) {
+            throw new ServiceException("提取码过长");
+        }
+
+        Integer isFree = sysResource.getIsFree();
+        if (isFree == null) {
+            sysResource.setIsFree(1);
+        } else if (!Integer.valueOf(0).equals(isFree) && !Integer.valueOf(1).equals(isFree)) {
+            throw new ServiceException("资源类型不正确");
+        }
     }
 }

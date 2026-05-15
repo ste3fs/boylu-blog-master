@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.boylu.common.PageQuery;

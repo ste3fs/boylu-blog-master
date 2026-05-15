@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import com.boylu.entity.SysArticle;
 import com.boylu.entity.SysNotifications;

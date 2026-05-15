@@ -1,4 +1,4 @@
-﻿package com.boylu;
+package com.boylu;
 
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.x.file.storage.spring.EnableFileStorage;

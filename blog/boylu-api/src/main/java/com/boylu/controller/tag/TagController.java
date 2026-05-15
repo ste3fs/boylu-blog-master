@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.tag;
+package com.boylu.controller.tag;
 
 import com.boylu.service.TagService;
 import com.boylu.vo.tag.TagListVo;

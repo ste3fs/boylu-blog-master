@@ -1,4 +1,4 @@
-﻿package com.boylu.dto;
+package com.boylu.dto;
 
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;

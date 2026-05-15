@@ -1,8 +1,9 @@
-﻿package com.boylu.service.impl;
+package com.boylu.service.impl;
 
 import java.util.List;
 
 import cn.dev33.satoken.stp.StpUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import com.boylu.mapper.SysResourceMapper;
 import com.boylu.entity.SysResource;
@@ -29,13 +30,13 @@ public class SysResourceServiceImpl extends ServiceImpl<SysResourceMapper, SysRe
         // 构建查询条件
         wrapper.eq(sysResource.getId() != null, SysResource::getId, sysResource.getId());
         wrapper.eq(sysResource.getUserId() != null, SysResource::getUserId, sysResource.getUserId());
-        wrapper.eq(sysResource.getName() != null, SysResource::getName, sysResource.getName());
-        wrapper.eq(sysResource.getCategory() != null, SysResource::getCategory, sysResource.getCategory());
+        wrapper.like(StringUtils.isNotBlank(sysResource.getName()), SysResource::getName, sysResource.getName());
+        wrapper.eq(StringUtils.isNotBlank(sysResource.getCategory()), SysResource::getCategory, sysResource.getCategory());
         wrapper.eq(sysResource.getDownloads() != null, SysResource::getDownloads, sysResource.getDownloads());
         wrapper.eq(sysResource.getIsFree() != null, SysResource::getIsFree, sysResource.getIsFree());
         wrapper.eq(sysResource.getPayType() != null, SysResource::getPayType, sysResource.getPayType());
-        wrapper.eq(sysResource.getPanPath() != null, SysResource::getPanPath, sysResource.getPanPath());
-        wrapper.eq(sysResource.getPanCode() != null, SysResource::getPanCode, sysResource.getPanCode());
+        wrapper.eq(StringUtils.isNotBlank(sysResource.getPanPath()), SysResource::getPanPath, sysResource.getPanPath());
+        wrapper.eq(StringUtils.isNotBlank(sysResource.getPanCode()), SysResource::getPanCode, sysResource.getPanCode());
         wrapper.eq(sysResource.getStatus() != null, SysResource::getStatus, sysResource.getStatus());
         wrapper.eq(sysResource.getCreateTime() != null, SysResource::getCreateTime, sysResource.getCreateTime());
         wrapper.orderByDesc(SysResource::getCreateTime);

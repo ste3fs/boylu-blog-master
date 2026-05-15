@@ -1,102 +1,67 @@
-# 项目问题清单与处理进度（2026-05-14）
+# 项目问题清单与处理进度
 
-本轮优先检查线上可见功能问题，并先处理首页随机视频播放器位置和功能异常。
+更新时间：2026-05-15
 
-## 2026-05-14 当前检查问题
+## 本轮已确认并处理
 
-### P1：随机视频播放器位置和功能异常（已修复并部署）
+### P1：后端 Java 文件 BOM 导致 Maven 编译失败（已修复）
 
-- 线上表现：随机视频内容直接渲染到页面底部，遮挡页脚、右侧悬浮按钮和页面内容。
-- GitHub 旧版对比：旧版 `RandomVideo` 的意图是左侧箭头触发播放器抽屉，播放器不应该常驻底部横向铺满。
-- 根因判断：前台 Element UI 当前只按需注册了部分组件，`RandomVideo` 使用的 `el-drawer`、`el-tooltip` 没有全局注册，组件会被浏览器当成普通未知标签输出；同时视频源仍是 `http://`，在 HTTPS 站点存在混合内容拦截风险。
-- 修复方向：改为组件内部的左侧固定小播放器，默认只显示左侧箭头，点击后展开；关闭时暂停播放，切换视频时重新拉取；视频源改为 HTTPS。
-- 处理结果：`blog-web/src/components/RandomVideo/index.vue` 已改为自包含左侧小面板，不再依赖未注册的 `el-drawer/el-tooltip`；`npm run build` 已通过，线上静态资源也已确认包含新播放器代码。
+- 现象：执行 `mvn -pl boylu-server -am package -DskipTests` 时，`boylu-commom` 大量 Java 文件报 `非法字符: '\ufeff'`。
+- 原因：项目中 283 个 Java 文件带 UTF-8 BOM，当前 Maven/JDK 编译链不接受 Java 源文件开头 BOM。
+- 处理：批量移除 Java 文件开头 BOM，只做编码清理，不改业务逻辑。
+- 验证：后端 Maven 构建已通过。
 
-### P2：已复核的历史记录
+### P1：资源管理页默认空列表（已修复并部署）
 
-- 普通上传流程已改为先写入临时文件，再读取文件头和图片元数据校验，不再通过 `MultipartFile#getBytes()` 读整图。
-- 本轮前台构建未再出现 `mavon-editor` eval 警告，该项不再作为待处理问题保留。
+- 现象：后台“站点管理 / 资源审核”默认显示“暂无数据”。
+- 原因：页面默认筛选 `status=1`（待审核），而已有资源多数是 `status=2`（已通过）。
+- 处理：后台资源页默认展示全部状态，分类、是否免费、状态筛选支持清空。
+- 验证：后台已构建并部署，`nginx -t` 通过，服务正常。
 
-## 已修复
+### P2：后台资源名搜索过于严格（已修复）
 
-### Git 仓库迁移
+- 现象：后台资源管理里输入部分资源名可能搜不到，只有完整名称精确匹配才返回。
+- 原因：后端资源管理查询使用 `eq(name)`。
+- 处理：改为 `like(name)`，同时分类、网盘地址、提取码等字符串筛选只在非空时生效，避免空字符串误过滤。
 
-- 已在干净 worktree 中单独完成 `mojian -> boylu` 后端迁移提交。
-- 后端模块统一为 `blog/boylu-*`，Java 包名统一为 `com.boylu`。
-- 旧 `blog/mojian-*` 不再作为当前修改目标。
+### P2：前台资源上传缺少后端基础校验（已修复）
 
-### 图片 canonical 策略
+- 现象：前台资源上传主要依赖前端表单校验，后端对名称、分类、网盘地址、描述长度等兜底不足。
+- 处理：`ResourceServiceImpl.add` 增加服务端 trim、必填校验、长度限制和 `isFree` 合法性校验。
+- 结果：非法或超长数据会在入库前被拦截，避免数据库异常或脏数据。
 
-- 最终策略已定稿：业务字段长期保存 `/boylu/file/content/{fileId}`。
-- 上传接口和文章封面响应式变体返回值统一为网关地址，不再因为本地存储而优先返回 `/localFile/...`。
-- 运行时仍保留性能策略：网关地址解析真实文件后跳转或读取 `/localFile/...`，由 Nginx 静态缓存返回。
-- `docs/IMAGE_STORAGE.md` 已同步该策略，并把 `/localFile/` 缓存说明改为 365 天 immutable。
+### P2：资源提取码被强制填写（已修复）
 
-### 图片加载链路
+- 现象：一些资源链接没有提取码，但前台上传和后台新增/修改都强制要求填写提取码。
+- 处理：提取码改为可选；网盘地址仍必填。
 
-- `SmartImage.vue` 已接入 `/img/local/<encoded>!w{width}.webp` 样式图链路，优先加载小 WebP 图。
-- 文章详情正文图片已改为懒加载样式图，并保留 `data-origin` 作为预览和失败回退地址。
-- `blog-web` 和 `blog-admin` 本地开发代理已补齐 `/img`。
-- `LocalImageStyleController` 已改为流式计算源图 hash，避免为 hash 一次性 `readAllBytes`。
-- 样式图生成已增加源文件大小、像素总量、GIF 回退、透明 PNG 转 JPG 回退、WebP 保留 alpha 和同一缓存文件生成锁。
-- `FileController` 已增加 `img-cache` 统计和安全清理接口，只处理 `img-cache`，不删除旧原图。
+## 已复核为正常
 
-### 图片处理降内存
+### 资源下载权限边界
 
-- 分片上传完成后不再 `Files.readAllBytes(mergedPath)`，改为基于临时合并文件上传。
-- 分片上传完成后的图片类型识别和尺寸校验改为读取文件头和图片元数据。
-- 普通上传流程已改为 `copyUploadToTempFile`，通过 `MultipartFile#getInputStream()` 写入临时文件后再进入校验和上传。
-- 旧文章封面回填不再把源图读成 `byte[]` 再交给封面服务，改为传入 `Path`。
-- `ArticleCoverImageService` 新增 `Path` 处理入口，源图 hash 改为流式计算，原图上传走本地文件输入。
-- 封面变体生成仍需要解码为 `BufferedImage`，这是当前生成多尺寸 WebP/JPG/AVIF 的必要内存占用。
+- 公开资源列表接口当前不会返回 `panPath` / `panCode`。
+- 免费资源点击后需要登录，通过 `/api/resource/download` 获取下载链接。
+- 付费资源需要登录并完成验证码校验后，通过 `/api/resource/verify` 获取下载方式。
 
-### 性能与稳定性
+### 图片存储策略
 
-- 热榜接口已增加 Redis 缓存，减少第三方接口慢响应和限流影响。
-- 旧文章封面回填前已增加文件大小和图片尺寸保护，源图过大或无法解析时跳过并记录日志。
-- 首页 Redis 缓存反序列化、分类快速切换、阅读时间、统计展示等问题已按前一轮记录修复。
-
-### 安全收口
-
-- 后台文章新增/更新已接入 `HtmlSanitizerUtil`，保存前清洗文章 HTML。
-- `HtmlSanitizerUtil` 已补充文章场景需要的图片懒加载属性和本地文件 URL 兼容。
-- `SaTokenConfigure` 已移除全局 `/api/**` 放行，改为明确公开接口白名单。
-- 部署脚本不再硬编码服务器密码，改为读取 `BOYLU_SSH_PASSWORD` 或使用 SSH key / ssh-agent。
-
-### 文档与临时目录
-
-- `.gitignore` 已加入 `.tmp/`，临时验证、数据库探测和一次性部署脚本默认不进入仓库。
-- 可复用脚本后续应移动到 `scripts/` 或 `deploy/`。
-- `blog/pom.xml` 乱码中文注释已改为清晰英文注释。
+- 业务字段长期保存 `/boylu/file/content/{fileId}`。
+- `/localFile/...` 继续作为历史兼容和 Nginx 静态缓存入口。
+- `/img/local/<encoded>!w{width}.webp` 样式图链路已接入，失败时回退原图和默认图。
 
 ## 仍需关注
 
-### 图片处理内存
+### P2：前端构建体积和依赖警告
 
-- 文章封面多尺寸生成仍需要将源图解码为 `BufferedImage`，如果后续图片量或并发继续增大，可以继续做更完整的流式/队列化处理。
+- 后台构建仍有 Sass legacy API 和大 chunk 警告。
+- 暂不影响运行，后续可单独做依赖拆分和 Sass API 升级。
 
-### 前端构建体积
+### P3：资源审核体验
 
-- 前台构建本轮已复核通过，未再出现 `mavon-editor` 自身 eval 警告。
-- 后台构建存在 Sass legacy API 和大 chunk 警告。
-- 这些目前不影响构建结果，后续可单独优化依赖拆分。
+- 目前后台资源审核已可用，但“新增资源表”文案偏代码生成风格，不够像真实后台操作。
+- 后续可把弹窗标题改成“新增资源 / 修改资源”，并给“待审核资源数量”做更明显提示。
 
-## 本轮验证结果
+## 本轮验证
 
-- `blog` Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
-- `blog-web` 构建已通过：`npm run build`。
-- 2026-05-14 随机视频播放器修复后，`blog-web` 构建再次通过：`npm run build`。
-- 2026-05-14 已同步 `blog-web/dist` 到服务器 `/var/www/boylu-blog/`，并保留 `/var/www/boylu-blog/admin/` 后台目录。
-- 服务器 `sudo nginx -t` 已通过，`https://boylu.cn/` 返回 200。
-- 线上资源已确认包含 `.random-video-panel` 样式和 `https://api.yujn.cn/api/zzxjj.php` 视频源。
-- `blog-admin` 构建已通过：`npm run build`。
-- `blog-web` 安装依赖时保留 npm audit 提示：20 个漏洞提示。
-- `blog-admin` 安装依赖时保留 npm audit 提示：11 个漏洞提示。
-- 前台构建本轮未再出现 `mavon-editor` eval 警告；后台构建保留 Sass legacy API 和大 chunk 警告。
-- 部署后检查：
-  - `sudo systemctl status boylu-blog --no-pager`
-  - `sudo nginx -t`
-  - 首页 `全部` 分类、相册页、文章详情页、留言板。
-  - `/boylu/api/article/home-list?pageNum=1&pageSize=10` 连续请求不返回 500。
-  - `/boylu/file/content/{id}` 能访问并最终命中 `/localFile/...`。
-  - `/img/local/<encoded>!w320.webp` 能返回样式图或正确回退。
+- 后端：`mvn -pl boylu-server -am package -DskipTests` 通过。
+- BOM 复查：Java 源文件开头 BOM 数量已从 283 降为 0。

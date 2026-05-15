@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import com.boylu.common.RedisConstants;
 import com.boylu.dto.Captcha;

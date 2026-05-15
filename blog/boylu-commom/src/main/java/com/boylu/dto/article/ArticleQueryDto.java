@@ -1,4 +1,4 @@
-﻿package com.boylu.dto.article;
+package com.boylu.dto.article;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;

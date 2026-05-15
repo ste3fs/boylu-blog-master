@@ -1,4 +1,4 @@
-﻿package com.boylu.entity;
+package com.boylu.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.boylu.utils.DateUtil;

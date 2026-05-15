@@ -1,4 +1,4 @@
-﻿package com.boylu.service;
+package com.boylu.service;
 
 import com.alibaba.fastjson2.JSONObject;
 import com.boylu.common.Result;

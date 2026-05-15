@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.menu;
+package com.boylu.vo.menu;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;

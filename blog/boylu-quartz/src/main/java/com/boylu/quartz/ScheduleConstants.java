@@ -1,4 +1,4 @@
-﻿package com.boylu.quartz;
+package com.boylu.quartz;
 
 /**
  * @author: boylu

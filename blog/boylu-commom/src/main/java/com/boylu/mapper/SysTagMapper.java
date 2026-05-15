@@ -1,4 +1,4 @@
-﻿package com.boylu.mapper;
+package com.boylu.mapper;
 
 import com.boylu.vo.tag.TagListVo;
 import com.boylu.entity.SysTag;

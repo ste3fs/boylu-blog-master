@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;

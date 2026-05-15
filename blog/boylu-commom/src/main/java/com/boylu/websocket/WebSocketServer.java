@@ -1,4 +1,4 @@
-﻿package com.boylu.websocket;
+package com.boylu.websocket;
 
 
 import org.slf4j.Logger;

@@ -1,4 +1,4 @@
-﻿package com.boylu.controller;
+package com.boylu.controller;
 
 import cn.hutool.core.util.RandomUtil;
 import com.boylu.common.RedisConstants;

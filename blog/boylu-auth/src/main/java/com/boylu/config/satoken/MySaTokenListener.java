@@ -1,4 +1,4 @@
-﻿package com.boylu.config.satoken;
+package com.boylu.config.satoken;
 
 import cn.dev33.satoken.listener.SaTokenListener;
 import cn.dev33.satoken.stp.SaLoginModel;

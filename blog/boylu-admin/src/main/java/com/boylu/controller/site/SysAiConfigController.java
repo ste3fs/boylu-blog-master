@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.site;
+package com.boylu.controller.site;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.hutool.core.io.FileUtil;

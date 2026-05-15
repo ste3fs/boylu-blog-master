@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.dashboard;
+package com.boylu.vo.dashboard;
 
 import io.swagger.annotations.ApiModelProperty;
 import lombok.AllArgsConstructor;

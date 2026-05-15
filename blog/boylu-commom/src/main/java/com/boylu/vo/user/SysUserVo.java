@@ -1,4 +1,4 @@
-﻿package com.boylu.vo.user;
+package com.boylu.vo.user;
 
 import com.boylu.entity.SysUser;
 import io.swagger.annotations.ApiModel;

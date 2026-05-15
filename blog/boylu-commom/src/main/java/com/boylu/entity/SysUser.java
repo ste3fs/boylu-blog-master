@@ -1,4 +1,4 @@
-﻿package com.boylu.entity;
+package com.boylu.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;

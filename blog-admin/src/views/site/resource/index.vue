@@ -209,7 +209,7 @@
             <el-input v-model="form.panPath" placeholder="请输入网盘地址" />
           </el-form-item>
           <el-form-item label="提取码" prop="panCode">
-            <el-input v-model="form.panCode" placeholder="请输入提取码" />
+            <el-input v-model="form.panCode" placeholder="没有提取码可以不填" />
           </el-form-item>
           <el-form-item label="状态" prop="status">
             <el-select v-model="form.status" placeholder="请选择状态">
@@ -305,7 +305,7 @@ const rules = reactive({
   description: [{ max: 500, message: "资源描述不能超过 500 个字符", trigger: "blur" }],
   isFree: [{ required: true, message: "是否免费不能为空", trigger: "blur" }],
   panPath: [{ required: true, message: "网盘地址不能为空", trigger: "blur" }],
-  panCode: [{ required: true, message: "提取码不能为空", trigger: "blur" }],
+  panCode: [],
   status: [{ required: true, message: "状态不能为空", trigger: "blur" }],
 });
 

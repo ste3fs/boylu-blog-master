@@ -1,4 +1,4 @@
-﻿package com.boylu.config;
+package com.boylu.config;
 
 
 import org.springframework.context.annotation.Bean;

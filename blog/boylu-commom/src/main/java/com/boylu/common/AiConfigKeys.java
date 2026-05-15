@@ -1,4 +1,4 @@
-﻿package com.boylu.common;
+package com.boylu.common;
 
 public final class AiConfigKeys {
 

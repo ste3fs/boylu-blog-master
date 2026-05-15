@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import org.apache.commons.lang3.StringUtils;
 

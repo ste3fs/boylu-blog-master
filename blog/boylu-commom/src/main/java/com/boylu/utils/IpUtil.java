@@ -1,4 +1,4 @@
-﻿package com.boylu.utils;
+package com.boylu.utils;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.json.JSONUtil;

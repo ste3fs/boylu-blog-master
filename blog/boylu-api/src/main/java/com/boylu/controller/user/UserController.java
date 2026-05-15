@@ -1,4 +1,4 @@
-﻿package com.boylu.controller.user;
+package com.boylu.controller.user;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.boylu.common.Result;

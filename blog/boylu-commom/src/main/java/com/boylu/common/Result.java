@@ -1,4 +1,4 @@
-﻿package com.boylu.common;
+package com.boylu.common;
 
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;

@@ -1,4 +1,4 @@
-﻿package com.boylu.quartz;
+package com.boylu.quartz;
 
 import com.boylu.common.RedisConstants;
 import com.boylu.entity.SysArticle;

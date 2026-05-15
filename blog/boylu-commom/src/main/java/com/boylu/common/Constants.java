@@ -1,4 +1,4 @@
-﻿package com.boylu.common;
+package com.boylu.common;
 
 public class Constants {
     public static final String UTF8 = "UTF-8";
