@@ -21,13 +21,13 @@ local-backups/ 本地备份，不应进入版本库
 
 ```text
 blog/
-  mojian-admin/    后台管理接口与后台业务服务
-  mojian-api/      前台公开接口与前台业务服务
-  mojian-auth/     登录、认证、第三方授权相关逻辑
-  mojian-commom/   公共实体、DTO、VO、工具类、配置、Mapper 接口
-  mojian-file/     文件上传与文件存储相关逻辑
-  mojian-quartz/   定时任务相关逻辑
-  mojian-server/   应用启动入口、配置文件、MyBatis XML、模板资源
+  boylu-admin/    后台管理接口与后台业务服务
+  boylu-api/      前台公开接口与前台业务服务
+  boylu-auth/     登录、认证、第三方授权相关逻辑
+  boylu-commom/   公共实体、DTO、VO、工具类、配置、Mapper 接口
+  boylu-file/     文件上传与文件存储相关逻辑
+  boylu-quartz/   定时任务相关逻辑
+  boylu-server/   应用启动入口、配置文件、MyBatis XML、模板资源
 ```
 
 放置规则：
@@ -35,8 +35,8 @@ blog/
 - 控制器放对应模块的 `controller`。
 - 业务接口放对应模块的 `service`。
 - 业务实现放对应模块的 `service/impl`。
-- 通用实体、DTO、VO、工具类优先放 `mojian-commom`。
-- MyBatis XML 放 `mojian-server/src/main/resources/mapper`。
+- 通用实体、DTO、VO、工具类优先放 `boylu-commom`。
+- MyBatis XML 放 `boylu-server/src/main/resources/mapper`。
 - 不要提交各模块的 `target`。
 
 ## 前台 `blog-web/`

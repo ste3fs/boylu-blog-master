@@ -45,7 +45,12 @@
         @click="openAlbum(album)"
       >
         <div class="album-cover">
-          <img v-lazy="resolveAlbumCover(album.cover)" :key="album.cover" :alt="album.name">
+          <SmartImage
+            class="album-cover-image"
+            :image="resolveAlbumCoverImage(album)"
+            :priority="index < 3"
+            sizes="(max-width: 768px) 100vw, 320px"
+          />
           <div v-if="album.isLock === 1" class="lock-icon">
             <i class="fas fa-lock"></i>
           </div>
@@ -63,12 +68,14 @@
 <script>
 import { getAlbumListApi } from '@/api/album'
 import SphereImageGrid from '@/components/common/SphereImageGrid.vue'
+import SmartImage from '@/components/common/SmartImage.vue'
 import { resolveImageUrl } from '@/utils/image'
 
 export default {
   name: 'Photos',
   components: {
-    SphereImageGrid
+    SphereImageGrid,
+    SmartImage
   },
   data() {
     return {
@@ -144,6 +151,15 @@ export default {
     },
     resolveAlbumCover(url) {
       return resolveImageUrl(url, this.$store.state.defaultImage)
+    },
+    resolveAlbumCoverImage(album) {
+      return {
+        alt: (album && album.name) || '',
+        width: 1200,
+        height: 800,
+        dominantColor: '#eef4ff',
+        fallback: this.resolveAlbumCover(album && album.cover)
+      }
     },
     handleResize() {
       this.viewportWidth = window.innerWidth
@@ -318,7 +334,7 @@ export default {
     transform: translateY(-5px);
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 
-    .album-cover img {
+    .album-cover :deep(.smart-image__img) {
       transform: scale(1.05);
     }
   }
@@ -328,10 +344,9 @@ export default {
     overflow: hidden;
     position: relative;
 
-    img {
+    .album-cover-image {
       width: 100%;
       height: 100%;
-      object-fit: cover;
       transition: transform 0.3s ease;
     }
 

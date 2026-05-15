@@ -53,12 +53,23 @@
 </template>
 
 <script>
+import Col from 'element-ui/lib/col'
+import Row from 'element-ui/lib/row'
+import Upload from 'element-ui/lib/upload'
+import 'element-ui/lib/theme-chalk/col.css'
+import 'element-ui/lib/theme-chalk/row.css'
+import 'element-ui/lib/theme-chalk/upload.css'
 import { VueCropper } from "vue-cropper";
 import { uploadFileApi } from '@/api/file'
 import { updateProfileApi } from '@/api/user'
 
 export default {
-  components: { VueCropper },
+  components: {
+    ElCol: Col,
+    ElRow: Row,
+    ElUpload: Upload,
+    VueCropper
+  },
   props: {
     user: {
       type: Object

@@ -1,19 +1,29 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
-import Home from '@/views/home/index.vue'
-import Layout from '@/layout/index.vue'
-import NotFound from '@/views/404/404.vue'
-import Article from '@/views/article/index.vue'
-import Archive from '@/views/archives/index.vue'
-import Categories from '@/views/categories/index.vue'
-import Tags from '@/views/tags/index.vue'
-import Messages from '@/views/messages/index.vue'
-import About from '@/views/about/index.vue'
-import Photos from '@/views/photos/index.vue'
 import store from '@/store';
 import { getToken } from '@/utils/cookie'
+import { setSeoMeta } from '@/utils/seo'
 
 Vue.use(VueRouter)
+
+const Layout = () => import('@/layout/index.vue')
+const Home = () => import('@/views/home/index.vue')
+const NotFound = () => import('@/views/404/404.vue')
+const Article = () => import('@/views/article/index.vue')
+const Archive = () => import('@/views/archives/index.vue')
+const Categories = () => import('@/views/categories/index.vue')
+const Tags = () => import('@/views/tags/index.vue')
+const Messages = () => import('@/views/messages/index.vue')
+const About = () => import('@/views/about/index.vue')
+const Photos = () => import('@/views/photos/index.vue')
+
+const routePrefetchMap = {
+  '/': [() => import('@/components/ArticleList/index.vue')],
+  '/article/:id': [
+    () => import('@/components/Comment/index.vue'),
+    () => import('@/utils/markdown')
+  ]
+}
 
 const routes = [
 
@@ -148,10 +158,17 @@ const routes = [
               },
               {
                 path: '/post/:id',
-                name: 'Post',
+                redirect: to => `/article/${to.params.id}`
+              },
+              {
+                path: '/article/:id',
+                name: 'ArticleDetail',
                 component: Article,
                 props: true,
                 meta: {
+                  title: '文章详情 - boylu博客',
+                  description: '阅读 boylu 博客的技术文章，涵盖前端、后端、运维与实战经验。',
+                  keywords: '技术博客,编程,前端,后端,运维,教程',
                   hidden: true
                 }
               },
@@ -250,9 +267,13 @@ VueRouter.prototype.push = function push (to) {
 
 
 router.beforeEach((to, from, next) => {
-  if (to.meta.title) {
-    document.title = to.meta.title
-  }
+  const title = to.meta.title || 'boylu博客-一个专注于技术分享的博客平台'
+  setSeoMeta({
+    title,
+    description: to.meta.description || 'boylu 的个人技术博客，记录开发实践与学习笔记',
+    keywords: to.meta.keywords || 'boylu博客,技术博客,编程学习',
+    canonicalUrl: to.fullPath || to.path
+  })
   //关闭搜索框
   store.commit('SET_SEARCH_VISIBLE', false)
 
@@ -267,6 +288,25 @@ router.beforeEach((to, from, next) => {
   }
 
   next()
+})
+
+router.afterEach((to) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+  const key = to.matched && to.matched.some(item => item.path === '/article/:id')
+    ? '/article/:id'
+    : to.path
+  const loaders = routePrefetchMap[key] || []
+  if (!loaders.length) {
+    return
+  }
+  const runner = () => loaders.forEach(load => load().catch(() => {}))
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(runner, { timeout: 1500 })
+    return
+  }
+  window.setTimeout(runner, 900)
 })
 
 export default router 

@@ -3,7 +3,7 @@
 将下面整段直接发给 Codex，替换花括号变量即可：
 
 ```text
-你现在是我的 PR 验收工程师。请对 PR #{PR_NUMBER} 做自动验收，项目根目录是 E:\做题\shiyi-blog-master。
+你现在是我的 PR 验收工程师。请对 PR #{PR_NUMBER} 做自动验收，项目根目录是 <PROJECT_ROOT>。
 
 验收目标：
 1. 先用 GitHub MCP 读取该 PR 的改动、评论、CI 状态，输出风险点。

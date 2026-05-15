@@ -8,7 +8,7 @@
         </div>
         <transition name="fade" mode="out-in">
           <div class="moment-item" :key="currentIndex">
-            <span class="moment-text" @click="goToMoments" v-html="moments[currentIndex].content" />
+            <span class="moment-text" @click="goToMoments" v-html="$sanitizeHtml(moments[currentIndex].content)" />
           </div>
         </transition>
       </div>
@@ -131,4 +131,4 @@ export default {
   opacity: 1;
   transform: translateY(0);
 }
-</style> 
+</style>

@@ -1,0 +1,77 @@
+package com.boylu.service.impl;
+
+import java.util.List;
+
+import cn.dev33.satoken.stp.StpUtil;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+import com.boylu.mapper.SysResourceMapper;
+import com.boylu.entity.SysResource;
+import com.boylu.service.SysResourceService;
+import com.boylu.utils.PageUtil;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import lombok.RequiredArgsConstructor;
+
+/**
+ * 资源表 服务实现类
+ */
+@Service
+@RequiredArgsConstructor
+public class SysResourceServiceImpl extends ServiceImpl<SysResourceMapper, SysResource> implements SysResourceService {
+
+    /**
+     * 查询资源表分页列表
+     */
+    @Override
+    public IPage<SysResource> selectPage(SysResource sysResource) {
+        LambdaQueryWrapper<SysResource> wrapper = new LambdaQueryWrapper<>();
+        // 构建查询条件
+        wrapper.eq(sysResource.getId() != null, SysResource::getId, sysResource.getId());
+        wrapper.eq(sysResource.getUserId() != null, SysResource::getUserId, sysResource.getUserId());
+        wrapper.like(StringUtils.isNotBlank(sysResource.getName()), SysResource::getName, sysResource.getName());
+        wrapper.eq(StringUtils.isNotBlank(sysResource.getCategory()), SysResource::getCategory, sysResource.getCategory());
+        wrapper.eq(sysResource.getDownloads() != null, SysResource::getDownloads, sysResource.getDownloads());
+        wrapper.eq(sysResource.getIsFree() != null, SysResource::getIsFree, sysResource.getIsFree());
+        wrapper.eq(sysResource.getPayType() != null, SysResource::getPayType, sysResource.getPayType());
+        wrapper.eq(StringUtils.isNotBlank(sysResource.getPanPath()), SysResource::getPanPath, sysResource.getPanPath());
+        wrapper.eq(StringUtils.isNotBlank(sysResource.getPanCode()), SysResource::getPanCode, sysResource.getPanCode());
+        wrapper.eq(sysResource.getStatus() != null, SysResource::getStatus, sysResource.getStatus());
+        wrapper.eq(sysResource.getCreateTime() != null, SysResource::getCreateTime, sysResource.getCreateTime());
+        wrapper.orderByDesc(SysResource::getCreateTime);
+        return page(PageUtil.getPage(), wrapper);
+    }
+
+
+    /**
+     * 新增资源表
+     */
+    @Override
+    public boolean insert(SysResource sysResource) {
+        sysResource.setUserId(StpUtil.getLoginIdAsLong());
+        if (sysResource.getDownloads() == null) {
+            sysResource.setDownloads(0);
+        }
+        if (sysResource.getStatus() == null) {
+            sysResource.setStatus(2);
+        }
+        return save(sysResource);
+    }
+
+    /**
+     * 修改资源表
+     */
+    @Override
+    public boolean update(SysResource sysResource) {
+        return updateById(sysResource);
+    }
+
+    /**
+     * 批量删除资源表
+     */
+    @Override
+    public boolean deleteByIds(List<Long> ids) {
+        return removeByIds(ids);
+    }
+}

@@ -115,7 +115,7 @@
             </div>
             <p class="qrcode-tip">
               <el-icon><Iphone /></el-icon>
-              扫码登录待配置，可联系站长微信 a3453619783
+              扫码登录待配置，请联系站点管理员
             </p>
           </div>
         </transition>
@@ -157,8 +157,8 @@
       <!-- 页脚版权信息 -->
       <footer class="footer">
         <p>Copyright © 2026 boylu博客管理系统</p>
-        <a href="mailto:3453619783@qq.com" target="_blank"
-          >3453619783@qq.com</a
+        <a href="mailto:admin@example.com" target="_blank"
+          >admin@example.com</a
         >
       </footer>
     </div>
@@ -259,7 +259,8 @@ const login = () => {
       router.push("/");
       ElMessage.success("登录成功");
     })
-    .catch(() => {
+    .catch((error) => {
+      ElMessage.error(error?.message || "登录失败，请检查账号密码或稍后重试");
       refresh();
     })
     .finally(() => {
@@ -284,18 +285,22 @@ const toggleTheme = () => {
 
 const handleLogin = async () => {
   loginForm.rememberMe = rememberMe.value;
-  loginFormRef.value?.validate((flag) => {
+  loginFormRef.value?.validate(async (flag) => {
     if (!flag) {
       return;
     }
-    getCaptchaSwitchApi().then((res) => {
+    try {
+      const res = await getCaptchaSwitchApi();
       if (!res.data || res.data.configValue === "Y") {
         showSliderVerify.value = true;
         nextTick(() => refresh());
       } else {
         login();
       }
-    });
+    } catch (error) {
+      ElMessage.warning("验证码配置读取失败，已改用账号密码登录");
+      login();
+    }
   });
 };
 

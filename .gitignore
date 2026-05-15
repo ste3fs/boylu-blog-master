@@ -24,6 +24,7 @@ _deploy_*
 _restore_*
 *.fix-*
 .tmp-*.sh
+.tmp/
 .javac_*.args
 .javac_cp.txt
 blog/.javac_*.args

@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Static resource folders
+Allow: /assets/
+Allow: /images/
+Allow: /localFile/
+
+# Avoid indexing admin area
+Disallow: /boylu1107/
+
+# Sitemap location
+Sitemap: https://boylu.cn/sitemap.xml

@@ -7,7 +7,7 @@
   >
     <div class="mobile-menu">
       <div class="menu-header">
-        <img :src="$store.state.webSiteInfo.logo" alt="logo" class="logo">
+        <img :src="menuLogoSrc" alt="logo" class="logo">
         <h2 class="site-name">{{ $store.state.webSiteInfo.name }}</h2>
       </div>
       <div class="menu-content">
@@ -33,8 +33,15 @@
 </template>
 
 <script>
+import Drawer from 'element-ui/lib/drawer'
+import 'element-ui/lib/theme-chalk/drawer.css'
+import { resolveImageUrl } from '@/utils/image'
+
 export default {
   name: 'MobileMenu',
+  components: {
+    ElDrawer: Drawer
+  },
   data() {
     return {
       visible: false
@@ -54,6 +61,12 @@ export default {
     }
   },
   computed: {
+    menuLogoSrc() {
+      return resolveImageUrl(
+        this.$store.state.webSiteInfo.authorAvatar || this.$store.state.webSiteInfo.logo,
+        this.$store.state.defaultImage
+      )
+    },
     routes() {
       const rootRoute = this.$router.options.routes.find(route => route.path === '/')
       if (!rootRoute || !rootRoute.children) return []
@@ -93,9 +106,13 @@ export default {
 }
 
 .logo {
-  height: 36px;
-  width: auto;
+  height: 40px;
+  width: 40px;
   border-radius: 5px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 2px;
+  box-sizing: border-box;
   transition: transform 0.3s ease;
 }
 

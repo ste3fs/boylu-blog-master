@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="login-page" data-build="20260411-2">
     <div class="login-shell">
       <section class="brand-panel">
@@ -382,6 +382,8 @@
 </template>
 
 <script>
+import Checkbox from 'element-ui/lib/checkbox'
+import 'element-ui/lib/theme-chalk/checkbox.css'
 import { disableScroll, enableScroll } from "@/utils/scroll";
 import {
   sendEmailCodeApi,
@@ -401,6 +403,7 @@ const TRUSTED_LOGIN_COOKIE = "trusted_login_verified";
 export default {
   name: "Login",
   components: {
+    ElCheckbox: Checkbox,
     SliderVerify,
   },
   data() {
@@ -741,6 +744,7 @@ export default {
     },
   },
   created() {
+    this.handleOauthLoginResult();
     const rememberedUsername = getCookie("remember_username");
     const rememberedEnabled = getCookie("remember_me") === "1";
     removeCookie("remember_password");
@@ -767,6 +771,27 @@ export default {
     this.initCharacterScene();
   },
   methods: {
+    handleOauthLoginResult() {
+      const { oauth, source, message, ...restQuery } = this.$route.query || {};
+      if (!oauth) {
+        return;
+      }
+
+      if (oauth === "cancelled") {
+        this.$message.warning(`已取消${source || "第三方"}登录`);
+      } else if (oauth === "disabled") {
+        this.$message.error(message || "账号已被禁用");
+      } else if (oauth === "failed") {
+        this.$message.error(message || "第三方登录失败");
+      }
+
+      this.$nextTick(() => {
+        this.$router.replace({
+          path: this.$route.path,
+          query: restQuery,
+        }).catch(() => {});
+      });
+    },
     persistRememberMe() {
       if (this.rememberMe && this.loginForm.username) {
         setCookieExpires("remember_me", "1", 30);
@@ -1015,17 +1040,22 @@ export default {
     async handleLogin() {
       this.$refs.ruleFrom.validate(async (valid) => {
         if (valid) {
-          getCaptchaSwitchApi().then((res) => {
-            if (!res.data || res.data.configValue === "Y") {
-              if (this.shouldSkipSliderVerify()) {
-                this.login();
-              } else {
-                this.isShowSliderVerify = true;
-              }
-            } else {
+          try {
+            const res = await getCaptchaSwitchApi();
+            if (res.data && res.data.configValue === "N") {
               this.login();
+              return;
             }
-          });
+
+            if (this.shouldSkipSliderVerify()) {
+              this.login();
+            } else {
+              this.isShowSliderVerify = true;
+            }
+          } catch (error) {
+            this.$message.warning("验证码配置读取失败，已改用账号密码登录");
+            this.login();
+          }
         } else {
           return false;
         }
@@ -2154,7 +2184,6 @@ export default {
 }
 
 </style>
-
 
 
 

@@ -43,7 +43,7 @@
             <span>发布于 {{ formatNoticeTime(item.createTime) }}</span>
           </div>
           <div class="announcement-body">
-            <span v-html="item.content"></span>
+            <span v-html="$sanitizeHtml(item.content)"></span>
           </div>
         </div>
       </div>
@@ -86,7 +86,7 @@ import { getRecommendArticlesApi } from '@/api/article'
 import Tag from './components/tagCloud.vue'
 import SignalPanel from '@/views/home/components/signalPanel.vue'
 import { copyText } from '@/utils/contact'
-import { resolveImageUrl, retryImageLoad } from '@/utils/image'
+import { getLazyImageOptions, resolveImageUrl, retryImageLoad } from '@/utils/image'
 
 export default {
   name: 'Sidebar',
@@ -198,13 +198,7 @@ export default {
       return resolveImageUrl(url, this.$store.state.defaultImage)
     },
     getLazyImage(url) {
-      const src = this.resolveImage(url)
-      const fallback = this.resolveImage(this.$store.state.defaultImage)
-      return {
-        src,
-        error: fallback,
-        loading: fallback
-      }
+      return getLazyImageOptions(url, this.$store.state.defaultImage)
     },
     /**
      * 处理图片加载失败

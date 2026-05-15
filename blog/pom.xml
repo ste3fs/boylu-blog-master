@@ -4,19 +4,19 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.mojian</groupId>
+    <groupId>com.boylu</groupId>
     <artifactId>blog</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
-        <module>mojian-commom</module>
-        <module>mojian-admin</module>
-        <module>mojian-api</module>
-        <module>mojian-server</module>
-        <module>mojian-file</module>
-        <module>mojian-quartz</module>
-        <module>mojian-auth</module>
+        <module>boylu-commom</module>
+        <module>boylu-admin</module>
+        <module>boylu-api</module>
+        <module>boylu-server</module>
+        <module>boylu-file</module>
+        <module>boylu-quartz</module>
+        <module>boylu-auth</module>
     </modules>
 
     <parent>
@@ -32,9 +32,8 @@
         <package.version>1.0-SNAPSHOT</package.version>
     </properties>
 
-
     <build>
-        <!-- 注：maven默认是不编译，因此加上如下resources才会生产对应的xml文件 目的：解决mybatis映射关系不对应问题  start =============== -->
+        <!-- Include mapper XML files from src/main/java so MyBatis mappings are packaged. -->
         <resources>
             <resource>
                 <directory>src/main/java</directory>
@@ -56,20 +55,18 @@
                 <filtering>false</filtering>
             </testResource>
         </testResources>
-        <!-- 注：maven默认是不编译，因此加上如下resources才会生产对应的xml文件 目的：解决mybatis映射关系不对应问题  end =============== -->
 
         <plugins>
-            <!-- maven打包插件 -> 将整个工程打成一个 fatjar -->
+            <!-- Spring Boot executable jar packaging. -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <!-- 作用:项目打成jar，同时把本地jar包也引入进去 -->
                 <configuration>
                     <includeSystemScope>true</includeSystemScope>
-                    <mainClass>com.mojian.NeatAdminApplication</mainClass>
+                    <mainClass>com.boylu.NeatAdminApplication</mainClass>
                 </configuration>
             </plugin>
-            <!--添加配置跳过测试-->
+            <!-- Skip tests during packaging by default. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -80,7 +77,6 @@
             </plugin>
         </plugins>
 
-        <!-- 固定Jar包名字 -->
-        <finalName>mojian-blog</finalName>
+        <finalName>boylu-blog</finalName>
     </build>
-</project> 
+</project>

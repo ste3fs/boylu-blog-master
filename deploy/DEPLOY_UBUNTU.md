@@ -2,8 +2,8 @@
 
 This deployment layout serves:
 
-- frontend at `http://111.229.123.234/`
-- admin at `http://111.229.123.234/boylu1107/login`
+- frontend at `https://your-domain.example/`
+- admin at `https://your-domain.example/boylu1107/login`
 - backend API behind `/mojian`
 - uploaded files behind `/localFile`
 
@@ -59,7 +59,7 @@ Upload these local outputs to the server:
 
 - `blog-web/dist/*` -> `/var/www/boylu-blog/`
 - `blog-admin/dist/*` -> `/var/www/boylu-blog/admin/`
-- `blog/mojian-server/target/mojian-blog.jar` -> `/opt/boylu-blog/server/mojian-blog.jar`
+- `blog/boylu-server/target/boylu-blog.jar` -> `/opt/boylu-blog/server/boylu-blog.jar`
 - `mj-blog.sql` -> `/opt/boylu-blog/sql/mj-blog.sql`
 - `deploy/sql/ubuntu-init.sql` -> `/opt/boylu-blog/sql/ubuntu-init.sql`
 - `deploy/systemd/boylu-blog.env.example` -> `/etc/boylu-blog/boylu-blog.env`
@@ -72,10 +72,10 @@ sudo nano /etc/boylu-blog/boylu-blog.env
 
 Set at least:
 
-- `PUBLIC_BASE_URL=http://111.229.123.234`
+- `PUBLIC_BASE_URL=https://your-domain.example`
 - `DB_USERNAME=boylu`
-- `DB_PASSWORD=your_real_password`
-- `CODERUTIL_ACCESS_KEY=your_coderutil_access_key` if hot-search is enabled
+- `DB_PASSWORD=<DB_PASSWORD>`
+- `CODERUTIL_ACCESS_KEY=<CODERUTIL_ACCESS_KEY>` if hot-search is enabled
 - `CODERUTIL_SECRET_KEY=your_coderutil_secret_key` if hot-search is enabled
 
 ## 6. Backend service
@@ -108,12 +108,12 @@ sudo systemctl reload nginx
 
 Check:
 
-- `http://111.229.123.234/`
-- `http://111.229.123.234/boylu1107/login`
-- `http://111.229.123.234/mojian/api/webConfig`
+- `https://your-domain.example/`
+- `https://your-domain.example/boylu1107/login`
+- `https://your-domain.example/boylu/api/webConfig`
 
 If uploads do not display, verify:
 
-- `sys_file_oss.domain` is `http://111.229.123.234/localFile/`
+- `sys_file_oss.domain` is `https://your-domain.example/localFile/`
 - `sys_file_oss.storage_path` is `/opt/boylu-blog/storage/`
 - `www-data` can read and write `/opt/boylu-blog/storage/`

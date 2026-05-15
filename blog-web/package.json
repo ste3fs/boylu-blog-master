@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "seo:sitemap": "node scripts/generate-sitemap.mjs",
+    "prebuild": "npm run seo:sitemap",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -13,13 +15,13 @@
     "animate.css": "^4.1.1",
     "axios": "^1.6.7",
     "cobe": "^2.0.1",
+    "dompurify": "^3.2.3",
     "element-ui": "^2.15.14",
     "fast-glob": "^3.3.3",
     "gsap": "^3.12.5",
     "highlight.js": "^11.11.0",
     "js-cookie": "^3.0.5",
     "marked": "^15.0.7",
-    "mavon-editor": "^2.10.4",
     "vite-plugin-svg-icons": "^2.0.1",
     "vue": "^2.7.16",
     "vue-cropper": "^0.6.5",

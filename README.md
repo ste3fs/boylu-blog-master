@@ -54,6 +54,6 @@ npm run dev
 
 ## 联系方式
 
-- QQ：`3453619783`
-- Email：`3453619783@qq.com`
-- WeChat：`a3453619783`
+- QQ：按需自行填写
+- Email：按需自行填写
+- WeChat：按需自行填写

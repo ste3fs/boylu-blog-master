@@ -63,12 +63,8 @@
   
   <script>
   import { mapState, mapActions } from 'vuex'
-  import gsap from 'gsap'
-  import ScrollTrigger from 'gsap/ScrollTrigger'
   import Sidebar from '@/components/Sidebar/index.vue'
   import { getCategoriesApi } from '@/api/article'
-
-  gsap.registerPlugin(ScrollTrigger)
   
   export default {
     name: 'Categories',
@@ -373,12 +369,11 @@
       margin: -$spacing-md;
       margin-bottom: $spacing-md;
       padding: $spacing-sm;
-      
+
       .category-tab {
         padding: $spacing-xs $spacing-sm;
         font-size: 0.85em;
       }
     }
   }
-  </style> 
-  
+  </style>

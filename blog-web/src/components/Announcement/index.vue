@@ -11,7 +11,7 @@
             <span>发布于 {{ formatNoticeTime(notice.createTime) }}</span>
           </div>
           <div class="announcement-text">
-            <span v-html="notice.content"></span>
+            <span v-html="$sanitizeHtml(notice.content)"></span>
           </div>
         </div>
         <div class="announcement-close" @click="close">

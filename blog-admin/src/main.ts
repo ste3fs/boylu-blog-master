@@ -19,10 +19,6 @@ const app = createApp(App)
 import SvgIcon from '@/components/SvgIcon/index.vue'
 app.component('svg-icon', SvgIcon)
 
-import mavonEditor from "mavon-editor";
-import "mavon-editor/dist/css/index.css";
-app.use(mavonEditor);
-
 // 初始化权限
 setupStore(app)
 

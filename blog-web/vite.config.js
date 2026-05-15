@@ -24,6 +24,14 @@ export default defineConfig(({ command, mode }) => {
                 rewrite: (path) =>
                   path.replace(new RegExp("^" + env.VITE_APP_BASE_API), ""),
               },
+              '/localFile': {
+                changeOrigin: true,
+                target: env.VITE_APP_API_URL,
+              },
+              '/img': {
+                changeOrigin: true,
+                target: env.VITE_APP_API_URL,
+              },
             },
         },
         plugins: [
@@ -46,10 +54,6 @@ export default defineConfig(({ command, mode }) => {
               manualChunks(id) {
                 if (!id.includes('node_modules')) {
                   return
-                }
-
-                if (id.includes('mavon-editor')) {
-                  return 'vendor-editor'
                 }
 
                 if (id.includes('element-ui')) {

@@ -1,7 +1,7 @@
 <template>
   <div class="article-list-component" v-loading="loading">
     <transition-group name="post-list" tag="div" class="posts-list">
-      <article v-for="post in articles" :key="post.id" class="post-item">
+      <article v-for="(post, index) in visibleArticles" :key="post.id" class="post-item">
         <div class="post-content">
           <div class="post-main">
             <div class="post-text">
@@ -12,39 +12,40 @@
                 </span>
                 <span class="post-title underline" @click="$emit('article-click', post.id)">{{ post.title }}</span>
               </h3>
-              <p class="post-excerpt">{{ post.summary }}</p>
+              <p class="post-excerpt">{{ post.excerpt || post.summary }}</p>
             </div>
             <div class="post-image" @click="$emit('article-click', post.id)">
-              <img
-                v-lazy="getLazyImage(post.cover)"
-                :key="resolveImage(post.cover)"
-                :data-origin="resolveImage(post.cover)"
-                :alt="post.title"
-                @error="handleImageError"
-              >
-              <div class="image-placeholder">
-                <i class="fas fa-image"></i>
-              </div>
+              <SmartImage
+                class="post-cover"
+                :image="resolvePostImage(post)"
+                :priority="isPriorityImage(index)"
+                sizes="(max-width: 576px) 92vw, (max-width: 1024px) 44vw, 220px"
+              />
             </div>
           </div>
 
           <div class="post-footer">
             <div class="footer-left">
               <div class="author-info">
-                <el-avatar :size="24" :src="resolveImage(post.avatar)"></el-avatar>
-                <span class="author-name">{{ post.nickname }}</span>
+                <img
+                  class="author-avatar"
+                  :src="resolveAuthorAvatar(post)"
+                  :alt="post.nickname || 'boylu'"
+                  @error="handleAuthorAvatarError"
+                >
+                <span class="author-name">{{ post.nickname || 'boylu' }}</span>
               </div>
               <div class="post-date">
                 <i class="far fa-calendar"></i>
-                {{ formatPublishTime(post.createTime) }}
+                {{ formatPublishTime(post.createdAt || post.createTime) }}
               </div>
               <div class="post-view">
                 <i class="far fa-eye"></i>
-                {{ post.quantity }}
+                {{ resolvePostViews(post) }}
               </div>
             </div>
             <div class="footer-right">
-              <span class="category-tag">{{ post.categoryName }}</span>
+              <span class="category-tag">{{ post.category || post.categoryName }}</span>
               <span class="read-time">
                 <i class="far fa-clock"></i>
                 {{ getReadTime(post) }}分钟阅读
@@ -54,6 +55,7 @@
         </div>
       </article>
     </transition-group>
+    <div v-if="hasMore" ref="loadMoreSentinel" class="load-more-sentinel" aria-hidden="true"></div>
 
     <el-empty v-if="!loading && articles.length === 0" description="暂无文章" />
 
@@ -74,10 +76,14 @@
 <script>
 import { formatPublishTime } from '@/utils/time'
 import { estimateReadMinutes } from '@/utils/readTime'
-import { resolveImageUrl, retryImageLoad } from '@/utils/image'
+import { resolveImageUrl } from '@/utils/image'
+import SmartImage from '@/components/common/SmartImage.vue'
 
 export default {
   name: 'ArticleList',
+  components: {
+    SmartImage
+  },
   props: {
     articles: {
       type: Array,
@@ -101,33 +107,137 @@ export default {
   },
   data() {
     return {
-      // 默认图片URL
+      displayedCount: 0,
+      firstScreenLimit: 4,
+      loadBatchSize: 3,
+      loadMoreObserver: null
+    }
+  },
+  computed: {
+    visibleArticles() {
+      return this.articles.slice(0, this.displayedCount)
+    },
+    hasMore() {
+      return this.displayedCount < this.articles.length
+    }
+  },
+  watch: {
+    articles: {
+      immediate: true,
+      handler() {
+        this.resetVisibleList()
+      }
+    },
+    'params.pageNum'() {
+      this.resetVisibleList()
     }
   },
   methods: {
+    resetVisibleList() {
+      const firstPage = Number((this.params && this.params.pageNum) || 1) === 1
+      const initialLimit = firstPage ? this.firstScreenLimit : this.firstScreenLimit + this.loadBatchSize
+      this.displayedCount = Math.min(this.articles.length, initialLimit)
+      this.$nextTick(() => {
+        this.setupLoadMoreObserver()
+      })
+    },
+    loadMoreArticles() {
+      if (!this.hasMore) {
+        return
+      }
+      this.displayedCount = Math.min(this.articles.length, this.displayedCount + this.loadBatchSize)
+      if (!this.hasMore && this.loadMoreObserver) {
+        this.loadMoreObserver.disconnect()
+        this.loadMoreObserver = null
+      }
+    },
+    setupLoadMoreObserver() {
+      if (this.loadMoreObserver) {
+        this.loadMoreObserver.disconnect()
+        this.loadMoreObserver = null
+      }
+      if (!this.hasMore || !this.$refs.loadMoreSentinel || typeof IntersectionObserver === 'undefined') {
+        return
+      }
+      this.loadMoreObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            this.loadMoreArticles()
+          }
+        })
+      }, {
+        rootMargin: '320px 0px',
+        threshold: 0.01
+      })
+      this.loadMoreObserver.observe(this.$refs.loadMoreSentinel)
+    },
     formatPublishTime(time) {
       return formatPublishTime(time)
     },
     getReadTime(post) {
-      const source = post.contentMd || post.content || post.summary || ''
+      const backendReadingTime = Number(post && post.readingTime)
+      if (Number.isFinite(backendReadingTime) && backendReadingTime > 0) {
+        return backendReadingTime
+      }
+      const source = post.contentMd || post.content || post.summary || post.excerpt || ''
       return estimateReadMinutes(source, {
-        summaryOnly: !post.contentMd && !post.content && !!post.summary
+        summaryOnly: !post.contentMd && !post.content && !!(post.summary || post.excerpt)
       })
     },
     resolveImage(url) {
       return resolveImageUrl(url, this.$store.state.defaultImage)
     },
-    getLazyImage(url) {
-      const src = this.resolveImage(url)
-      const fallback = this.resolveImage(this.$store.state.defaultImage)
+    resolveAuthorFallback() {
+      const siteInfo = this.$store.state.webSiteInfo || {}
+      return resolveImageUrl(siteInfo.authorAvatar || siteInfo.touristAvatar || '/boylu-avatar.jpg', '/boylu-avatar.jpg')
+    },
+    resolveAuthorAvatar(post) {
+      return resolveImageUrl(post && post.avatar, this.resolveAuthorFallback())
+    },
+    handleAuthorAvatarError(event) {
+      if (!event || !event.target) {
+        return
+      }
+      event.target.onerror = null
+      event.target.src = this.resolveAuthorFallback()
+    },
+    resolvePostImage(post) {
+      if (post.coverImage) {
+        const coverFallback = this.resolveImage(post.coverImage.fallback || post.coverImage.source)
+        const legacyCover = this.resolveImage(post.cover)
+        const fallback = this.isDefaultCover(coverFallback) && legacyCover
+          ? legacyCover
+          : (coverFallback || legacyCover)
+        return {
+          ...post.coverImage,
+          alt: post.coverImage.alt || post.title,
+          fallback,
+          styleSource: fallback
+        }
+      }
       return {
-        src,
-        error: fallback,
-        loading: fallback
+        alt: post.title,
+        width: 1600,
+        height: 900,
+        dominantColor: '#eef4ff',
+        fallback: this.resolveImage(post.cover)
       }
     },
-    handleImageError(e) {
-      retryImageLoad(e.target, this.$store.state.defaultImage)
+    isDefaultCover(url) {
+      const defaultImage = this.resolveImage(this.$store.state.defaultImage)
+      return !!url && !!defaultImage && url === defaultImage
+    },
+    resolvePostViews(post) {
+      return post.views || post.quantity || 0
+    },
+    isPriorityImage(index) {
+      return Number((this.params && this.params.pageNum) || 1) === 1 && index < 2
+    }
+  },
+  beforeDestroy() {
+    if (this.loadMoreObserver) {
+      this.loadMoreObserver.disconnect()
+      this.loadMoreObserver = null
     }
   }
 }
@@ -202,20 +312,20 @@ export default {
 
   .post-image {
     position: relative;
-    height: 140px;
+    aspect-ratio: 16 / 9;
+    height: auto;
     min-width: 0;
     border-radius: 8px;
     overflow: hidden;
     cursor: pointer;
     background: var(--hover-bg);
-    img {
-      width: 100%;
+
+    .post-cover {
       height: 100%;
-      object-fit: cover;
-      transition: transform 0.3s ease;
+      min-height: 100%;
     }
 
-    &:hover img {
+    &:hover :deep(.smart-image__img) {
       transform: scale(1.05);
     }
   }
@@ -242,10 +352,19 @@ export default {
     align-items: center;
     gap: $spacing-lg;
 
-    .author-info {
-      display: flex;
-      align-items: center;
-      gap: $spacing-sm;
+      .author-info {
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+
+      .author-avatar {
+        width: 24px;
+        height: 24px;
+        flex: 0 0 24px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--hover-bg);
+      }
 
       .author-name {
         font-weight: 500;
@@ -290,7 +409,7 @@ export default {
     grid-template-columns: 1fr;
     
     .post-image {
-      height: 220px;
+      height: auto;
       order: -1;
     }
   }
@@ -319,7 +438,7 @@ export default {
     gap: $spacing-md;
 
     .post-image {
-      height: 180px;
+      height: auto;
     }
   }
 
@@ -346,5 +465,10 @@ export default {
 .post-list-leave-to {
   opacity: 0;
   transform: translateY(30px);
+}
+
+.load-more-sentinel {
+  width: 100%;
+  height: 1px;
 }
 </style>

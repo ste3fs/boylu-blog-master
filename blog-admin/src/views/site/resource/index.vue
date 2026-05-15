@@ -12,7 +12,7 @@
           />
         </el-form-item>
         <el-form-item label="分类" prop="category">
-          <el-select v-model="queryParams.category" placeholder="请选择分类">
+          <el-select v-model="queryParams.category" placeholder="请选择分类" clearable>
             <el-option
               v-for="item in categoryList"
               :key="item.value"
@@ -22,7 +22,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="是否免费" prop="isFree">
-          <el-select v-model="queryParams.isFree" placeholder="请选择是否免费">
+          <el-select v-model="queryParams.isFree" placeholder="请选择是否免费" clearable>
             <el-option
               v-for="item in freeList"
               :key="item.value"
@@ -32,7 +32,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="状态" prop="status">
-            <el-select v-model="queryParams.status" placeholder="请选择状态">
+            <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
                 <el-option v-for="item in statusList" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
         </el-form-item>
@@ -68,6 +68,20 @@
       >
         <el-table-column type="selection" width="55" align="center" />
         <el-table-column label="资源名" show-overflow-tooltip align="center" prop="name" width="200"/>
+        <el-table-column label="封面" align="center" prop="cover" width="90">
+          <template #default="scope">
+            <el-image
+              v-if="scope.row.cover"
+              class="resource-cover-image"
+              :src="scope.row.cover"
+              fit="cover"
+              :preview-src-list="[scope.row.cover]"
+              preview-teleported
+            />
+            <span v-else class="text-muted">无</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="描述" show-overflow-tooltip align="center" prop="description" min-width="180"/>
         <el-table-column label="分类" align="center" prop="category">
           <template #default="scope">
             <span v-for="item in categoryList" :key="item.value">
@@ -108,9 +122,28 @@
         <el-table-column
           label="操作"
           align="center"
+          width="240"
           class-name="small-padding fixed-width"
         >
           <template #default="scope">
+            <el-button
+              v-if="scope.row.status === 1"
+              type="success"
+              link
+              :icon="Check"
+              v-permission="['sys:resource:update']"
+              @click="handleAudit(scope.row, 2)"
+              >通过
+            </el-button>
+            <el-button
+              v-if="scope.row.status === 1"
+              type="warning"
+              link
+              :icon="Close"
+              v-permission="['sys:resource:update']"
+              @click="handleAudit(scope.row, 0)"
+              >拒绝
+            </el-button>
             <el-button
               type="primary"
               link
@@ -141,7 +174,7 @@
       />
 
       <!-- 添加或修改对话框 -->
-      <el-dialog v-model="open" :title="title" width="500px" append-to-body>
+      <el-dialog v-model="open" :title="title" width="620px" append-to-body>
         <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
           <el-form-item label="资源名" prop="name">
             <el-input v-model="form.name" placeholder="请输入资源名" />
@@ -150,6 +183,19 @@
             <el-select v-model="form.category" placeholder="请选择分类">
                 <el-option v-for="item in categoryList" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
+          </el-form-item>
+          <el-form-item label="封面" prop="cover">
+            <UploadImage v-model="form.cover" :source="'resource-cover'" :limit="1" />
+          </el-form-item>
+          <el-form-item label="描述" prop="description">
+            <el-input
+              v-model="form.description"
+              type="textarea"
+              :rows="4"
+              maxlength="500"
+              show-word-limit
+              placeholder="请输入资源描述"
+            />
           </el-form-item>
           <el-form-item label="是否免费" prop="isFree">
             <el-select v-model="form.isFree" placeholder="请选择是否免费">
@@ -163,7 +209,7 @@
             <el-input v-model="form.panPath" placeholder="请输入网盘地址" />
           </el-form-item>
           <el-form-item label="提取码" prop="panCode">
-            <el-input v-model="form.panCode" placeholder="请输入提取码" />
+            <el-input v-model="form.panCode" placeholder="没有提取码可以不填" />
           </el-form-item>
           <el-form-item label="状态" prop="status">
             <el-select v-model="form.status" placeholder="请选择状态">
@@ -184,7 +230,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Delete, Edit, Plus, Refresh, Search } from "@element-plus/icons-vue";
+import { Check, Close, Delete, Edit, Plus } from "@element-plus/icons-vue";
 import {
   listSysResourceApi,
   detailSysResourceApi,
@@ -193,6 +239,7 @@ import {
   updateSysResourceApi,
 } from "@/api/site/resource";
 import { getDictDataByDictTypesApi } from "@/api/system/dict";
+import UploadImage from "@/components/Upload/Image.vue";
 
 // 遮罩层
 const loading = ref(true);
@@ -212,6 +259,8 @@ const queryParams = reactive({
   pageSize: 10,
   name: undefined,
   category: undefined,
+  cover: undefined,
+  description: undefined,
   isFree: undefined,
   status: undefined,
 });
@@ -253,9 +302,10 @@ const form = reactive<any>({});
 const rules = reactive({
   name: [{ required: true, message: "资源名不能为空", trigger: "blur" }],
   category: [{ required: true, message: "分类不能为空", trigger: "blur" }],
+  description: [{ max: 500, message: "资源描述不能超过 500 个字符", trigger: "blur" }],
   isFree: [{ required: true, message: "是否免费不能为空", trigger: "blur" }],
   panPath: [{ required: true, message: "网盘地址不能为空", trigger: "blur" }],
-  panCode: [{ required: true, message: "提取码不能为空", trigger: "blur" }],
+  panCode: [],
   status: [{ required: true, message: "状态不能为空", trigger: "blur" }],
 });
 
@@ -287,18 +337,22 @@ const cancel = () => {
 
 /** 表单重置 */
 const reset = () => {
-  form.value = {
+  Object.keys(form).forEach((key) => delete form[key]);
+  Object.assign(form, {
     id: undefined,
     userId: undefined,
     name: undefined,
     category: undefined,
+    cover: undefined,
+    description: undefined,
     downloads: undefined,
     isFree: undefined,
     payType: undefined,
     panPath: undefined,
     panCode: undefined,
+    status: 2,
     createTime: undefined,
-  };
+  });
   formRef.value?.resetFields();
 };
 
@@ -333,6 +387,24 @@ const handleUpdate = (row: any) => {
     Object.assign(form, response.data);
     open.value = true;
     title.value = "修改资源表";
+  });
+};
+
+/** 审核资源 */
+const handleAudit = (row: any, status: number) => {
+  const actionText = status === 2 ? "通过" : "拒绝";
+  ElMessageBox.confirm(`确认${actionText}资源“${row.name || row.id}”？`, "审核确认", {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    type: status === 2 ? "success" : "warning",
+  }).then(() => {
+    return updateSysResourceApi({
+      ...row,
+      status,
+    });
+  }).then(() => {
+    ElMessage.success(`已${actionText}`);
+    getList();
   });
 };
 
@@ -412,3 +484,15 @@ onMounted(() => {
   getCategoryList();
 });
 </script>
+
+<style scoped>
+.resource-cover-image {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+}
+
+.text-muted {
+  color: #909399;
+}
+</style>

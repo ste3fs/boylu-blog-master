@@ -1,12 +1,12 @@
 UPDATE sys_web_config
-SET web_url = 'http://111.229.123.234',
+SET web_url = 'https://your-domain.example',
     logo = '/boylu-logo.png',
     author = 'boylu',
     author_avatar = '/boylu-avatar.jpg'
 WHERE id = 1;
 
 UPDATE sys_friend
-SET url = 'http://111.229.123.234',
+SET url = 'https://your-domain.example',
     avatar = '/boylu-logo.png'
 WHERE id = 4;
 

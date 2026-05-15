@@ -361,8 +361,8 @@ CREATE TABLE `sys_article`
 INSERT INTO `sys_article`
 VALUES (292, 1, 20, '个人开发的后台管理系统展示', 'https://api.dicebear.com/7.x/shapes/svg?seed=boylu-admin',
         '基于vue3+typescript+elmentui-plus开发的一款后台管理系统，功能跟若依差不多，主要不同的是样式美化，要比若依更漂亮',
-'<h4><a id=\"_0\"></a>前言</h4>\r\n<p>本后台管理系统基于 vue3、typescript 以及 element-plus 构建，适合作为中后台项目演示与二次开发基础。</p>\r\n<h4><a id=\"_4\"></a>视频预览</h4>\r\n<p><video height=\"100%\" width=\"100%\" src=\"http://127.0.0.1:8800/localFile/local-plus/upload/20241120_230652.mp4\" controls autoplay></video></p>\r\n<h4><a id=\"_8\"></a>联系站长</h4>\r\n<p><a href=\"mailto:3453619783@qq.com\" target=\"_blank\">3453619783@qq.com</a></p>\r\n',
-        '#### 前言\r\n\r\n  本后台管理系统基于 vue3、typescript 以及 element-plus 构建，适合作为中后台项目演示与二次开发基础。\r\n  \r\n  #### 视频预览\r\n    <video height=100% width=100% src=\"http://127.0.0.1:8800/localFile/local-plus/upload/20241120_230652.mp4\" controls autoplay></video>\r\n  \r\n  #### 联系站长\r\n  [3453619783@qq.com](mailto:3453619783@qq.com)',
+'<h4><a id=\"_0\"></a>前言</h4>\r\n<p>本后台管理系统基于 vue3、typescript 以及 element-plus 构建，适合作为中后台项目演示与二次开发基础。</p>\r\n<h4><a id=\"_4\"></a>视频预览</h4>\r\n<p><video height=\"100%\" width=\"100%\" src=\"http://127.0.0.1:8800/localFile/local-plus/upload/20241120_230652.mp4\" controls autoplay></video></p>\r\n<h4><a id=\"_8\"></a>联系站长</h4>\r\n<p><a href=\"mailto:admin@example.com\" target=\"_blank\">admin@example.com</a></p>\r\n',
+        '#### 前言\r\n\r\n  本后台管理系统基于 vue3、typescript 以及 element-plus 构建，适合作为中后台项目演示与二次开发基础。\r\n  \r\n  #### 视频预览\r\n    <video height=100% width=100% src=\"http://127.0.0.1:8800/localFile/local-plus/upload/20241120_230652.mp4\" controls autoplay></video>\r\n  \r\n  #### 联系站长\r\n  [admin@example.com](mailto:admin@example.com)',
         1, 0, 1, 1, 1, 0, NULL, 263, NULL, NULL, '2024-11-27 22:05:36', '2024-12-27 04:00:00');
 
 -- ----------------------------
@@ -632,7 +632,7 @@ CREATE TABLE `sys_friend`
 -- ----------------------------
 INSERT INTO `sys_friend`
 VALUES (4, 'boylu博客', 'http://localhost:3000', '/boylu-logo.png', '一个专注技术分享的平台',
-        '3453619783@qq.com', 99, '1', 0, '2022-12-13 09:16:15', '2022-12-13 09:16:15');
+        'admin@example.com', 99, '1', 0, '2022-12-13 09:16:15', '2022-12-13 09:16:15');
 
 -- ----------------------------
 -- Table structure for sys_job
@@ -1406,10 +1406,10 @@ INSERT INTO `sys_web_config`
 VALUES (1, '/boylu-logo.png', 'boylu博客',
         '一个专注于技术分享的博客平台', '', 'http://localhost:3000', 'boylu', '专注技术分享与实践记录。',
         '/boylu-avatar.jpg', NULL, NULL, '',
-        '', '3453619783', '', '3453619783@qq.com', 'a3453619783',
+        '', 'your_qq', '', 'admin@example.com', 'your_wechat',
         '[\"qq\",\"wechat\",\"email\"]', '[]', 1, 1,
         'https://api.dicebear.com/7.x/avataaars/svg?seed=Guest',
-        '欢迎来到 boylu 博客，技术交流可联系 QQ：3453619783，微信：a3453619783。',
+        '欢迎来到 boylu 博客，技术交流可联系 QQ：your_qq，微信：your_wechat。',
         NULL, '2024-12-22 11:55:25', '2024-12-22 11:55:25', 0);
 
 -- ----------------------------
@@ -1554,6 +1554,8 @@ CREATE TABLE `sys_resource`
     `user_id`     bigint NOT NULL COMMENT '用户id',
     `name`        varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '资源名',
     `category`    varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci  DEFAULT NULL COMMENT '分类',
+    `cover`       varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '资源封面',
+    `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '资源描述',
     `downloads`   int                                                           DEFAULT NULL COMMENT '下载量',
     `is_free`     int                                                           DEFAULT NULL COMMENT '是否免费',
     `pay_type`    int                                                           DEFAULT NULL COMMENT '付费方式',

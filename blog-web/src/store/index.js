@@ -5,6 +5,25 @@ import { getToken, setToken, removeToken } from '@/utils/cookie'
 
 Vue.use(Vuex)
 
+const brokenLogoPath = '/boylu-logo.png'
+const fullAvatarPath = '/boylu-avatar.jpg'
+
+function normalizeLogoPath(url) {
+  if (typeof url !== 'string' || !url) {
+    return url
+  }
+  return url.includes(brokenLogoPath) ? url.replace(brokenLogoPath, fullAvatarPath) : url
+}
+
+function normalizeSiteInfo(info = {}) {
+  return {
+    ...info,
+    logo: normalizeLogoPath(info.logo) || fullAvatarPath,
+    authorAvatar: normalizeLogoPath(info.authorAvatar) || fullAvatarPath,
+    touristAvatar: normalizeLogoPath(info.touristAvatar)
+  }
+}
+
 function getCachedUserInfo() {
   const cachedUser = sessionStorage.getItem("user")
   if (!cachedUser) {
@@ -22,10 +41,10 @@ function getCachedUserInfo() {
 export default new Vuex.Store({
   state: {
     userInfo: getCachedUserInfo(),
-    defaultImage: '/boylu-logo.png',
+    defaultImage: '/images/boylu-image-loading-fallback.webp',
     imageVersion: Date.now(),
     webSiteInfo: {
-      logo: '/boylu-logo.png',
+      logo: '/boylu-avatar.jpg',
       name: 'boylu博客',
       author: 'boylu',
       authorInfo: '专注技术分享与实践记录。',
@@ -45,7 +64,7 @@ export default new Vuex.Store({
   },
   mutations: {
     setSiteInfo(state, info) {
-      state.webSiteInfo = info
+      state.webSiteInfo = normalizeSiteInfo(info)
     },
     SET_TOKEN(state, payload) {
       const token = typeof payload === 'string' ? payload : payload?.token

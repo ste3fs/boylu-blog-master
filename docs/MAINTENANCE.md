@@ -38,34 +38,34 @@ git status --short
 ## 重新安装依赖
 
 ```powershell
-cd E:\做题\shiyi-blog-master\blog-web
+cd <PROJECT_ROOT>\blog-web
 npm install
 ```
 
 ```powershell
-cd E:\做题\shiyi-blog-master\blog-admin
+cd <PROJECT_ROOT>\blog-admin
 npm install
 ```
 
 ```powershell
-cd E:\做题\shiyi-blog-master\e2e
+cd <PROJECT_ROOT>\e2e
 npm install
 ```
 
 ## 重新构建
 
 ```powershell
-cd E:\做题\shiyi-blog-master\blog-web
+cd <PROJECT_ROOT>\blog-web
 npm run build
 ```
 
 ```powershell
-cd E:\做题\shiyi-blog-master\blog-admin
+cd <PROJECT_ROOT>\blog-admin
 npm run build
 ```
 
 ```powershell
-cd E:\做题\shiyi-blog-master\blog
+cd <PROJECT_ROOT>\blog
 mvn clean package
 ```
 
@@ -74,13 +74,13 @@ mvn clean package
 先启动前台和后台，再运行：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File E:\做题\shiyi-blog-master\scripts\run-playwright-regression.ps1
+powershell -ExecutionPolicy Bypass -File <PROJECT_ROOT>\scripts\run-playwright-regression.ps1
 ```
 
 如果缺少浏览器：
 
 ```powershell
-cd E:\做题\shiyi-blog-master\e2e
+cd <PROJECT_ROOT>\e2e
 npm run install:browsers
 ```
 
