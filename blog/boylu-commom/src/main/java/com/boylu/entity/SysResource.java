@@ -26,6 +26,12 @@ public class SysResource implements Serializable {
     @ApiModelProperty(value = "分类")
     private String category;
 
+    @ApiModelProperty(value = "封面图片")
+    private String cover;
+
+    @ApiModelProperty(value = "资源描述")
+    private String description;
+
     @ApiModelProperty(value = "下载量")
     private Integer downloads;
 

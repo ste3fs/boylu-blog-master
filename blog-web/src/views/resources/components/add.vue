@@ -29,6 +29,39 @@
           </el-select>
         </el-form-item>
 
+        <el-form-item label="封面图片" prop="cover">
+          <el-upload
+            action="#"
+            :show-file-list="false"
+            :http-request="uploadCover"
+            :before-upload="beforeCoverUpload"
+          >
+            <div class="resource-cover-uploader">
+              <img
+                v-if="uploadForm.cover"
+                :src="resolveCover(uploadForm.cover)"
+                class="resource-cover-preview"
+                alt="资源封面"
+              >
+              <div v-else class="resource-cover-placeholder">
+                <i class="el-icon-picture-outline"></i>
+                <span>上传封面</span>
+              </div>
+            </div>
+          </el-upload>
+        </el-form-item>
+
+        <el-form-item label="资源描述" prop="description">
+          <el-input
+            v-model="uploadForm.description"
+            type="textarea"
+            :rows="3"
+            maxlength="200"
+            show-word-limit
+            placeholder="简单说明这个资源的用途、版本或使用场景"
+          />
+        </el-form-item>
+
         <el-form-item label="资源类型" prop="isFree">
           <el-radio-group v-model="uploadForm.isFree">
             <el-radio :label="1">免费</el-radio>
@@ -60,19 +93,24 @@ import Option from 'element-ui/lib/option'
 import Radio from 'element-ui/lib/radio'
 import RadioGroup from 'element-ui/lib/radio-group'
 import Select from 'element-ui/lib/select'
+import Upload from 'element-ui/lib/upload'
 import 'element-ui/lib/theme-chalk/option.css'
 import 'element-ui/lib/theme-chalk/radio.css'
 import 'element-ui/lib/theme-chalk/radio-group.css'
 import 'element-ui/lib/theme-chalk/select.css'
 import 'element-ui/lib/theme-chalk/select-dropdown.css'
+import 'element-ui/lib/theme-chalk/upload.css'
 import { addResourceApi } from '@/api/resources';
+import { uploadFileApi } from '@/api/file'
+import { resolveImageUrl } from '@/utils/image'
 export default {
   name: "AddResource",
   components: {
     ElOption: Option,
     ElRadio: Radio,
     ElRadioGroup: RadioGroup,
-    ElSelect: Select
+    ElSelect: Select,
+    ElUpload: Upload
   },
   props: {
     visible: {
@@ -90,6 +128,8 @@ export default {
       uploadForm: {
         name: '',
         category: '',
+        cover: '',
+        description: '',
         isFree: 1,
         panPath: '',
         panCode: ''
@@ -101,6 +141,9 @@ export default {
         ],
         category: [
           { required: true, message: '请选择资源分类', trigger: 'change' }
+        ],
+        description: [
+          { max: 200, message: '资源描述不能超过 200 个字符', trigger: 'blur' }
         ],
         isFree: [
           { required: true, message: '请选择资源类型', trigger: 'change' }
@@ -132,6 +175,39 @@ export default {
     handleClose() {
       this.dialogVisible = false;
       this.$refs.uploadForm.resetFields();
+      this.uploadForm.cover = ''
+      this.uploadForm.description = ''
+    },
+    resolveCover(url) {
+      return resolveImageUrl(url, '')
+    },
+    beforeCoverUpload(file) {
+      const isImage = /^image\/(jpeg|png|gif|webp)$/.test(file.type)
+      const isLt5M = file.size / 1024 / 1024 <= 5
+      if (!isImage) {
+        this.$message.error('只能上传 jpg/png/gif/webp 图片')
+        return false
+      }
+      if (!isLt5M) {
+        this.$message.error('封面图片不能超过 5MB')
+        return false
+      }
+      return true
+    },
+    async uploadCover(options) {
+      const formData = new FormData()
+      formData.append('file', options.file)
+      try {
+        const res = await uploadFileApi(formData, 'resource-cover')
+        this.uploadForm.cover = typeof res.data === 'string'
+          ? res.data
+          : (res.data?.fallback || '')
+        this.$message.success('封面上传成功')
+        options.onSuccess(res)
+      } catch (error) {
+        this.$message.error(error.message || '封面上传失败')
+        options.onError(error)
+      }
     },
     /**
      * 提交上传
@@ -159,5 +235,31 @@ export default {
 </script>
 
 <style scoped lang="scss">
+.resource-cover-uploader {
+  width: 112px;
+  height: 82px;
+  border: 1px dashed #d9e2ef;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+  cursor: pointer;
+}
 
+.resource-cover-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.resource-cover-placeholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 12px;
+}
 </style>

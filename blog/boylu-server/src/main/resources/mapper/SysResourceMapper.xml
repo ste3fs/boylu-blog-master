@@ -11,6 +11,8 @@
             u.avatar as avatar,
             t.name as name,
             t.category as category,
+            t.cover as cover,
+            t.description as description,
             t.downloads as downloads,
             t.is_free as isFree,
             t.pay_type as payType,

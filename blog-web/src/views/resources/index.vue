@@ -120,7 +120,13 @@
           @click="handleResourceClick(resource)"
         >
           <div class="resource-card__icon">
-            <svg-icon :icon-class="resolveCategoryIcon(resource.category)"></svg-icon>
+            <img
+              v-if="resource.cover"
+              :src="resolveResourceCover(resource.cover)"
+              class="resource-cover-thumb"
+              :alt="resource.name"
+            >
+            <svg-icon v-else :icon-class="resolveCategoryIcon(resource.category)"></svg-icon>
           </div>
 
           <div class="resource-card__content">
@@ -175,7 +181,13 @@
       <div v-if="currentResource" class="resource-detail">
         <div class="detail-header">
           <div class="detail-header__icon">
-            <svg-icon :icon-class="resolveCategoryIcon(currentResource.category)"></svg-icon>
+            <img
+              v-if="currentResource.cover"
+              :src="resolveResourceCover(currentResource.cover)"
+              class="resource-detail-cover"
+              :alt="currentResource.name"
+            >
+            <svg-icon v-else :icon-class="resolveCategoryIcon(currentResource.category)"></svg-icon>
           </div>
           <div class="detail-header__copy">
             <h3>{{ currentResource.name }}</h3>
@@ -490,6 +502,9 @@ export default {
       const key = String(category || '').toLowerCase()
       return CATEGORY_ICON_MAP[key] || 'folder-open'
     },
+    resolveResourceCover(url) {
+      return resolveImageUrl(url, this.$store.state.defaultImage)
+    },
     resolveAvatar(url) {
       return resolveImageUrl(url, this.$store.state.defaultImage)
     },
@@ -800,6 +815,15 @@ export default {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(79, 70, 229, 0.14));
   color: #2563eb;
   font-size: 28px;
+}
+
+.resource-cover-thumb,
+.resource-detail-cover {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  display: block;
 }
 
 .resource-card__content {

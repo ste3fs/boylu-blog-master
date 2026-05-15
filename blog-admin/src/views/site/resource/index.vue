@@ -68,6 +68,20 @@
       >
         <el-table-column type="selection" width="55" align="center" />
         <el-table-column label="资源名" show-overflow-tooltip align="center" prop="name" width="200"/>
+        <el-table-column label="封面" align="center" prop="cover" width="90">
+          <template #default="scope">
+            <el-image
+              v-if="scope.row.cover"
+              class="resource-cover-image"
+              :src="scope.row.cover"
+              fit="cover"
+              :preview-src-list="[scope.row.cover]"
+              preview-teleported
+            />
+            <span v-else class="text-muted">无</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="描述" show-overflow-tooltip align="center" prop="description" min-width="180"/>
         <el-table-column label="分类" align="center" prop="category">
           <template #default="scope">
             <span v-for="item in categoryList" :key="item.value">
@@ -160,7 +174,7 @@
       />
 
       <!-- 添加或修改对话框 -->
-      <el-dialog v-model="open" :title="title" width="500px" append-to-body>
+      <el-dialog v-model="open" :title="title" width="620px" append-to-body>
         <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
           <el-form-item label="资源名" prop="name">
             <el-input v-model="form.name" placeholder="请输入资源名" />
@@ -169,6 +183,19 @@
             <el-select v-model="form.category" placeholder="请选择分类">
                 <el-option v-for="item in categoryList" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
+          </el-form-item>
+          <el-form-item label="封面" prop="cover">
+            <UploadImage v-model="form.cover" :source="'resource-cover'" :limit="1" />
+          </el-form-item>
+          <el-form-item label="描述" prop="description">
+            <el-input
+              v-model="form.description"
+              type="textarea"
+              :rows="4"
+              maxlength="500"
+              show-word-limit
+              placeholder="请输入资源描述"
+            />
           </el-form-item>
           <el-form-item label="是否免费" prop="isFree">
             <el-select v-model="form.isFree" placeholder="请选择是否免费">
@@ -212,6 +239,7 @@ import {
   updateSysResourceApi,
 } from "@/api/site/resource";
 import { getDictDataByDictTypesApi } from "@/api/system/dict";
+import UploadImage from "@/components/Upload/Image.vue";
 
 // 遮罩层
 const loading = ref(true);
@@ -231,6 +259,8 @@ const queryParams = reactive({
   pageSize: 10,
   name: undefined,
   category: undefined,
+  cover: undefined,
+  description: undefined,
   isFree: undefined,
   status: 1,
 });
@@ -272,6 +302,7 @@ const form = reactive<any>({});
 const rules = reactive({
   name: [{ required: true, message: "资源名不能为空", trigger: "blur" }],
   category: [{ required: true, message: "分类不能为空", trigger: "blur" }],
+  description: [{ max: 500, message: "资源描述不能超过 500 个字符", trigger: "blur" }],
   isFree: [{ required: true, message: "是否免费不能为空", trigger: "blur" }],
   panPath: [{ required: true, message: "网盘地址不能为空", trigger: "blur" }],
   panCode: [{ required: true, message: "提取码不能为空", trigger: "blur" }],
@@ -312,6 +343,8 @@ const reset = () => {
     userId: undefined,
     name: undefined,
     category: undefined,
+    cover: undefined,
+    description: undefined,
     downloads: undefined,
     isFree: undefined,
     payType: undefined,
@@ -451,3 +484,15 @@ onMounted(() => {
   getCategoryList();
 });
 </script>
+
+<style scoped>
+.resource-cover-image {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+}
+
+.text-muted {
+  color: #909399;
+}
+</style>

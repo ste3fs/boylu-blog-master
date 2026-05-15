@@ -1554,6 +1554,8 @@ CREATE TABLE `sys_resource`
     `user_id`     bigint NOT NULL COMMENT '用户id',
     `name`        varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '资源名',
     `category`    varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci  DEFAULT NULL COMMENT '分类',
+    `cover`       varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '资源封面',
+    `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '资源描述',
     `downloads`   int                                                           DEFAULT NULL COMMENT '下载量',
     `is_free`     int                                                           DEFAULT NULL COMMENT '是否免费',
     `pay_type`    int                                                           DEFAULT NULL COMMENT '付费方式',
