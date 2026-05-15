@@ -12,7 +12,7 @@
           />
         </el-form-item>
         <el-form-item label="分类" prop="category">
-          <el-select v-model="queryParams.category" placeholder="请选择分类">
+          <el-select v-model="queryParams.category" placeholder="请选择分类" clearable>
             <el-option
               v-for="item in categoryList"
               :key="item.value"
@@ -22,7 +22,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="是否免费" prop="isFree">
-          <el-select v-model="queryParams.isFree" placeholder="请选择是否免费">
+          <el-select v-model="queryParams.isFree" placeholder="请选择是否免费" clearable>
             <el-option
               v-for="item in freeList"
               :key="item.value"
@@ -32,7 +32,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="状态" prop="status">
-            <el-select v-model="queryParams.status" placeholder="请选择状态">
+            <el-select v-model="queryParams.status" placeholder="请选择状态" clearable>
                 <el-option v-for="item in statusList" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
         </el-form-item>
@@ -262,7 +262,7 @@ const queryParams = reactive({
   cover: undefined,
   description: undefined,
   isFree: undefined,
-  status: 1,
+  status: undefined,
 });
 
 const categoryList = ref<any[]>([]);
