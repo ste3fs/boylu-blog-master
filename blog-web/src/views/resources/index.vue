@@ -202,13 +202,14 @@
         </div>
 
         <div v-if="!showVerifyCode && !currentResource.panPath" class="get-link-section">
-          <el-button type="primary" @click="handleGetLink">
-            获取下载链接
+          <el-button type="primary" :loading="downloading" @click="handleGetLink">
+            {{ isCurrentResourceFree ? '登录后获取下载链接' : '获取下载方式' }}
           </el-button>
-          <p>为控制资源外链滥用，当前仍保留验证码校验流程。</p>
+          <p v-if="isCurrentResourceFree">免费资源登录后即可下载，不需要扫码。</p>
+          <p v-else>付费资源需要完成验证码校验后获取下载方式。</p>
         </div>
 
-        <div v-if="showVerifyCode && !currentResource.panPath" class="verify-section">
+        <div v-if="!isCurrentResourceFree && showVerifyCode && !currentResource.panPath" class="verify-section">
           <div class="qr-code">
             <img v-lazy="scanPlaceholderUrl" :key="scanPlaceholderUrl" alt="扫码占位图">
             <p class="scan-tip">
@@ -260,8 +261,9 @@ import Tag from 'element-ui/lib/tag'
 import 'element-ui/lib/theme-chalk/tag.css'
 import Add from './components/add.vue'
 import { getDictDataApi } from '@/api/dict'
-import { getResourcesApi, verifyCodeApi } from '@/api/resources'
+import { downloadResourceApi, getResourcesApi, verifyCodeApi } from '@/api/resources'
 import { copyText as copyPlainText } from '@/utils/contact'
+import { getToken } from '@/utils/cookie'
 import { resolveImageUrl } from '@/utils/image'
 import { formatDate, formatDateTime } from '@/utils/time'
 
@@ -302,6 +304,7 @@ export default {
       currentResource: null,
       showVerifyCode: false,
       verifying: false,
+      downloading: false,
       errorMessage: '',
       scanPlaceholderUrl: new URL('../../assets/scan-placeholder.svg', import.meta.url).href,
       verifyForm: {
@@ -323,6 +326,9 @@ export default {
       return this.categoryOptions.length
         ? this.categoryOptions
         : [{ id: 'fallback', label: '默认分类', value: 'default', remark: 'folder-open' }]
+    },
+    isCurrentResourceFree() {
+      return Number(this.currentResource?.isFree) === 1
     }
   },
   created() {
@@ -403,12 +409,42 @@ export default {
       }
       this.uploadDialogVisible = true
     },
-    handleGetLink() {
-      if (!this.$store.state.userInfo) {
-        this.$message.warning('请先登录')
+    async handleGetLink() {
+      if (!getToken()) {
+        this.$message.warning('请先登录后下载')
+        this.$router.push({
+          path: '/login',
+          query: {
+            redirect: this.$route.fullPath || '/resources'
+          }
+        }).catch(() => {})
         return
       }
-      this.showVerifyCode = true
+
+      if (!this.isCurrentResourceFree) {
+        this.showVerifyCode = true
+        return
+      }
+
+      this.downloading = true
+      try {
+        const res = await downloadResourceApi(this.currentResource.id)
+        this.currentResource = {
+          ...this.currentResource,
+          downloads: res.data.downloads,
+          panPath: res.data.panPath,
+          panCode: res.data.panCode
+        }
+        this.resourceList = this.resourceList.map(item => (
+          item.id === this.currentResource.id
+            ? { ...item, downloads: this.currentResource.downloads }
+            : item
+        ))
+      } catch (error) {
+        this.$message.error(error.message || '获取下载链接失败')
+      } finally {
+        this.downloading = false
+      }
     },
     async handleVerify() {
       if (!this.verifyForm.code) {

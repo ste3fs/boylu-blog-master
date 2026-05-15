@@ -5,16 +5,16 @@
 
     <select id="getResourceList" resultType="com.boylu.vo.resource.SysResourceVo">
         select
-            t.id,
-            t.user_id,
-            u.nickname,
-            u.avatar,
-            t.name,
-            t.category,
-            t.downloads,
-            t.is_free,
-            t.pay_type,
-            t.create_time
+            t.id as id,
+            t.user_id as userId,
+            u.nickname as nickname,
+            u.avatar as avatar,
+            t.name as name,
+            t.category as category,
+            t.downloads as downloads,
+            t.is_free as isFree,
+            t.pay_type as payType,
+            t.create_time as createTime
         from sys_resource t
         left join sys_user u on t.user_id = u.id
         where t.status = 2

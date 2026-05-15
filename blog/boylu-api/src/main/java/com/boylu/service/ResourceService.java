@@ -16,4 +16,6 @@ public interface ResourceService {
     void add(SysResource sysResource);
 
     SysResource verify(String code,Long id);
+
+    SysResource download(Long id);
 }

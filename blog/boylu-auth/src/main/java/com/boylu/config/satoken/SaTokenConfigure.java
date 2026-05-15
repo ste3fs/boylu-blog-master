@@ -51,7 +51,6 @@ public class SaTokenConfigure implements WebMvcConfigurer {
             "/api/moment/list",
             "/api/tag/list",
             "/api/resource/list",
-            "/api/resource/verify",
             "/api/perf/report",
             "/wechat/**",
             "/img/**",

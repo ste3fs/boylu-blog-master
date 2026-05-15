@@ -33,3 +33,14 @@ export function verifyCodeApi(data) {
   })
 }
 
+/**
+ * 登录后获取免费资源下载链接
+ */
+export function downloadResourceApi(id) {
+  return request({
+    url: '/api/resource/download',
+    method: 'get',
+    params: { id }
+  })
+}
+

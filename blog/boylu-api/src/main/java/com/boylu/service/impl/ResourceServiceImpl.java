@@ -64,4 +64,24 @@ public class ResourceServiceImpl implements ResourceService {
 
         return sysResource;
     }
+
+    @Override
+    public SysResource download(Long id) {
+        if (id == null || id <= 0) {
+            throw new ServiceException("资源不存在");
+        }
+
+        SysResource sysResource = baseMapper.selectById(id);
+        if (sysResource == null || !ResourceStatusEnum.PASS.getCode().equals(sysResource.getStatus())) {
+            throw new ServiceException("资源不存在或未通过审核");
+        }
+        if (!Integer.valueOf(1).equals(sysResource.getIsFree())) {
+            throw new ServiceException("付费资源请完成验证后下载");
+        }
+
+        sysResource.setDownloads((sysResource.getDownloads() == null ? 0 : sysResource.getDownloads()) + 1);
+        baseMapper.updateById(sysResource);
+
+        return sysResource;
+    }
 }

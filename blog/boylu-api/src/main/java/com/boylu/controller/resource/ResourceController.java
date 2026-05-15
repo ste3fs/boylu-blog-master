@@ -35,9 +35,16 @@ public class ResourceController {
 
     @GetMapping("/verify")
     @Operation(description = "校验验证码")
+    @SaCheckLogin
     public Result<SysResource> verify(String code,Long id) {
         return Result.success(resourceService.verify(code,id));
     }
 
+    @GetMapping("/download")
+    @Operation(description = "获取免费资源下载链接")
+    @SaCheckLogin
+    public Result<SysResource> download(Long id) {
+        return Result.success(resourceService.download(id));
+    }
 
 }
