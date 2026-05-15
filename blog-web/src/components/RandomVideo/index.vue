@@ -63,8 +63,14 @@ export default {
             videoError: ''
         }
     },
+    watch: {
+        drawer(isOpen) {
+            this.updatePageOffset(isOpen);
+        }
+    },
     beforeDestroy() {
         this.pauseVideo();
+        this.updatePageOffset(false);
     },
     methods: {
         toggleDrawer() {
@@ -119,6 +125,12 @@ export default {
             this.isPlaying = isPlaying;
             this.btnContent = isPlaying ? '暂停' : '播放';
             this.btnIcon = isPlaying ? 'el-icon-video-pause' : 'el-icon-video-play';
+        },
+        updatePageOffset(isOpen) {
+            if (typeof document === 'undefined') {
+                return;
+            }
+            document.body.classList.toggle('random-video-open', Boolean(isOpen));
         },
         handleVideoError() {
             this.videoError = '视频加载失败，请稍后再试或切换下一个视频';
@@ -217,7 +229,7 @@ export default {
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .random-video-actions {
@@ -297,6 +309,21 @@ export default {
     .random-video-slide-enter,
     .random-video-slide-leave-to {
         transform: translateX(-16px);
+    }
+}
+</style>
+
+<style lang="scss">
+@media (min-width: 1025px) {
+    body.random-video-open {
+        padding-left: clamp(474px, calc(30vw + 56px), 696px);
+        transition: padding-left 0.2s ease;
+    }
+}
+
+@media (max-width: 1024px) {
+    body.random-video-open {
+        padding-left: 0;
     }
 }
 </style>
