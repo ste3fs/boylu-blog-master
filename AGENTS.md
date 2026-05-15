@@ -8,6 +8,7 @@
 - SSH 用户：`ubuntu`
 - 前台站点目录：`/var/www/boylu-blog/`
 - 后台管理目录：`/var/www/boylu-blog/admin/`
+- 后台线上入口：`/boylu1107`；`/admin` 被 Nginx 故意返回 404，不要作为后台健康检查地址。
 - 后端服务目录：`/opt/boylu-blog/server/`
 - 上传文件目录：`/opt/boylu-blog/storage/`
 - 后端服务名：`boylu-blog`

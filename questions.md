@@ -43,6 +43,11 @@
 - 免费资源点击后需要登录，通过 `/api/resource/download` 获取下载链接。
 - 付费资源需要登录并完成验证码校验后，通过 `/api/resource/verify` 获取下载方式。
 
+### 后台访问路径
+
+- 线上后台真实入口是 `/boylu1107`。
+- `/admin` 和 `/admin/` 在 Nginx 中被故意配置为 404，用于隐藏后台入口，不应作为后台健康检查地址。
+
 ### 图片存储策略
 
 - 业务字段长期保存 `/boylu/file/content/{fileId}`。
