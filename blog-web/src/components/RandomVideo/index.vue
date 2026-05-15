@@ -175,9 +175,12 @@ export default {
 
 .random-video-panel {
     position: fixed;
-    left: 38px;
-    top: 50%;
-    width: clamp(420px, 30vw, 640px);
+    left: 18px;
+    top: 78px;
+    bottom: 26px;
+    display: flex;
+    flex-direction: column;
+    width: calc(clamp(560px, 32vw, 680px) - 36px);
     max-width: calc(100vw - 54px);
     overflow: hidden;
     border: 1px solid rgba(120, 140, 170, 0.18);
@@ -185,7 +188,7 @@ export default {
     background: var(--card-bg, rgba(255, 255, 255, 0.94));
     box-shadow: 0 18px 50px rgba(20, 31, 50, 0.18);
     backdrop-filter: blur(16px);
-    transform: translateY(-50%);
+    transform: none;
     pointer-events: auto;
 }
 
@@ -219,8 +222,9 @@ export default {
 }
 
 .video-container {
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
-    aspect-ratio: 16 / 9;
     overflow: hidden;
     background: #05070a;
 }
@@ -283,10 +287,10 @@ export default {
 .random-video-slide-enter,
 .random-video-slide-leave-to {
     opacity: 0;
-    transform: translateY(-50%) translateX(-16px);
+    transform: translateX(-16px);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .random-video-btn {
         top: auto;
         bottom: 118px;
@@ -301,9 +305,14 @@ export default {
         left: 36px;
         top: auto;
         bottom: 92px;
+        display: block;
         width: calc(100vw - 50px);
         max-width: calc(100vw - 50px);
         transform: none;
+    }
+
+    .video-container {
+        aspect-ratio: 16 / 9;
     }
 
     .random-video-slide-enter,
@@ -316,7 +325,7 @@ export default {
 <style lang="scss">
 @media (min-width: 1025px) {
     body.random-video-open {
-        padding-left: clamp(474px, calc(30vw + 56px), 696px);
+        padding-left: clamp(560px, 32vw, 680px);
         transition: padding-left 0.2s ease;
     }
 }
