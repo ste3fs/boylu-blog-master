@@ -27,8 +27,12 @@ import org.dromara.x.file.storage.core.FileStorageService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.net.ssl.HttpsURLConnection;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -337,7 +341,7 @@ public class NotionImportService {
         ServiceException lastException = null;
         for (int attempt = 1; attempt <= NOTION_REQUEST_RETRY_TIMES; attempt++) {
             try {
-                return requestNotionObject(pathAndQuery);
+                return requestNotionObjectByJdk(pathAndQuery);
             } catch (ServiceException ex) {
                 lastException = ex;
                 if (StringUtils.contains(ex.getMessage(), "HTTP ")) {
@@ -360,6 +364,52 @@ public class NotionImportService {
             Thread.sleep(NOTION_REQUEST_RETRY_DELAY_MS * failedAttempt);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    private JSONObject requestNotionObjectByJdk(String pathAndQuery) {
+        HttpsURLConnection connection = null;
+        try {
+            URL url = new URL(NOTION_API_BASE + pathAndQuery);
+            connection = (HttpsURLConnection) url.openConnection();
+            connection.setConnectTimeout(NOTION_REQUEST_TIMEOUT_MS);
+            connection.setReadTimeout(NOTION_REQUEST_TIMEOUT_MS);
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Authorization", "Bearer " + apiToken.trim());
+            connection.setRequestProperty("Notion-Version", StringUtils.defaultIfBlank(notionVersion, "2022-06-28"));
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Accept", "application/json");
+
+            int status = connection.getResponseCode();
+            String body = readResponseBody(connection, status);
+            if (status < 200 || status >= 300) {
+                throw new ServiceException("Notion 页面读取失败，请确认页面已共享给 Integration。HTTP "
+                        + status + ": " + StrUtil.sub(body, 0, 180));
+            }
+            return JSONUtil.parseObj(body);
+        } catch (ServiceException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ServiceException("Notion 页面读取失败：" + ex.getMessage(), ex);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private String readResponseBody(HttpsURLConnection connection, int status) throws Exception {
+        InputStream inputStream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+        if (inputStream == null) {
+            return "";
+        }
+        try (InputStream input = inputStream; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int length;
+            while ((length = input.read(buffer)) != -1) {
+                output.write(buffer, 0, length);
+            }
+            return output.toString(StandardCharsets.UTF_8.name());
         }
     }
 
