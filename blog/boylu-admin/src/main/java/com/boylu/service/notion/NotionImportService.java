@@ -34,8 +34,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -51,6 +53,9 @@ public class NotionImportService {
     private static final Pattern COMPACT_UUID_PATTERN = Pattern.compile("(?i)([0-9a-f]{32})");
     private static final int MAX_BLOCK_DEPTH = 8;
     private static final int MAX_BLOCK_COUNT = 600;
+    private static final int NOTION_REQUEST_TIMEOUT_MS = 15000;
+    private static final int NOTION_REQUEST_RETRY_TIMES = 3;
+    private static final long NOTION_REQUEST_RETRY_DELAY_MS = 500L;
 
     private final FileStorageService fileStorageService;
     private final FileDetailService fileDetailService;
@@ -79,7 +84,7 @@ public class NotionImportService {
         }
 
         String pageId = extractPageId(dto.getPageUrl());
-        JSONObject page = requestNotionObject("/pages/" + urlEncode(pageId));
+        JSONObject page = requestNotionObjectWithRetry("/pages/" + urlEncode(pageId));
 
         List<String> warnings = new ArrayList<>();
         ImportContext context = new ImportContext(resolveImportImages(dto), warnings);
@@ -127,7 +132,7 @@ public class NotionImportService {
             if (StringUtils.isNotBlank(nextCursor)) {
                 path += "&start_cursor=" + urlEncode(nextCursor);
             }
-            JSONObject response = requestNotionObject(path);
+            JSONObject response = requestNotionObjectWithRetry(path);
             JSONArray results = response.getJSONArray("results");
             if (results != null) {
                 for (Object item : results) {
@@ -328,12 +333,42 @@ public class NotionImportService {
         appendPlainText(plainText, title);
     }
 
+    private JSONObject requestNotionObjectWithRetry(String pathAndQuery) {
+        ServiceException lastException = null;
+        for (int attempt = 1; attempt <= NOTION_REQUEST_RETRY_TIMES; attempt++) {
+            try {
+                return requestNotionObject(pathAndQuery);
+            } catch (ServiceException ex) {
+                lastException = ex;
+                if (StringUtils.contains(ex.getMessage(), "HTTP ")) {
+                    throw ex;
+                }
+                if (attempt >= NOTION_REQUEST_RETRY_TIMES) {
+                    break;
+                }
+                log.warn("Notion request failed, will retry. attempt={}/{}, path={}, error={}",
+                        attempt, NOTION_REQUEST_RETRY_TIMES, pathAndQuery, ex.getMessage());
+                sleepBeforeRetry(attempt);
+            }
+        }
+        throw new ServiceException("Notion 页面读取失败，已重试 " + NOTION_REQUEST_RETRY_TIMES
+                + " 次：" + (lastException == null ? "unknown" : lastException.getMessage()), lastException);
+    }
+
+    private void sleepBeforeRetry(int failedAttempt) {
+        try {
+            Thread.sleep(NOTION_REQUEST_RETRY_DELAY_MS * failedAttempt);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private JSONObject requestNotionObject(String pathAndQuery) {
         String url = NOTION_API_BASE + pathAndQuery;
         HttpResponse response = null;
         try {
             response = HttpRequest.get(url)
-                    .timeout(30000)
+                    .timeout(NOTION_REQUEST_TIMEOUT_MS)
                     .header(Header.AUTHORIZATION, "Bearer " + apiToken.trim())
                     .header("Notion-Version", StringUtils.defaultIfBlank(notionVersion, "2022-06-28"))
                     .header(Header.CONTENT_TYPE, "application/json")
@@ -361,6 +396,10 @@ public class NotionImportService {
         }
         if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
             return imageUrl;
+        }
+        String cachedUrl = context.getImageUrlCache().get(imageUrl);
+        if (StringUtils.isNotBlank(cachedUrl)) {
+            return cachedUrl;
         }
 
         HttpResponse response = null;
@@ -399,7 +438,9 @@ public class NotionImportService {
                     .putAttr("source", "notion-import")
                     .upload();
             String publicUrl = buildPublicContentUrl(fileInfo);
-            return StringUtils.defaultIfBlank(publicUrl, imageUrl);
+            String resultUrl = StringUtils.defaultIfBlank(publicUrl, imageUrl);
+            context.getImageUrlCache().put(imageUrl, resultUrl);
+            return resultUrl;
         } catch (Exception ex) {
             log.warn("Failed to persist Notion image, url={}", imageUrl, ex);
             context.getWarnings().add("图片保存到本站失败，已保留原链接：" + shortText(imageUrl));
@@ -687,6 +728,7 @@ public class NotionImportService {
     private static class ImportContext {
         private final boolean importImages;
         private final List<String> warnings;
+        private final Map<String, String> imageUrlCache = new HashMap<>();
         private int importedBlocks;
     }
 

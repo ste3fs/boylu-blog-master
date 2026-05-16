@@ -205,8 +205,8 @@ deploy/systemd/boylu-blog.env.example
 
 - 导入后默认保存为草稿，可在后台继续编辑后再发布。
 - 常见块会转换为 Markdown/HTML：标题、段落、列表、待办、引用、代码块、图片、分割线等。
-- 图片默认下载到本站文件存储，并保存为 `/boylu/file/content/{fileId}`，避免 Notion 临时图片链接过期。
-- 如果图片下载失败或超过 `NOTION_MAX_IMAGE_SIZE_MB`，会保留原链接并在导入结果里返回提示。
+- 图片默认保留 Notion 原链接，导入速度更快；如果在弹窗中开启“下载到本站”，会保存为 `/boylu/file/content/{fileId}`。
+- 如果图片下载失败、超过 `NOTION_MAX_IMAGE_SIZE_MB` 或 Notion 临时图片不可达，会保留原链接并在导入结果里返回提示。
 
 ## 生产构建
 

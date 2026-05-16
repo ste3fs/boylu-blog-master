@@ -67,7 +67,7 @@ hot-search:
 notion:
   api-token: ${NOTION_API_TOKEN:}
   version: ${NOTION_VERSION:2022-06-28}
-  import-images: ${NOTION_IMPORT_IMAGES:true}
+  import-images: ${NOTION_IMPORT_IMAGES:false}
   max-image-size-mb: ${NOTION_MAX_IMAGE_SIZE_MB:10}
 
 mail:

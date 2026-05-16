@@ -562,7 +562,7 @@
         </el-form-item>
       </el-form>
       <el-alert
-        title="需要先在服务端配置 NOTION_API_TOKEN，并把 Notion 页面共享给该 Integration。导入后会生成文章草稿，可继续编辑封面、摘要和正文。"
+        title="需要先在服务端配置 NOTION_API_TOKEN，并把 Notion 页面共享给该 Integration。默认保留图片原链接以加快导入，需要长期保存图片时再开启下载到本站。"
         type="info"
         :closable="false"
       />
@@ -676,7 +676,7 @@ const notionForm = reactive<any>({
   isStick: 0,
   isCarousel: 0,
   isRecommend: 0,
-  importImages: true
+  importImages: false
 })
 
 const statusOptions = ref<any>([])
@@ -985,7 +985,7 @@ const resetNotionForm = () => {
   notionForm.isStick = 0
   notionForm.isCarousel = 0
   notionForm.isRecommend = 0
-  notionForm.importImages = true
+  notionForm.importImages = false
 }
 
 const openNotionImport = () => {
