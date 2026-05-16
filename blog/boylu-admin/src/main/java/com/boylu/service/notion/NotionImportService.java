@@ -34,6 +34,7 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.Proxy;
 import java.net.URLEncoder;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -63,8 +64,8 @@ public class NotionImportService {
     private static final int MAX_BLOCK_DEPTH = 8;
     private static final int MAX_BLOCK_COUNT = 600;
     private static final int NOTION_REQUEST_TIMEOUT_MS = 15000;
-    private static final int NOTION_REQUEST_RETRY_TIMES = 3;
-    private static final long NOTION_REQUEST_RETRY_DELAY_MS = 500L;
+    private static final int NOTION_REQUEST_RETRY_TIMES = 4;
+    private static final long NOTION_REQUEST_RETRY_DELAY_MS = 1000L;
 
     private final FileStorageService fileStorageService;
     private final FileDetailService fileDetailService;
@@ -394,20 +395,32 @@ public class NotionImportService {
             try {
                 return requestNotionObjectByJdk(pathAndQuery);
             } catch (ServiceException ex) {
-                lastException = ex;
-                if (StringUtils.contains(ex.getMessage(), "HTTP ")) {
+                if (isNotionHttpFailure(ex)) {
                     throw ex;
                 }
-                if (attempt >= NOTION_REQUEST_RETRY_TIMES) {
-                    break;
+                try {
+                    return requestNotionObject(pathAndQuery);
+                } catch (ServiceException fallbackEx) {
+                    if (isNotionHttpFailure(fallbackEx)) {
+                        throw fallbackEx;
+                    }
+                    fallbackEx.addSuppressed(ex);
+                    lastException = fallbackEx;
+                    if (attempt >= NOTION_REQUEST_RETRY_TIMES) {
+                        break;
+                    }
+                    log.warn("Notion request failed, will retry. attempt={}/{}, path={}, primary={}, fallback={}",
+                            attempt, NOTION_REQUEST_RETRY_TIMES, pathAndQuery, ex.getMessage(), fallbackEx.getMessage());
+                    sleepBeforeRetry(attempt);
                 }
-                log.warn("Notion request failed, will retry. attempt={}/{}, path={}, error={}",
-                        attempt, NOTION_REQUEST_RETRY_TIMES, pathAndQuery, ex.getMessage());
-                sleepBeforeRetry(attempt);
             }
         }
         throw new ServiceException("Notion 页面读取失败，已重试 " + NOTION_REQUEST_RETRY_TIMES
                 + " 次：" + (lastException == null ? "unknown" : lastException.getMessage()), lastException);
+    }
+
+    private boolean isNotionHttpFailure(ServiceException ex) {
+        return ex != null && StringUtils.contains(ex.getMessage(), "HTTP ");
     }
 
     private void sleepBeforeRetry(int failedAttempt) {
@@ -422,7 +435,7 @@ public class NotionImportService {
         HttpsURLConnection connection = null;
         try {
             URL url = new URL(NOTION_API_BASE + pathAndQuery);
-            connection = (HttpsURLConnection) url.openConnection();
+            connection = (HttpsURLConnection) url.openConnection(Proxy.NO_PROXY);
             connection.setConnectTimeout(NOTION_REQUEST_TIMEOUT_MS);
             connection.setReadTimeout(NOTION_REQUEST_TIMEOUT_MS);
             connection.setRequestMethod("GET");
@@ -430,6 +443,7 @@ public class NotionImportService {
             connection.setRequestProperty("Notion-Version", StringUtils.defaultIfBlank(notionVersion, "2022-06-28"));
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("User-Agent", "boylu-blog/1.0");
 
             int status = connection.getResponseCode();
             String body = readResponseBody(connection, status);
