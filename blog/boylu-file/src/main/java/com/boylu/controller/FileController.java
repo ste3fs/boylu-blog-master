@@ -718,27 +718,25 @@ public class FileController {
                 throw new ServiceException("Upload file size cannot exceed " + maxUploadSizeMb + "MB");
             }
 
-            validateImageDimensions(filePath);
+            ImageSize imageSize = validateImageDimensions(filePath);
             DetectedImageType imageType = detectImageType(filePath);
             String path = DateUtil.parseDateToStr(DateUtil.YYYYMMDD, DateUtil.getNowDate()) + "/";
             if (StringUtils.isNotBlank(normalizedSource)) {
                 path = path + normalizedSource + "/";
             }
             String resolvedContentType = StringUtils.defaultIfBlank(contentType, "image/" + imageType.getExtension());
-            if ("article-cover".equals(normalizedSource)) {
-                return articleCoverImageService.process(filePath, originalFilename, resolvedContentType, path, normalizedSource);
-            }
-
             String saveFilename = UUID.randomUUID().toString().replace("-", "") + "." + imageType.getExtension();
-            FileInfo fileInfo = fileStorageService.of(filePath.toFile(), saveFilename, resolvedContentType, size)
-                    .setPath(path)
-                    .setSaveFilename(saveFilename)
-                    .setContentType(resolvedContentType)
-                    .setOriginalFilename(StringUtils.defaultIfBlank(originalFilename, saveFilename))
-                    .putAttr("source", normalizedSource)
-                    .upload();
-            if (fileInfo == null) {
-                throw new ServiceException("Upload file failed");
+            FileInfo fileInfo = storeImageFile(
+                    filePath,
+                    saveFilename,
+                    resolvedContentType,
+                    size,
+                    path,
+                    originalFilename,
+                    normalizedSource
+            );
+            if ("article-cover".equals(normalizedSource)) {
+                return buildImmediateCoverImage(fileInfo, originalFilename, imageSize);
             }
             return buildPublicContentUrl(fileInfo);
         } catch (IOException ex) {
@@ -746,15 +744,44 @@ public class FileController {
         }
     }
 
-    private void validateImageDimensions(Path filePath) {
+    private FileInfo storeImageFile(Path filePath, String saveFilename, String contentType, long size,
+                                    String path, String originalFilename, String source) {
+        FileInfo fileInfo = fileStorageService.of(filePath.toFile(), saveFilename, contentType, size)
+                .setPath(path)
+                .setSaveFilename(saveFilename)
+                .setContentType(contentType)
+                .setOriginalFilename(StringUtils.defaultIfBlank(originalFilename, saveFilename))
+                .putAttr("source", source)
+                .upload();
+        if (fileInfo == null) {
+            throw new ServiceException("Upload file failed");
+        }
+        return fileInfo;
+    }
+
+    private CoverImageVo buildImmediateCoverImage(FileInfo fileInfo, String originalFilename, ImageSize imageSize) {
+        String fallback = StringUtils.defaultIfBlank(buildPublicContentUrl(fileInfo), CoverImageUtil.FALLBACK_IMAGE);
+        String fileId = fileInfo == null ? null : fileInfo.getId();
+        return CoverImageVo.builder()
+                .key(fallback)
+                .alt(StringUtils.defaultString(originalFilename))
+                .width(imageSize == null ? CoverImageUtil.DEFAULT_WIDTH : imageSize.getWidth())
+                .height(imageSize == null ? CoverImageUtil.DEFAULT_HEIGHT : imageSize.getHeight())
+                .dominantColor(CoverImageUtil.DEFAULT_DOMINANT_COLOR)
+                .fallback(fallback)
+                .hash(StringUtils.defaultIfBlank(fileId, UUID.randomUUID().toString().replace("-", "")))
+                .build();
+    }
+
+    private ImageSize validateImageDimensions(Path filePath) {
         try (ImageInputStream imageInputStream = ImageIO.createImageInputStream(filePath.toFile())) {
-            validateImageDimensions(imageInputStream);
+            return validateImageDimensions(imageInputStream);
         } catch (IOException ex) {
             throw new ServiceException("读取上传图片失败");
         }
     }
 
-    private void validateImageDimensions(ImageInputStream imageInputStream) throws IOException {
+    private ImageSize validateImageDimensions(ImageInputStream imageInputStream) throws IOException {
         if (imageInputStream == null) {
             throw new ServiceException("无法解析上传图片");
         }
@@ -771,6 +798,7 @@ public class FileController {
                 throw new ServiceException("图片分辨率超过限制，最大支持 "
                         + Math.max(1, maxImageWidth) + "x" + Math.max(1, maxImageHeight));
             }
+            return new ImageSize(width, height);
         } finally {
             reader.dispose();
         }
@@ -1202,6 +1230,24 @@ public class FileController {
 
         public String getExtension() {
             return extension;
+        }
+    }
+
+    private static class ImageSize {
+        private final int width;
+        private final int height;
+
+        private ImageSize(int width, int height) {
+            this.width = width;
+            this.height = height;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+
+        public int getHeight() {
+            return height;
         }
     }
 }

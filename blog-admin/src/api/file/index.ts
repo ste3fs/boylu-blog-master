@@ -15,7 +15,7 @@ export function uploadApi(data: any, source: string, config: Record<string, any>
     url: '/file/upload',
     method: 'post',
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 60000,
+    timeout: 180000,
     data,
     params: { source },
     ...config
@@ -51,6 +51,7 @@ export function completeChunkUploadApi(uploadId: string) {
   return request({
     url: '/file/upload/chunk/complete',
     method: 'post',
+    timeout: 180000,
     params: { uploadId }
   })
 }

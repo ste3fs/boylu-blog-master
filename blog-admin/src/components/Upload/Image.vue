@@ -140,7 +140,9 @@ const resolvePersistedUrl = (item: Partial<UploadFile> & { response?: any; url?:
 const buildFileList = (value: string | string[] | undefined | null) => {
   return normalizeImageList(value).map((url, index) => ({
     name: getImageName(url) || `image-${index + 1}`,
-    url
+    url,
+    status: 'success' as const,
+    percentage: 100
   }))
 }
 
@@ -194,7 +196,7 @@ const uploadSingleRequest = async (file: File, options: UploadRequestOptions) =>
       if (!event.total) {
         return
       }
-      const percent = Math.min(100, Math.max(0, Math.round((event.loaded / event.total) * 100)))
+      const percent = Math.min(95, Math.max(0, Math.round((event.loaded / event.total) * 100)))
       options.onProgress({ percent } as any)
     }
   })
@@ -281,6 +283,8 @@ const handleRemove: UploadProps['onRemove'] = async (file, uploadFiles) => {
   fileList.value = uploadFiles
     .map((item) => ({
       ...item,
+      status: resolvePersistedUrl(item) ? 'success' as const : item.status,
+      percentage: resolvePersistedUrl(item) ? 100 : item.percentage,
       name: item.name || getImageName(resolvePersistedUrl(item)),
       url: resolvePersistedUrl(item) || String(item.url || '')
     }))
@@ -301,13 +305,20 @@ const handleSuccess = (response: any, uploadFile: UploadFile, uploadFiles: Uploa
   uploadFile.url = currentUrl
   uploadFile.name = getImageName(currentUrl) || uploadFile.name
   uploadFile.response = metadata ? { data: metadata } : response
+  uploadFile.status = 'success'
+  uploadFile.percentage = 100
 
   fileList.value = uploadFiles
-    .map((item) => ({
-      ...item,
-      name: item.name || getImageName(String(item.url || (item.response as any)?.data || '')),
-      url: resolvePersistedUrl(item) || String(item.url || '')
-    }))
+    .map((item) => {
+      const persistedUrl = resolvePersistedUrl(item)
+      return {
+        ...item,
+        status: persistedUrl ? 'success' as const : item.status,
+        percentage: persistedUrl ? 100 : item.percentage,
+        name: item.name || getImageName(persistedUrl || String(item.url || '')),
+        url: persistedUrl || String(item.url || '')
+      }
+    })
 
   syncFromFileList(fileList.value)
   emit('metadata-change', metadata)
@@ -335,6 +346,7 @@ const handleUploadRequest = async (options: UploadRequestOptions) => {
     const response = uploadFile.size > CHUNK_THRESHOLD
       ? await uploadByChunk(uploadFile, options)
       : await uploadSingleRequest(uploadFile, options)
+    options.onProgress({ percent: 100 } as any)
     options.onSuccess(response as any)
     reportPerfApi({
       eventType: 'upload',
