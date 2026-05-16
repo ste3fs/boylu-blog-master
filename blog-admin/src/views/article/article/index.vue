@@ -37,6 +37,8 @@
               @click="handlePushBaiduRecent">推送近期到百度</el-button>
               <el-button type="warning" plain :icon="Setting" v-permission="['sys:article:reptile']"
               @click="reptileDialog.visible = true">爬取文章</el-button>
+              <el-button type="primary" plain :icon="Plus" v-permission="['sys:article:add']"
+              @click="openNotionImport">导入 Notion</el-button>
           </PageToolbarGroup>
           <PageToolbarGroup kind="danger">
               <el-button type="danger" plain :icon="Delete" :disabled="selectedIds.length === 0"
@@ -493,6 +495,85 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      title="导入 Notion 笔记"
+      v-model="notionDialog.visible"
+      :width="isMobile ? '100vw' : '720px'"
+      :fullscreen="isMobile"
+      @close="resetNotionForm"
+    >
+      <el-form :model="notionForm" :label-width="isMobile ? '88px' : '110px'">
+        <el-form-item label="页面地址" required>
+          <el-input v-model="notionForm.pageUrl" clearable placeholder="粘贴 Notion 页面 URL 或 Page ID" />
+        </el-form-item>
+        <el-form-item label="文章分类" required>
+          <el-select
+            v-model="notionForm.categoryName"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择或输入分类"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in categoryOptions"
+              :key="item.id || item.name"
+              :label="item.name"
+              :value="item.name"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="文章标签">
+          <el-select
+            v-model="notionForm.tags"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择或输入标签"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in tagOptions"
+              :key="item.id || item.name"
+              :label="item.name"
+              :value="item.name"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="保存状态">
+          <el-radio-group v-model="notionForm.status">
+            <el-radio-button :label="0">草稿</el-radio-button>
+            <el-radio-button :label="1">发布</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="图片处理">
+          <el-switch v-model="notionForm.importImages" active-text="下载到本站" inactive-text="保留原链接" />
+        </el-form-item>
+        <el-form-item label="摘要">
+          <el-input
+            v-model="notionForm.summary"
+            type="textarea"
+            :rows="3"
+            maxlength="220"
+            show-word-limit
+            placeholder="可留空，系统会从 Notion 正文自动生成"
+          />
+        </el-form-item>
+      </el-form>
+      <el-alert
+        title="需要先在服务端配置 NOTION_API_TOKEN，并把 Notion 页面共享给该 Integration。导入后会生成文章草稿，可继续编辑封面、摘要和正文。"
+        type="info"
+        :closable="false"
+      />
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="notionDialog.visible = false">取消</el-button>
+          <el-button type="primary" :loading="submitLoading" @click="submitNotionImport">导入</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -508,7 +589,7 @@ import { getCategoryListApi } from '@/api/article/category'
 import { getTagListApi } from '@/api/article/tag'
 import {
   getArticleListApi, getDetailApi, deleteArticleApi,
-  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi
+  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi, importNotionArticleApi
 } from '@/api/article'
 import { uploadApi, deleteFileApi } from '@/api/file'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
@@ -555,6 +636,10 @@ const reptileDialog = reactive({
   visible: false,
 })
 
+const notionDialog = reactive({
+  visible: false
+})
+
 // 表单数据
 const form = reactive<any>({
   id: undefined,
@@ -578,6 +663,20 @@ const form = reactive<any>({
 
 const reptileForm = reactive({
   url: ''
+})
+
+const notionForm = reactive<any>({
+  pageUrl: '',
+  categoryName: 'Notion',
+  tags: ['Notion'],
+  summary: '',
+  status: 0,
+  readType: 1,
+  isOriginal: 1,
+  isStick: 0,
+  isCarousel: 0,
+  isRecommend: 0,
+  importImages: true
 })
 
 const statusOptions = ref<any>([])
@@ -875,6 +974,61 @@ const submitReptile = () => {
   })
 }
 
+const resetNotionForm = () => {
+  notionForm.pageUrl = ''
+  notionForm.categoryName = 'Notion'
+  notionForm.tags = ['Notion']
+  notionForm.summary = ''
+  notionForm.status = 0
+  notionForm.readType = 1
+  notionForm.isOriginal = 1
+  notionForm.isStick = 0
+  notionForm.isCarousel = 0
+  notionForm.isRecommend = 0
+  notionForm.importImages = true
+}
+
+const openNotionImport = () => {
+  resetNotionForm()
+  notionDialog.visible = true
+}
+
+const submitNotionImport = async () => {
+  const pageUrl = String(notionForm.pageUrl || '').trim()
+  const categoryName = String(notionForm.categoryName || '').trim()
+  const tags = Array.isArray(notionForm.tags)
+    ? notionForm.tags.map((item: string) => String(item || '').trim()).filter(Boolean)
+    : []
+
+  if (!pageUrl) {
+    ElMessage.warning('请填写 Notion 页面地址')
+    return
+  }
+  if (!categoryName) {
+    ElMessage.warning('请选择或输入文章分类')
+    return
+  }
+
+  submitLoading.value = true
+  try {
+    const res = await importNotionArticleApi({
+      ...notionForm,
+      pageUrl,
+      categoryName,
+      tags: tags.length ? tags : ['Notion']
+    })
+    const result = res.data || {}
+    ElMessage.success(`导入成功：${result.title || 'Notion 笔记'}`)
+    notionDialog.visible = false
+    getList()
+    if (result.articleId) {
+      handleUpdate({ id: result.articleId })
+    }
+  } finally {
+    submitLoading.value = false
+  }
+}
+
 // 批量删除
 const handleBatchDelete = () => {
   if (selectedIds.value.length === 0) return
@@ -1022,6 +1176,7 @@ const submitForm = async () => {
 const cancel = () => {
   dialog.visible = false
   reptileDialog.visible = false
+  notionDialog.visible = false
   contentEditorDialogVisible.value = false
   formRef.value?.resetFields()
   reptileForm.url = ''

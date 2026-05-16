@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.boylu.common.Constants;
 import com.boylu.common.ResultCode;
 import com.boylu.dto.article.ArticleQueryDto;
+import com.boylu.dto.article.NotionImportDto;
 import com.boylu.entity.SysArticle;
 import com.boylu.entity.SysCategory;
 import com.boylu.entity.SysTag;
@@ -16,6 +17,7 @@ import com.boylu.mapper.SysArticleMapper;
 import com.boylu.mapper.SysCategoryMapper;
 import com.boylu.mapper.SysTagMapper;
 import com.boylu.service.SysArticleService;
+import com.boylu.service.notion.NotionImportService;
 import com.boylu.service.seo.BaiduPushService;
 import com.boylu.utils.AiUtil;
 import com.boylu.utils.CoverImageUtil;
@@ -24,6 +26,7 @@ import com.boylu.utils.LocalFileUrlNormalizeUtil;
 import com.boylu.utils.PageUtil;
 import com.boylu.utils.RedisUtil;
 import com.boylu.vo.article.ArticleListVo;
+import com.boylu.vo.article.NotionImportResultVo;
 import com.boylu.vo.article.SysArticleDetailVo;
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
 import com.vladsch.flexmark.util.data.MutableDataSet;
@@ -54,6 +57,8 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
     private final RedisUtil redisUtil;
 
     private final BaiduPushService baiduPushService;
+
+    private final NotionImportService notionImportService;
 
     @Override
     public IPage<ArticleListVo> selectPage(ArticleQueryDto articleQueryDto) {
@@ -91,6 +96,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         //添加分类
         addCategory(sysArticle, obj);
         baseMapper.insert(obj);
+        sysArticle.setId(obj.getId());
         clearHomePostsCache();
         clearArticleDetailCache(obj.getId());
 
@@ -137,6 +143,20 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         addTags(sysArticle, obj);
         triggerBaiduPushIfPublished(obj);
         return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public NotionImportResultVo importFromNotion(NotionImportDto dto) {
+        NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
+        SysArticleDetailVo article = importResult.getArticle();
+        add(article);
+        return NotionImportResultVo.builder()
+                .articleId(article.getId())
+                .title(article.getTitle())
+                .importedBlocks(importResult.getImportedBlocks())
+                .warnings(importResult.getWarnings())
+                .build();
     }
 
     @Override
@@ -278,6 +298,9 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
     private void addTags(SysArticleDetailVo sysArticle, SysArticle obj) {
         //添加标签
+        if (sysArticle.getTags() == null || sysArticle.getTags().isEmpty()) {
+            return;
+        }
         List<Integer> tagIds = new ArrayList<>();
         for (String tag : sysArticle.getTags()) {
             SysTag sysTag = sysTagMapper.selectOne(new LambdaQueryWrapper<SysTag>().eq(SysTag::getName, tag));

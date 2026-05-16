@@ -181,6 +181,7 @@ REDIS_DATABASE=8
 MAIL_EMAIL=<MAIL_EMAIL>
 MAIL_PASSWORD=<MAIL_PASSWORD>
 AI_API_KEY=<AI_API_KEY>
+NOTION_API_TOKEN=<NOTION_API_TOKEN>
 ```
 
 完整示例见：
@@ -188,6 +189,24 @@ AI_API_KEY=<AI_API_KEY>
 ```text
 deploy/systemd/boylu-blog.env.example
 ```
+
+## Notion 笔记导入
+
+后台文章管理页提供“导入 Notion”入口，会把 Notion 页面导入为博客文章草稿。
+
+使用步骤：
+
+1. 在 Notion 创建 Integration，复制 Internal Integration Secret。
+2. 把要导入的 Notion 页面 Share 给这个 Integration。
+3. 在后端运行环境配置 `NOTION_API_TOKEN`，不要写进源码。
+4. 进入后台 `文章管理`，点击 `导入 Notion`，粘贴页面 URL 或 Page ID。
+
+默认行为：
+
+- 导入后默认保存为草稿，可在后台继续编辑后再发布。
+- 常见块会转换为 Markdown/HTML：标题、段落、列表、待办、引用、代码块、图片、分割线等。
+- 图片默认下载到本站文件存储，并保存为 `/boylu/file/content/{fileId}`，避免 Notion 临时图片链接过期。
+- 如果图片下载失败或超过 `NOTION_MAX_IMAGE_SIZE_MB`，会保留原链接并在导入结果里返回提示。
 
 ## 生产构建
 

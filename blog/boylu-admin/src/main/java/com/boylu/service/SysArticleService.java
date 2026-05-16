@@ -3,8 +3,10 @@ package com.boylu.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.boylu.dto.article.ArticleQueryDto;
+import com.boylu.dto.article.NotionImportDto;
 import com.boylu.entity.SysArticle;
 import com.boylu.vo.article.ArticleListVo;
+import com.boylu.vo.article.NotionImportResultVo;
 import com.boylu.vo.article.SysArticleDetailVo;
 
 import java.util.List;
@@ -39,6 +41,7 @@ public interface SysArticleService extends IService<SysArticle> {
      */
     Boolean update(SysArticleDetailVo sysArticle);
 
+    NotionImportResultVo importFromNotion(NotionImportDto dto);
 
     /**
      * 删除

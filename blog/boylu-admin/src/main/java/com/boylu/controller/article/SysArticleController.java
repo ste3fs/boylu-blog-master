@@ -4,9 +4,11 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.boylu.common.Result;
 import com.boylu.dto.article.ArticleQueryDto;
+import com.boylu.dto.article.NotionImportDto;
 import com.boylu.entity.SysArticle;
 import com.boylu.service.SysArticleService;
 import com.boylu.vo.article.ArticleListVo;
+import com.boylu.vo.article.NotionImportResultVo;
 import com.boylu.vo.article.SysArticleDetailVo;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -41,6 +43,13 @@ public class SysArticleController {
     @SaCheckPermission("sys:article:add")
     public Result<Boolean> add(@RequestBody SysArticleDetailVo sysArticle) {
         return Result.success(sysArticleService.add(sysArticle));
+    }
+
+    @PostMapping("/import/notion")
+    @ApiOperation(value = "导入 Notion 笔记")
+    @SaCheckPermission("sys:article:add")
+    public Result<NotionImportResultVo> importNotion(@RequestBody NotionImportDto dto) {
+        return Result.success(sysArticleService.importFromNotion(dto));
     }
 
     @PutMapping("/update")

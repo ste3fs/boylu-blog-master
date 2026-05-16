@@ -78,3 +78,13 @@ export function reptileArticleApi(url: any) {
     params: {url: url}
   })
 }
+
+// 导入 Notion 笔记为文章草稿
+export function importNotionArticleApi(data: any) {
+  return request({
+    url: '/sys/article/import/notion',
+    method: 'post',
+    timeout: 120000,
+    data
+  })
+}
