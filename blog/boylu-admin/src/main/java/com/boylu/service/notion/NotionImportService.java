@@ -9,11 +9,14 @@ import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.boylu.dto.article.NotionImportDto;
+import com.boylu.entity.SysArticle;
 import com.boylu.entity.FileDetail;
 import com.boylu.exception.ServiceException;
 import com.boylu.service.FileDetailService;
+import com.boylu.utils.CoverImageUtil;
 import com.boylu.utils.DateUtil;
 import com.boylu.vo.article.SysArticleDetailVo;
+import com.boylu.vo.article.CoverImageVo;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
@@ -55,6 +58,8 @@ public class NotionImportService {
     private static final String DEFAULT_PUBLIC_FILE_CONTENT_PREFIX = "/boylu/file/content/";
     private static final Pattern UUID_PATTERN = Pattern.compile("(?i)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})");
     private static final Pattern COMPACT_UUID_PATTERN = Pattern.compile("(?i)([0-9a-f]{32})");
+    private static final Pattern MARKDOWN_IMAGE_URL_PATTERN = Pattern.compile("!\\[[^\\]]*]\\((https?://[^\\s)]+)\\)");
+    private static final Pattern HTML_IMAGE_SRC_PATTERN = Pattern.compile("(<img\\b[^>]*?\\bsrc=[\"'])(https?://[^\"']+)([\"'][^>]*>)", Pattern.CASE_INSENSITIVE);
     private static final int MAX_BLOCK_DEPTH = 8;
     private static final int MAX_BLOCK_COUNT = 600;
     private static final int NOTION_REQUEST_TIMEOUT_MS = 15000;
@@ -122,6 +127,52 @@ public class NotionImportService {
         article.setIsRecommend(defaultInt(dto.getIsRecommend(), 0));
 
         return new ImportPageResult(article, context.getImportedBlocks(), warnings);
+    }
+
+    public String extractPageIdSafely(String value) {
+        try {
+            return extractPageId(value);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public LocalizeImagesResult localizeArticleImages(SysArticle article) {
+        if (article == null || article.getId() == null) {
+            return new LocalizeImagesResult(null, 0, Collections.emptyList());
+        }
+        List<String> warnings = new ArrayList<>();
+        ImportContext context = new ImportContext(true, warnings);
+        SysArticle update = new SysArticle();
+        update.setId(article.getId());
+        int changedCount = 0;
+
+        String localizedContentMd = replaceMarkdownImages(article.getContentMd(), context);
+        if (!StringUtils.equals(localizedContentMd, article.getContentMd())) {
+            update.setContentMd(localizedContentMd);
+            changedCount++;
+        }
+
+        String localizedContent = replaceHtmlImages(article.getContent(), context);
+        if (!StringUtils.equals(localizedContent, article.getContent())) {
+            update.setContent(localizedContent);
+            changedCount++;
+        }
+
+        String localizedCover = localizeSingleImageUrl(article.getCover(), context);
+        if (!StringUtils.equals(localizedCover, article.getCover())) {
+            update.setCover(localizedCover);
+            CoverImageVo coverImage = CoverImageUtil.fromJson(null, localizedCover, article.getTitle());
+            coverImage.setKey(localizedCover);
+            coverImage.setFallback(localizedCover);
+            update.setCoverImage(CoverImageUtil.toJson(coverImage));
+            changedCount++;
+        }
+
+        if (changedCount <= 0) {
+            return new LocalizeImagesResult(null, 0, warnings);
+        }
+        return new LocalizeImagesResult(update, changedCount, warnings);
     }
 
     private void renderChildren(String blockId, int depth, StringBuilder markdown, StringBuilder plainText, ImportContext context) {
@@ -509,6 +560,52 @@ public class NotionImportService {
         }
     }
 
+    private String replaceMarkdownImages(String markdown, ImportContext context) {
+        if (StringUtils.isBlank(markdown)) {
+            return markdown;
+        }
+        Matcher matcher = MARKDOWN_IMAGE_URL_PATTERN.matcher(markdown);
+        StringBuffer buffer = new StringBuffer();
+        while (matcher.find()) {
+            String originalUrl = matcher.group(1);
+            String localizedUrl = localizeSingleImageUrl(originalUrl, context);
+            matcher.appendReplacement(buffer, Matcher.quoteReplacement(matcher.group(0).replace(originalUrl, localizedUrl)));
+        }
+        matcher.appendTail(buffer);
+        return buffer.toString();
+    }
+
+    private String replaceHtmlImages(String html, ImportContext context) {
+        if (StringUtils.isBlank(html)) {
+            return html;
+        }
+        Matcher matcher = HTML_IMAGE_SRC_PATTERN.matcher(html);
+        StringBuffer buffer = new StringBuffer();
+        while (matcher.find()) {
+            String originalUrl = matcher.group(2);
+            String localizedUrl = localizeSingleImageUrl(originalUrl, context);
+            matcher.appendReplacement(buffer, Matcher.quoteReplacement(matcher.group(1) + localizedUrl + matcher.group(3)));
+        }
+        matcher.appendTail(buffer);
+        return buffer.toString();
+    }
+
+    private String localizeSingleImageUrl(String imageUrl, ImportContext context) {
+        if (StringUtils.isBlank(imageUrl) || !isRemoteImageUrl(imageUrl)) {
+            return imageUrl;
+        }
+        String downloadUrl = imageUrl.replace("&amp;", "&");
+        return persistImageIfNeeded(downloadUrl, context);
+    }
+
+    private boolean isRemoteImageUrl(String imageUrl) {
+        String lower = StringUtils.defaultString(imageUrl).toLowerCase(Locale.ROOT);
+        return (lower.startsWith("http://") || lower.startsWith("https://"))
+                && !lower.contains("boylu.cn/")
+                && !lower.contains("www.boylu.cn/")
+                && !lower.contains("boylu.top/");
+    }
+
     private String buildPublicContentUrl(FileInfo fileInfo) {
         if (fileInfo == null) {
             return null;
@@ -787,6 +884,14 @@ public class NotionImportService {
     public static class ImportPageResult {
         private SysArticleDetailVo article;
         private Integer importedBlocks;
+        private List<String> warnings;
+    }
+
+    @Data
+    @AllArgsConstructor
+    public static class LocalizeImagesResult {
+        private SysArticle article;
+        private Integer changedCount;
         private List<String> warnings;
     }
 }

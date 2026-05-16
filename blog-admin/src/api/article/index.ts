@@ -88,3 +88,11 @@ export function importNotionArticleApi(data: any) {
     data
   })
 }
+
+export function syncNotionArticleApi(id: any) {
+  return request({
+    url: `/sys/article/sync/notion/${id}`,
+    method: 'post',
+    timeout: 120000
+  })
+}

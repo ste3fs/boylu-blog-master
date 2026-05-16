@@ -52,6 +52,13 @@ public class SysArticleController {
         return Result.success(sysArticleService.importFromNotion(dto));
     }
 
+    @PostMapping("/sync/notion/{id}")
+    @ApiOperation(value = "同步 Notion 笔记")
+    @SaCheckPermission("sys:article:update")
+    public Result<NotionImportResultVo> syncNotion(@PathVariable Long id) {
+        return Result.success(sysArticleService.syncNotionArticle(id));
+    }
+
     @PutMapping("/update")
     @ApiOperation(value = "修改文章")
     @SaCheckPermission("sys:article:update")

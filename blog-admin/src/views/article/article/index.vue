@@ -96,11 +96,13 @@
         </el-table-column>
         <el-table-column label="阅读量" align="center" prop="quantity" />
         <el-table-column label="发布时间" align="center" prop="createTime" width="180" />
-        <el-table-column label="操作" align="center" width="280" fixed="right">
+        <el-table-column label="操作" align="center" width="380" fixed="right">
           <template #default="scope">
             <PageTableActions>
               <PageTableAction type="success" :icon="Position" @click="handlePushBaidu(scope.row)"
                 v-permission="['sys:article:update']">推送百度</PageTableAction>
+              <PageTableAction v-if="isNotionArticle(scope.row)" type="warning" :icon="Position" @click="handleSyncNotion(scope.row)"
+                v-permission="['sys:article:update']">同步 Notion</PageTableAction>
               <PageTableAction type="primary" :icon="Edit" @click="handleUpdate(scope.row)"
                 v-permission="['sys:article:update']">编辑</PageTableAction>
               <PageTableAction type="danger" :icon="Delete" @click="handleDelete(scope.row)"
@@ -195,6 +197,7 @@
             </div>
 
             <div class="mobile-article-card__actions">
+              <el-button v-if="isNotionArticle(row)" type="warning" plain :icon="Position" @click="handleSyncNotion(row)">同步 Notion</el-button>
               <el-button type="primary" plain :icon="Edit" @click="handleUpdate(row)">编辑</el-button>
               <el-button type="danger" plain :icon="Delete" @click="handleDelete(row)">删除</el-button>
             </div>
@@ -589,7 +592,7 @@ import { getCategoryListApi } from '@/api/article/category'
 import { getTagListApi } from '@/api/article/tag'
 import {
   getArticleListApi, getDetailApi, deleteArticleApi,
-  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi, importNotionArticleApi
+  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi, importNotionArticleApi, syncNotionArticleApi
 } from '@/api/article'
 import { uploadApi, deleteFileApi } from '@/api/file'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
@@ -1018,7 +1021,8 @@ const submitNotionImport = async () => {
       tags: tags.length ? tags : ['Notion']
     })
     const result = res.data || {}
-    ElMessage.success(`导入成功：${result.title || 'Notion 笔记'}`)
+    const actionText = result.updated ? '同步成功' : '导入成功'
+    ElMessage.success(`${actionText}：${result.title || 'Notion 笔记'}，图片会继续在后台下载到本站`)
     notionDialog.visible = false
     getList()
     if (result.articleId) {
@@ -1087,6 +1091,17 @@ const handlePushBaiduRecent = () => {
   }).catch(() => {
     ElMessage.error('推送失败，请检查百度收录配置')
   })
+}
+
+const isNotionArticle = (row: any) => {
+  return String(row?.originalUrl || '').includes('notion.so')
+}
+
+const handleSyncNotion = async (row: any) => {
+  if (!row?.id) return
+  await syncNotionArticleApi(row.id)
+  ElMessage.success('Notion 同步完成，图片会继续在后台下载到本站')
+  getList()
 }
 
 // 搜索

@@ -43,6 +43,8 @@ public interface SysArticleService extends IService<SysArticle> {
 
     NotionImportResultVo importFromNotion(NotionImportDto dto);
 
+    NotionImportResultVo syncNotionArticle(Long articleId);
+
     /**
      * 删除
      * @param ids

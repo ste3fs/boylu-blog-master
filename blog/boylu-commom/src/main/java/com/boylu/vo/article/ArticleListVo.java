@@ -45,6 +45,9 @@ public class ArticleListVo {
     @ApiModelProperty(value = "文章封面地址")
     private String cover;
 
+    @ApiModelProperty(value = "杞浇鍦板潃")
+    private String originalUrl;
+
     @ApiModelProperty(value = "文章封面图片元数据")
     private CoverImageVo coverImage;
 

@@ -15,5 +15,9 @@ public class NotionImportResultVo {
 
     private Integer importedBlocks;
 
+    private Boolean updated;
+
+    private Boolean imageLocalizationQueued;
+
     private List<String> warnings;
 }

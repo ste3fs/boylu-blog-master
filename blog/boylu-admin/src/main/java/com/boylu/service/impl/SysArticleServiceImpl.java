@@ -39,6 +39,8 @@ import org.jsoup.select.Elements;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -150,13 +152,150 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
     public NotionImportResultVo importFromNotion(NotionImportDto dto) {
         NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
         SysArticleDetailVo article = importResult.getArticle();
-        add(article);
+        SysArticle existingArticle = findExistingNotionArticle(article.getOriginalUrl());
+        boolean updated = existingArticle != null;
+        saveImportedArticle(article, existingArticle);
+        queueNotionImageLocalization(article.getId());
         return NotionImportResultVo.builder()
                 .articleId(article.getId())
                 .title(article.getTitle())
                 .importedBlocks(importResult.getImportedBlocks())
+                .updated(updated)
+                .imageLocalizationQueued(true)
                 .warnings(importResult.getWarnings())
                 .build();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public NotionImportResultVo syncNotionArticle(Long articleId) {
+        if (articleId == null || articleId <= 0) {
+            throw new ServiceException("文章ID不合法");
+        }
+        SysArticle existingArticle = baseMapper.selectById(articleId);
+        if (existingArticle == null) {
+            throw new ServiceException("文章不存在");
+        }
+        if (StringUtils.isBlank(existingArticle.getOriginalUrl())
+                || !StringUtils.containsIgnoreCase(existingArticle.getOriginalUrl(), "notion.so")) {
+            throw new ServiceException("当前文章不是 Notion 导入文章，无法同步");
+        }
+
+        SysArticleDetailVo currentDetail = detail(articleId.intValue());
+        NotionImportDto dto = new NotionImportDto();
+        dto.setPageUrl(existingArticle.getOriginalUrl());
+        dto.setCategoryName(currentDetail.getCategoryName());
+        dto.setTags(currentDetail.getTags());
+        dto.setReadType(existingArticle.getReadType());
+        dto.setStatus(existingArticle.getStatus());
+        dto.setIsOriginal(existingArticle.getIsOriginal());
+        dto.setIsStick(existingArticle.getIsStick());
+        dto.setIsCarousel(existingArticle.getIsCarousel());
+        dto.setIsRecommend(existingArticle.getIsRecommend());
+        dto.setImportImages(false);
+
+        NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
+        SysArticleDetailVo article = importResult.getArticle();
+        article.setId(existingArticle.getId());
+        saveImportedArticle(article, existingArticle);
+        queueNotionImageLocalization(article.getId());
+        return NotionImportResultVo.builder()
+                .articleId(article.getId())
+                .title(article.getTitle())
+                .importedBlocks(importResult.getImportedBlocks())
+                .updated(true)
+                .imageLocalizationQueued(true)
+                .warnings(importResult.getWarnings())
+                .build();
+    }
+
+    private void saveImportedArticle(SysArticleDetailVo article, SysArticle existingArticle) {
+        SysArticle obj = new SysArticle();
+        BeanUtils.copyProperties(article, obj);
+        obj.setCoverImage(resolveCoverImageJson(article));
+        normalizeArticleFileUrls(obj);
+        obj.setUserId(resolveImportedArticleUserId(existingArticle));
+
+        addCategory(article, obj);
+        if (existingArticle == null) {
+            baseMapper.insert(obj);
+            article.setId(obj.getId());
+        } else {
+            obj.setId(existingArticle.getId());
+            baseMapper.updateById(obj);
+            article.setId(existingArticle.getId());
+            sysTagMapper.deleteArticleTagsByArticleIds(Collections.singletonList(obj.getId()));
+        }
+
+        clearHomePostsCache();
+        clearArticleDetailCache(obj.getId());
+        addTags(article, obj);
+        if (existingArticle == null || (existingArticle.getStatus() != Constants.YES && obj.getStatus() == Constants.YES)) {
+            triggerBaiduPushIfPublished(obj);
+        }
+    }
+
+    private Long resolveImportedArticleUserId(SysArticle existingArticle) {
+        if (existingArticle != null && existingArticle.getUserId() != null) {
+            return existingArticle.getUserId();
+        }
+        try {
+            if (StpUtil.isLogin()) {
+                return StpUtil.getLoginIdAsLong();
+            }
+        } catch (Exception ignored) {
+            // Scheduled Notion sync has no login context; fall back to the first admin user id.
+        }
+        return 1L;
+    }
+
+    private SysArticle findExistingNotionArticle(String sourceUrl) {
+        if (StringUtils.isBlank(sourceUrl)) {
+            return null;
+        }
+        String pageId = notionImportService.extractPageIdSafely(sourceUrl);
+        LambdaQueryWrapper<SysArticle> wrapper = new LambdaQueryWrapper<SysArticle>()
+                .select(SysArticle::getId, SysArticle::getUserId, SysArticle::getOriginalUrl, SysArticle::getStatus)
+                .eq(SysArticle::getOriginalUrl, sourceUrl);
+        if (StringUtils.isNotBlank(pageId)) {
+            String compactPageId = pageId.replace("-", "");
+            wrapper.or(item -> item.like(SysArticle::getOriginalUrl, pageId)
+                    .or()
+                    .like(SysArticle::getOriginalUrl, compactPageId));
+        }
+        wrapper.last("limit 1");
+        return baseMapper.selectOne(wrapper);
+    }
+
+    private void queueNotionImageLocalization(Long articleId) {
+        Runnable task = () -> ThreadUtil.execAsync(() -> localizeNotionArticleImages(articleId));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
+        } else {
+            task.run();
+        }
+    }
+
+    private void localizeNotionArticleImages(Long articleId) {
+        try {
+            SysArticle article = baseMapper.selectById(articleId);
+            NotionImportService.LocalizeImagesResult result = notionImportService.localizeArticleImages(article);
+            if (result.getArticle() == null) {
+                return;
+            }
+            baseMapper.updateById(result.getArticle());
+            clearHomePostsCache();
+            clearArticleDetailCache(articleId);
+            log.info("Notion article images localized, articleId={}, changedFields={}, warnings={}",
+                    articleId, result.getChangedCount(), result.getWarnings());
+        } catch (Exception ex) {
+            log.warn("Failed to localize Notion article images, articleId={}", articleId, ex);
+        }
     }
 
     @Override

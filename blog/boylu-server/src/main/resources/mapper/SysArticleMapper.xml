@@ -11,6 +11,7 @@
         <result property="categoryId" column="category_id"/>
         <result property="summary" column="summary"/>
         <result property="cover" column="cover"/>
+        <result property="originalUrl" column="original_url"/>
         <result property="coverImageJson" column="cover_image"/>
         <result property="contentMd" column="content_md"/>
         <result property="quantity" column="quantity"/>
@@ -95,6 +96,7 @@
             a.title,
             a.summary,
             a.cover,
+            a.original_url,
             a.cover_image,
             a.content_md,
             a.quantity,

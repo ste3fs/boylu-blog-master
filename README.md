@@ -207,6 +207,9 @@ deploy/systemd/boylu-blog.env.example
 - 常见块会转换为 Markdown/HTML：标题、段落、列表、待办、引用、代码块、图片、分割线等。
 - 图片默认保留 Notion 原链接，导入速度更快；如果在弹窗中开启“下载到本站”，会保存为 `/boylu/file/content/{fileId}`。
 - 如果图片下载失败、超过 `NOTION_MAX_IMAGE_SIZE_MB` 或 Notion 临时图片不可达，会保留原链接并在导入结果里返回提示。
+- 导入完成后会自动启动后台图片本地化任务，把正文和封面里的远程图片下载到本站并替换为本地文件地址。
+- 同一个 Notion 页面再次导入会更新已有文章；文章列表里的“同步 Notion”按钮也可以手动同步内容。
+- 默认每天 04:20 自动同步最近的 Notion 文章，可通过 `NOTION_AUTO_SYNC_ENABLED`、`NOTION_AUTO_SYNC_CRON`、`NOTION_AUTO_SYNC_LIMIT` 调整。
 
 ## 生产构建
 
