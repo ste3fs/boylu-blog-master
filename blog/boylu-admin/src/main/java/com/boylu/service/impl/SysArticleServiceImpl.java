@@ -18,6 +18,7 @@ import com.boylu.mapper.SysCategoryMapper;
 import com.boylu.mapper.SysTagMapper;
 import com.boylu.service.SysArticleService;
 import com.boylu.service.notion.NotionImportService;
+import com.boylu.service.notion.NotionSyncLogService;
 import com.boylu.service.seo.BaiduPushService;
 import com.boylu.utils.AiUtil;
 import com.boylu.utils.CoverImageUtil;
@@ -61,6 +62,8 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
     private final BaiduPushService baiduPushService;
 
     private final NotionImportService notionImportService;
+
+    private final NotionSyncLogService notionSyncLogService;
 
     @Override
     public IPage<ArticleListVo> selectPage(ArticleQueryDto articleQueryDto) {
@@ -150,24 +153,39 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
     @Override
     @Transactional(rollbackFor = Exception.class)
     public NotionImportResultVo importFromNotion(NotionImportDto dto) {
+        String sourceUrl = dto == null ? null : dto.getPageUrl();
+        Long logId = notionSyncLogService.start(NotionSyncLogService.ACTION_IMPORT, null, sourceUrl, null);
         if (dto != null) {
             dto.setImportImages(false);
         }
-        NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
-        SysArticleDetailVo article = importResult.getArticle();
-        SysArticle existingArticle = findExistingNotionArticle(article.getOriginalUrl());
-        ensureNotionImportHasContent(importResult, existingArticle != null);
-        boolean updated = existingArticle != null;
-        saveImportedArticle(article, existingArticle);
-        queueNotionImageLocalization(article.getId());
-        return NotionImportResultVo.builder()
-                .articleId(article.getId())
-                .title(article.getTitle())
-                .importedBlocks(importResult.getImportedBlocks())
-                .updated(updated)
-                .imageLocalizationQueued(true)
-                .warnings(importResult.getWarnings())
-                .build();
+        try {
+            NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
+            SysArticleDetailVo article = importResult.getArticle();
+            SysArticle existingArticle = findExistingNotionArticle(article.getOriginalUrl());
+            ensureNotionImportHasContent(importResult, existingArticle != null);
+            boolean updated = existingArticle != null;
+            saveImportedArticle(article, existingArticle);
+            notionSyncLogService.markSyncSuccess(
+                    logId,
+                    article.getId(),
+                    article.getTitle(),
+                    article.getOriginalUrl(),
+                    importResult.getImportedBlocks(),
+                    importResult.getWarnings()
+            );
+            queueNotionImageLocalization(article.getId(), logId);
+            return NotionImportResultVo.builder()
+                    .articleId(article.getId())
+                    .title(article.getTitle())
+                    .importedBlocks(importResult.getImportedBlocks())
+                    .updated(updated)
+                    .imageLocalizationQueued(true)
+                    .warnings(importResult.getWarnings())
+                    .build();
+        } catch (Exception ex) {
+            notionSyncLogService.markSyncFailed(logId, null, null, sourceUrl, ex);
+            throw ex;
+        }
     }
 
     @Override
@@ -185,33 +203,58 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             throw new ServiceException("当前文章不是 Notion 导入文章，无法同步");
         }
 
-        SysArticleDetailVo currentDetail = detail(articleId.intValue());
-        NotionImportDto dto = new NotionImportDto();
-        dto.setPageUrl(existingArticle.getOriginalUrl());
-        dto.setCategoryName(currentDetail.getCategoryName());
-        dto.setTags(currentDetail.getTags());
-        dto.setReadType(existingArticle.getReadType());
-        dto.setStatus(existingArticle.getStatus());
-        dto.setIsOriginal(existingArticle.getIsOriginal());
-        dto.setIsStick(existingArticle.getIsStick());
-        dto.setIsCarousel(existingArticle.getIsCarousel());
-        dto.setIsRecommend(existingArticle.getIsRecommend());
-        dto.setImportImages(false);
+        Long logId = notionSyncLogService.start(
+                NotionSyncLogService.ACTION_SYNC,
+                existingArticle.getId(),
+                existingArticle.getOriginalUrl(),
+                existingArticle.getTitle()
+        );
+        try {
+            SysArticleDetailVo currentDetail = detail(articleId.intValue());
+            NotionImportDto dto = new NotionImportDto();
+            dto.setPageUrl(existingArticle.getOriginalUrl());
+            dto.setCategoryName(currentDetail.getCategoryName());
+            dto.setTags(currentDetail.getTags());
+            dto.setReadType(existingArticle.getReadType());
+            dto.setStatus(existingArticle.getStatus());
+            dto.setIsOriginal(existingArticle.getIsOriginal());
+            dto.setIsStick(existingArticle.getIsStick());
+            dto.setIsCarousel(existingArticle.getIsCarousel());
+            dto.setIsRecommend(existingArticle.getIsRecommend());
+            dto.setImportImages(false);
 
-        NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
-        SysArticleDetailVo article = importResult.getArticle();
-        ensureNotionImportHasContent(importResult, true);
-        article.setId(existingArticle.getId());
-        saveImportedArticle(article, existingArticle);
-        queueNotionImageLocalization(article.getId());
-        return NotionImportResultVo.builder()
-                .articleId(article.getId())
-                .title(article.getTitle())
-                .importedBlocks(importResult.getImportedBlocks())
-                .updated(true)
-                .imageLocalizationQueued(true)
-                .warnings(importResult.getWarnings())
-                .build();
+            NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
+            SysArticleDetailVo article = importResult.getArticle();
+            ensureNotionImportHasContent(importResult, true);
+            article.setId(existingArticle.getId());
+            saveImportedArticle(article, existingArticle);
+            notionSyncLogService.markSyncSuccess(
+                    logId,
+                    article.getId(),
+                    article.getTitle(),
+                    article.getOriginalUrl(),
+                    importResult.getImportedBlocks(),
+                    importResult.getWarnings()
+            );
+            queueNotionImageLocalization(article.getId(), logId);
+            return NotionImportResultVo.builder()
+                    .articleId(article.getId())
+                    .title(article.getTitle())
+                    .importedBlocks(importResult.getImportedBlocks())
+                    .updated(true)
+                    .imageLocalizationQueued(true)
+                    .warnings(importResult.getWarnings())
+                    .build();
+        } catch (Exception ex) {
+            notionSyncLogService.markSyncFailed(
+                    logId,
+                    existingArticle.getId(),
+                    existingArticle.getTitle(),
+                    existingArticle.getOriginalUrl(),
+                    ex
+            );
+            throw ex;
+        }
     }
 
     private void ensureNotionImportHasContent(NotionImportService.ImportPageResult importResult, boolean updatingExistingArticle) {
@@ -287,8 +330,8 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         return baseMapper.selectOne(wrapper);
     }
 
-    private void queueNotionImageLocalization(Long articleId) {
-        Runnable task = () -> ThreadUtil.execAsync(() -> localizeNotionArticleImages(articleId));
+    private void queueNotionImageLocalization(Long articleId, Long logId) {
+        Runnable task = () -> ThreadUtil.execAsync(() -> localizeNotionArticleImages(articleId, logId));
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -301,19 +344,24 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         }
     }
 
-    private void localizeNotionArticleImages(Long articleId) {
+    private void localizeNotionArticleImages(Long articleId, Long logId) {
         try {
+            notionSyncLogService.markImageRunning(logId);
             SysArticle article = baseMapper.selectById(articleId);
             NotionImportService.LocalizeImagesResult result = notionImportService.localizeArticleImages(article);
+            if (result.getArticle() != null) {
+                baseMapper.updateById(result.getArticle());
+                clearHomePostsCache();
+                clearArticleDetailCache(articleId);
+            }
+            notionSyncLogService.markImageResult(logId, result);
             if (result.getArticle() == null) {
                 return;
             }
-            baseMapper.updateById(result.getArticle());
-            clearHomePostsCache();
-            clearArticleDetailCache(articleId);
             log.info("Notion article images localized, articleId={}, changedFields={}, warnings={}",
                     articleId, result.getChangedCount(), result.getWarnings());
         } catch (Exception ex) {
+            notionSyncLogService.markImageFailed(logId, ex);
             log.warn("Failed to localize Notion article images, articleId={}", articleId, ex);
         }
     }

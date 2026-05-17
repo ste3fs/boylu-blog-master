@@ -96,3 +96,10 @@ export function syncNotionArticleApi(id: any) {
     timeout: 120000
   })
 }
+
+export function getNotionSyncLogsApi(id: any) {
+  return request({
+    url: id ? `/sys/article/notion/logs/${id}` : '/sys/article/notion/logs',
+    method: 'get'
+  })
+}

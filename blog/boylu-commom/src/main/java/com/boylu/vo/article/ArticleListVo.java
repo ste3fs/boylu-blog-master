@@ -85,5 +85,23 @@ public class ArticleListVo {
     @JsonFormat(pattern = DateUtil.YYYY_MM_DD_HH_MM_SS)
     private LocalDateTime createTime;
 
+    private Long notionLogId;
+
+    private String notionAction;
+
+    private String notionStatus;
+
+    private String notionImageStatus;
+
+    private String notionMessage;
+
+    private Integer notionImageTotal;
+
+    private Integer notionImageLocalized;
+
+    private Integer notionImageFailed;
+
+    @JsonFormat(pattern = DateUtil.YYYY_MM_DD_HH_MM_SS)
+    private LocalDateTime notionSyncTime;
 
 }

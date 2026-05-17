@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.boylu.common.Result;
 import com.boylu.dto.article.ArticleQueryDto;
 import com.boylu.dto.article.NotionImportDto;
+import com.boylu.entity.NotionArticleSyncLog;
 import com.boylu.entity.SysArticle;
 import com.boylu.service.SysArticleService;
+import com.boylu.service.notion.NotionSyncLogService;
 import com.boylu.vo.article.ArticleListVo;
 import com.boylu.vo.article.NotionImportResultVo;
 import com.boylu.vo.article.SysArticleDetailVo;
@@ -24,6 +26,8 @@ import java.util.List;
 public class SysArticleController {
 
     private final SysArticleService sysArticleService;
+
+    private final NotionSyncLogService notionSyncLogService;
 
     @GetMapping("/list")
     @ApiOperation(value  = "文章列表")
@@ -57,6 +61,20 @@ public class SysArticleController {
     @SaCheckPermission("sys:article:update")
     public Result<NotionImportResultVo> syncNotion(@PathVariable Long id) {
         return Result.success(sysArticleService.syncNotionArticle(id));
+    }
+
+    @GetMapping("/notion/logs")
+    @ApiOperation(value = "最近 Notion 同步日志")
+    @SaCheckPermission("sys:article:list")
+    public Result<List<NotionArticleSyncLog>> recentNotionLogs() {
+        return Result.success(notionSyncLogService.listRecent());
+    }
+
+    @GetMapping("/notion/logs/{articleId}")
+    @ApiOperation(value = "Notion 同步日志")
+    @SaCheckPermission("sys:article:list")
+    public Result<List<NotionArticleSyncLog>> notionLogs(@PathVariable Long articleId) {
+        return Result.success(notionSyncLogService.listByArticleId(articleId));
     }
 
     @PutMapping("/update")

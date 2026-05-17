@@ -39,6 +39,8 @@
               @click="reptileDialog.visible = true">爬取文章</el-button>
               <el-button type="primary" plain :icon="Plus" v-permission="['sys:article:add']"
               @click="openNotionImport">导入 Notion</el-button>
+              <el-button type="info" plain :icon="Setting" v-permission="['sys:article:list']"
+              @click="openNotionLogs()">Notion 日志</el-button>
           </PageToolbarGroup>
           <PageToolbarGroup kind="danger">
               <el-button type="danger" plain :icon="Delete" :disabled="selectedIds.length === 0"
@@ -96,13 +98,29 @@
         </el-table-column>
         <el-table-column label="阅读量" align="center" prop="quantity" />
         <el-table-column label="发布时间" align="center" prop="createTime" width="180" />
-        <el-table-column label="操作" align="center" width="380" fixed="right">
+        <el-table-column label="Notion 状态" align="center" width="220">
+          <template #default="scope">
+            <div v-if="isNotionArticle(scope.row)" class="notion-status-cell">
+              <el-tag :type="notionStatusType(scope.row.notionStatus)" size="small">
+                {{ notionStatusLabel(scope.row.notionStatus) }}
+              </el-tag>
+              <el-tag :type="notionImageStatusType(scope.row.notionImageStatus)" size="small" effect="plain">
+                图片：{{ notionImageStatusLabel(scope.row) }}
+              </el-tag>
+              <span class="notion-status-message">{{ scope.row.notionMessage || '暂无同步日志' }}</span>
+            </div>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" align="center" width="440" fixed="right">
           <template #default="scope">
             <PageTableActions>
               <PageTableAction type="success" :icon="Position" @click="handlePushBaidu(scope.row)"
                 v-permission="['sys:article:update']">推送百度</PageTableAction>
               <PageTableAction v-if="isNotionArticle(scope.row)" type="warning" :icon="Position" @click="handleSyncNotion(scope.row)"
                 v-permission="['sys:article:update']">同步 Notion</PageTableAction>
+              <PageTableAction v-if="isNotionArticle(scope.row)" type="info" :icon="Setting" @click="openNotionLogs(scope.row)"
+                v-permission="['sys:article:list']">日志</PageTableAction>
               <PageTableAction type="primary" :icon="Edit" @click="handleUpdate(scope.row)"
                 v-permission="['sys:article:update']">编辑</PageTableAction>
               <PageTableAction type="danger" :icon="Delete" @click="handleDelete(scope.row)"
@@ -167,6 +185,16 @@
               </el-tag>
             </div>
 
+            <div v-if="isNotionArticle(row)" class="mobile-article-card__notion">
+              <el-tag :type="notionStatusType(row.notionStatus)" size="small">
+                {{ notionStatusLabel(row.notionStatus) }}
+              </el-tag>
+              <el-tag :type="notionImageStatusType(row.notionImageStatus)" size="small" effect="plain">
+                图片：{{ notionImageStatusLabel(row) }}
+              </el-tag>
+              <span>{{ row.notionMessage || '暂无同步日志' }}</span>
+            </div>
+
             <div class="mobile-article-card__status">
               <div class="mobile-article-card__switch">
                 <span>发布状态</span>
@@ -198,6 +226,7 @@
 
             <div class="mobile-article-card__actions">
               <el-button v-if="isNotionArticle(row)" type="warning" plain :icon="Position" @click="handleSyncNotion(row)">同步 Notion</el-button>
+              <el-button v-if="isNotionArticle(row)" type="info" plain :icon="Setting" @click="openNotionLogs(row)">日志</el-button>
               <el-button type="primary" plain :icon="Edit" @click="handleUpdate(row)">编辑</el-button>
               <el-button type="danger" plain :icon="Delete" @click="handleDelete(row)">删除</el-button>
             </div>
@@ -577,6 +606,52 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="notionLogDialog.visible"
+      :title="notionLogDialog.title || 'Notion 同步日志'"
+      :width="isMobile ? '100vw' : '880px'"
+      :fullscreen="isMobile"
+    >
+      <el-table v-loading="notionLogLoading" :data="notionLogs" border>
+        <el-table-column label="时间" prop="updateTime" width="170" />
+        <el-table-column label="文章" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.articleTitle || row.sourceUrl || '未创建文章' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="类型" width="82">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain">{{ notionActionLabel(row.action) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="同步" width="96">
+          <template #default="{ row }">
+            <el-tag :type="notionStatusType(row.status)" size="small">
+              {{ notionStatusLabel(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="图片" width="150">
+          <template #default="{ row }">
+            <el-tag :type="notionImageStatusType(row.imageStatus)" size="small" effect="plain">
+              {{ notionImageStatusLabel(row.imageStatus) }}
+            </el-tag>
+            <div class="notion-log-count">
+              {{ row.localizedImages || 0 }}/{{ row.totalImages || 0 }}
+              <span v-if="row.failedImages">失败 {{ row.failedImages }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="结果">
+          <template #default="{ row }">
+            <div class="notion-log-message">{{ row.message || '-' }}</div>
+            <div v-if="row.warnings" class="notion-log-warning">{{ row.warnings }}</div>
+            <div v-if="row.errorDetail" class="notion-log-error">{{ row.errorDetail }}</div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -592,7 +667,7 @@ import { getCategoryListApi } from '@/api/article/category'
 import { getTagListApi } from '@/api/article/tag'
 import {
   getArticleListApi, getDetailApi, deleteArticleApi,
-  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi, importNotionArticleApi, syncNotionArticleApi
+  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi, importNotionArticleApi, syncNotionArticleApi, getNotionSyncLogsApi
 } from '@/api/article'
 import { uploadApi, deleteFileApi } from '@/api/file'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
@@ -642,6 +717,13 @@ const reptileDialog = reactive({
 const notionDialog = reactive({
   visible: false
 })
+
+const notionLogDialog = reactive({
+  visible: false,
+  title: ''
+})
+const notionLogs = ref<any[]>([])
+const notionLogLoading = ref(false)
 
 // 表单数据
 const form = reactive<any>({
@@ -1097,6 +1179,78 @@ const isNotionArticle = (row: any) => {
   return String(row?.originalUrl || '').includes('notion.so')
 }
 
+const notionActionLabel = (action?: string) => {
+  const map: Record<string, string> = {
+    import: '导入',
+    sync: '同步'
+  }
+  return map[String(action || '')] || '同步'
+}
+
+const notionStatusLabel = (status?: string) => {
+  const map: Record<string, string> = {
+    running: '同步中',
+    success: '同步成功',
+    failed: '同步失败'
+  }
+  return map[String(status || '')] || '暂无日志'
+}
+
+const notionStatusType = (status?: string) => {
+  const map: Record<string, any> = {
+    running: 'warning',
+    success: 'success',
+    failed: 'danger'
+  }
+  return map[String(status || '')] || 'info'
+}
+
+const notionImageStatusLabel = (value: any) => {
+  const status = typeof value === 'string' ? value : value?.notionImageStatus || value?.imageStatus
+  const total = typeof value === 'object' ? (value?.notionImageTotal ?? value?.totalImages) : undefined
+  const localized = typeof value === 'object' ? (value?.notionImageLocalized ?? value?.localizedImages) : undefined
+  const failed = typeof value === 'object' ? (value?.notionImageFailed ?? value?.failedImages) : undefined
+  const map: Record<string, string> = {
+    pending: '待处理',
+    running: '处理中',
+    success: '完成',
+    partial_failed: '部分失败',
+    failed: '失败',
+    none: '无远程图',
+    skipped: '已跳过'
+  }
+  const label = map[String(status || '')] || '暂无日志'
+  if (typeof total === 'number' && total > 0) {
+    return failed ? `${label} ${localized || 0}/${total}，失败 ${failed}` : `${label} ${localized || 0}/${total}`
+  }
+  return label
+}
+
+const notionImageStatusType = (status?: string) => {
+  const map: Record<string, any> = {
+    pending: 'info',
+    running: 'warning',
+    success: 'success',
+    partial_failed: 'warning',
+    failed: 'danger',
+    none: 'info',
+    skipped: 'info'
+  }
+  return map[String(status || '')] || 'info'
+}
+
+const openNotionLogs = async (row?: any) => {
+  notionLogDialog.title = row?.id ? `${row.title || '文章'} - Notion 同步日志` : '最近 Notion 同步日志'
+  notionLogDialog.visible = true
+  notionLogLoading.value = true
+  try {
+    const res: any = await getNotionSyncLogsApi(row?.id)
+    notionLogs.value = res.data || []
+  } finally {
+    notionLogLoading.value = false
+  }
+}
+
 const handleSyncNotion = async (row: any) => {
   if (!row?.id) return
   await syncNotionArticleApi(row.id)
@@ -1347,6 +1501,49 @@ onUnmounted(() => {
     margin-bottom: 0;
   }
 
+  .notion-status-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .notion-status-message {
+    max-width: 190px;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .notion-log-count,
+  .notion-log-message,
+  .notion-log-warning,
+  .notion-log-error {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .notion-log-count {
+    margin-top: 4px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .notion-log-warning {
+    margin-top: 4px;
+    color: var(--el-color-warning);
+    white-space: pre-wrap;
+  }
+
+  .notion-log-error {
+    max-height: 120px;
+    margin-top: 4px;
+    color: var(--el-color-danger);
+    overflow: auto;
+    white-space: pre-wrap;
+  }
 
 
   .dialog-footer {
@@ -1485,6 +1682,16 @@ onUnmounted(() => {
       flex-wrap: wrap;
       gap: 6px;
       margin-top: 12px;
+    }
+
+    .mobile-article-card__notion {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
     }
 
     .mobile-article-card__status {

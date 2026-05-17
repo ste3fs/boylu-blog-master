@@ -47,9 +47,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -147,7 +149,7 @@ public class NotionImportService {
 
     public LocalizeImagesResult localizeArticleImages(SysArticle article) {
         if (article == null || article.getId() == null) {
-            return new LocalizeImagesResult(null, 0, Collections.emptyList());
+            return new LocalizeImagesResult(null, 0, Collections.emptyList(), 0, 0, 0);
         }
         List<String> warnings = new ArrayList<>();
         ImportContext context = new ImportContext(true, warnings);
@@ -178,9 +180,23 @@ public class NotionImportService {
         }
 
         if (changedCount <= 0) {
-            return new LocalizeImagesResult(null, 0, warnings);
+            return new LocalizeImagesResult(
+                    null,
+                    0,
+                    warnings,
+                    context.getAttemptedImageUrls().size(),
+                    context.getLocalizedImageUrls().size(),
+                    context.getFailedImageUrls().size()
+            );
         }
-        return new LocalizeImagesResult(update, changedCount, warnings);
+        return new LocalizeImagesResult(
+                update,
+                changedCount,
+                warnings,
+                context.getAttemptedImageUrls().size(),
+                context.getLocalizedImageUrls().size(),
+                context.getFailedImageUrls().size()
+        );
     }
 
     private void renderChildren(String blockId, int depth, StringBuilder markdown, StringBuilder plainText, ImportContext context) {
@@ -711,6 +727,7 @@ public class NotionImportService {
         }
         String cachedUrl = context.getImageUrlCache().get(imageUrl);
         if (StringUtils.isNotBlank(cachedUrl)) {
+            context.getLocalizedImageUrls().add(imageUrl);
             return cachedUrl;
         }
 
@@ -719,6 +736,7 @@ public class NotionImportService {
         try {
             response = HttpRequest.get(imageUrl).timeout(30000).execute();
             if (!response.isOk()) {
+                context.getFailedImageUrls().add(imageUrl);
                 context.getWarnings().add("图片下载失败，已保留原链接：" + shortText(imageUrl));
                 return imageUrl;
             }
@@ -726,12 +744,14 @@ public class NotionImportService {
             byte[] bytes = response.bodyBytes();
             long maxBytes = Math.max(1L, maxImageSizeMb) * 1024L * 1024L;
             if (bytes == null || bytes.length == 0 || bytes.length > maxBytes) {
+                context.getFailedImageUrls().add(imageUrl);
                 context.getWarnings().add("图片过大或为空，已保留原链接：" + shortText(imageUrl));
                 return imageUrl;
             }
 
             String contentType = StringUtils.defaultIfBlank(response.header(Header.CONTENT_TYPE), "image/jpeg");
             if (!contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+                context.getFailedImageUrls().add(imageUrl);
                 context.getWarnings().add("Notion 图片响应不是图片类型，已保留原链接：" + shortText(imageUrl));
                 return imageUrl;
             }
@@ -752,9 +772,15 @@ public class NotionImportService {
             String publicUrl = buildPublicContentUrl(fileInfo);
             String resultUrl = StringUtils.defaultIfBlank(publicUrl, imageUrl);
             context.getImageUrlCache().put(imageUrl, resultUrl);
+            if (StringUtils.equals(resultUrl, imageUrl)) {
+                context.getFailedImageUrls().add(imageUrl);
+            } else {
+                context.getLocalizedImageUrls().add(imageUrl);
+            }
             return resultUrl;
         } catch (Exception ex) {
             log.warn("Failed to persist Notion image, url={}", imageUrl, ex);
+            context.getFailedImageUrls().add(imageUrl);
             context.getWarnings().add("图片保存到本站失败，已保留原链接：" + shortText(imageUrl));
             return imageUrl;
         } finally {
@@ -806,6 +832,7 @@ public class NotionImportService {
             return imageUrl;
         }
         String downloadUrl = imageUrl.replace("&amp;", "&");
+        context.getAttemptedImageUrls().add(downloadUrl);
         return persistImageIfNeeded(downloadUrl, context);
     }
 
@@ -1093,6 +1120,9 @@ public class NotionImportService {
         private final boolean importImages;
         private final List<String> warnings;
         private final Map<String, String> imageUrlCache = new HashMap<>();
+        private final Set<String> attemptedImageUrls = new HashSet<>();
+        private final Set<String> localizedImageUrls = new HashSet<>();
+        private final Set<String> failedImageUrls = new HashSet<>();
         private int importedBlocks;
     }
 
@@ -1110,5 +1140,8 @@ public class NotionImportService {
         private SysArticle article;
         private Integer changedCount;
         private List<String> warnings;
+        private Integer totalImages;
+        private Integer localizedImages;
+        private Integer failedImages;
     }
 }
