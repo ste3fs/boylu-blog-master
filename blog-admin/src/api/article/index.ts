@@ -103,3 +103,10 @@ export function getNotionSyncLogsApi(id: any) {
     method: 'get'
   })
 }
+
+export function deleteNotionSyncLogsApi(ids: any) {
+  return request({
+    url: `/sys/article/notion/logs/${ids}`,
+    method: 'delete'
+  })
+}

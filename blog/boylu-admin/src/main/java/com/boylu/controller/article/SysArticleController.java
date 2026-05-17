@@ -77,6 +77,13 @@ public class SysArticleController {
         return Result.success(notionSyncLogService.listByArticleId(articleId));
     }
 
+    @DeleteMapping("/notion/logs/{ids}")
+    @ApiOperation(value = "删除 Notion 同步日志")
+    @SaCheckPermission("sys:article:update")
+    public Result<Boolean> deleteNotionLogs(@PathVariable List<Long> ids) {
+        return Result.success(notionSyncLogService.deleteByIds(ids));
+    }
+
     @PutMapping("/update")
     @ApiOperation(value = "修改文章")
     @SaCheckPermission("sys:article:update")

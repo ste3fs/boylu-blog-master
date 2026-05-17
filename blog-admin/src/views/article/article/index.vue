@@ -609,47 +609,105 @@
     <el-dialog
       v-model="notionLogDialog.visible"
       :title="notionLogDialog.title || 'Notion 同步日志'"
-      :width="isMobile ? '100vw' : '880px'"
+      :width="isMobile ? '100vw' : '1120px'"
       :fullscreen="isMobile"
+      class="notion-log-dialog"
     >
-      <el-table v-loading="notionLogLoading" :data="notionLogs" border>
-        <el-table-column label="时间" prop="updateTime" width="170" />
-        <el-table-column label="文章" min-width="160" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ row.articleTitle || row.sourceUrl || '未创建文章' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" width="82">
-          <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ notionActionLabel(row.action) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="同步" width="96">
-          <template #default="{ row }">
-            <el-tag :type="notionStatusType(row.status)" size="small">
-              {{ notionStatusLabel(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="图片" width="150">
-          <template #default="{ row }">
-            <el-tag :type="notionImageStatusType(row.imageStatus)" size="small" effect="plain">
-              {{ notionImageStatusLabel(row.imageStatus) }}
-            </el-tag>
-            <div class="notion-log-count">
-              {{ row.localizedImages || 0 }}/{{ row.totalImages || 0 }}
-              <span v-if="row.failedImages">失败 {{ row.failedImages }}</span>
+      <div class="notion-log-toolbar">
+        <div class="notion-log-toolbar__summary">
+          共 {{ notionLogs.length }} 条
+          <span v-if="selectedNotionLogIds.length">，已选 {{ selectedNotionLogIds.length }} 条</span>
+        </div>
+        <div class="notion-log-toolbar__actions">
+          <el-button :icon="Refresh" :loading="notionLogLoading" @click="refreshNotionLogs">刷新</el-button>
+          <el-button
+            type="danger"
+            plain
+            :icon="Delete"
+            :disabled="selectedNotionLogIds.length === 0"
+            @click="handleDeleteSelectedNotionLogs"
+          >
+            删除选中
+          </el-button>
+          <el-button
+            type="danger"
+            plain
+            :disabled="notionLogs.length === 0"
+            @click="handleDeleteVisibleNotionLogs"
+          >
+            清空当前列表
+          </el-button>
+        </div>
+      </div>
+
+      <div v-loading="notionLogLoading" class="notion-log-list">
+        <el-empty v-if="!notionLogs.length" description="暂无 Notion 同步日志" />
+        <el-scrollbar v-else :max-height="isMobile ? 'calc(100vh - 150px)' : '62vh'">
+          <article
+            v-for="row in notionLogs"
+            :key="row.id"
+            class="notion-log-card"
+            :class="`is-${row.status || 'empty'}`"
+          >
+            <div class="notion-log-card__head">
+              <el-checkbox
+                :model-value="selectedNotionLogIds.includes(row.id)"
+                @change="(checked) => toggleNotionLogSelection(row.id, Boolean(checked))"
+              />
+              <div class="notion-log-card__title">
+                <strong>{{ row.articleTitle || '未创建文章' }}</strong>
+                <span>{{ row.updateTime || row.createTime || '-' }}</span>
+              </div>
+              <div class="notion-log-card__badges">
+                <el-tag size="small" effect="plain">{{ notionActionLabel(row.action) }}</el-tag>
+                <el-tag :type="notionStatusType(row.status)" size="small">
+                  {{ notionStatusLabel(row.status) }}
+                </el-tag>
+                <el-tag :type="notionImageStatusType(row.imageStatus)" size="small" effect="plain">
+                  图片：{{ notionImageStatusLabel(row) }}
+                </el-tag>
+              </div>
+              <el-button link type="danger" :icon="Delete" @click="handleDeleteNotionLog(row)">删除</el-button>
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="结果">
-          <template #default="{ row }">
-            <div class="notion-log-message">{{ row.message || '-' }}</div>
-            <div v-if="row.warnings" class="notion-log-warning">{{ row.warnings }}</div>
-            <div v-if="row.errorDetail" class="notion-log-error">{{ row.errorDetail }}</div>
-          </template>
-        </el-table-column>
-      </el-table>
+
+            <div class="notion-log-card__meta">
+              <div>
+                <span>块数量</span>
+                <strong>{{ row.importedBlocks ?? 0 }}</strong>
+              </div>
+              <div>
+                <span>改动字段</span>
+                <strong>{{ row.changedFields ?? 0 }}</strong>
+              </div>
+              <div>
+                <span>图片进度</span>
+                <strong>{{ row.localizedImages || 0 }}/{{ row.totalImages || 0 }}</strong>
+              </div>
+              <div>
+                <span>失败图片</span>
+                <strong>{{ row.failedImages || 0 }}</strong>
+              </div>
+            </div>
+
+            <div v-if="row.sourceUrl" class="notion-log-source">
+              <span>来源</span>
+              <el-link :href="row.sourceUrl" target="_blank" type="primary">
+                {{ row.sourceUrl }}
+              </el-link>
+            </div>
+
+            <div class="notion-log-result">
+              <div class="notion-log-message">{{ cleanNotionLogText(row.message) || '-' }}</div>
+              <div v-if="row.warnings" class="notion-log-warning">{{ cleanNotionLogText(row.warnings) }}</div>
+              <el-collapse v-if="row.errorDetail" class="notion-log-error-collapse">
+                <el-collapse-item title="查看技术错误详情" :name="String(row.id)">
+                  <pre class="notion-log-error">{{ row.errorDetail }}</pre>
+                </el-collapse-item>
+              </el-collapse>
+            </div>
+          </article>
+        </el-scrollbar>
+      </div>
     </el-dialog>
 
   </div>
@@ -657,7 +715,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, Plus, Setting, Position } from '@element-plus/icons-vue'
+import { Delete, Edit, Plus, Setting, Position, Refresh } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 import '@wangeditor/editor/dist/css/style.css'
@@ -667,7 +725,7 @@ import { getCategoryListApi } from '@/api/article/category'
 import { getTagListApi } from '@/api/article/tag'
 import {
   getArticleListApi, getDetailApi, deleteArticleApi,
-  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi, importNotionArticleApi, syncNotionArticleApi, getNotionSyncLogsApi
+  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi, importNotionArticleApi, syncNotionArticleApi, getNotionSyncLogsApi, deleteNotionSyncLogsApi
 } from '@/api/article'
 import { uploadApi, deleteFileApi } from '@/api/file'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
@@ -720,10 +778,12 @@ const notionDialog = reactive({
 
 const notionLogDialog = reactive({
   visible: false,
-  title: ''
+  title: '',
+  articleId: undefined as any
 })
 const notionLogs = ref<any[]>([])
 const notionLogLoading = ref(false)
+const selectedNotionLogIds = ref<any[]>([])
 
 // 表单数据
 const form = reactive<any>({
@@ -1239,16 +1299,91 @@ const notionImageStatusType = (status?: string) => {
   return map[String(status || '')] || 'info'
 }
 
-const openNotionLogs = async (row?: any) => {
-  notionLogDialog.title = row?.id ? `${row.title || '文章'} - Notion 同步日志` : '最近 Notion 同步日志'
-  notionLogDialog.visible = true
+const cleanNotionLogText = (text?: string) => {
+  return String(text || '')
+    .replace(/com\.boylu\.[\s\S]*$/g, '')
+    .replace(/\s+at\s+[\s\S]*$/g, '')
+    .trim()
+}
+
+const loadNotionLogs = async (articleId?: any) => {
   notionLogLoading.value = true
   try {
-    const res: any = await getNotionSyncLogsApi(row?.id)
+    const res: any = await getNotionSyncLogsApi(articleId)
     notionLogs.value = res.data || []
+    selectedNotionLogIds.value = selectedNotionLogIds.value.filter((id) =>
+      notionLogs.value.some((row) => row.id === id)
+    )
   } finally {
     notionLogLoading.value = false
   }
+}
+
+const openNotionLogs = async (row?: any) => {
+  notionLogDialog.title = row?.id ? `${row.title || '文章'} - Notion 同步日志` : '最近 Notion 同步日志'
+  notionLogDialog.articleId = row?.id
+  notionLogDialog.visible = true
+  selectedNotionLogIds.value = []
+  await loadNotionLogs(row?.id)
+}
+
+const refreshNotionLogs = () => {
+  return loadNotionLogs(notionLogDialog.articleId)
+}
+
+const toggleNotionLogSelection = (id: any, checked: boolean) => {
+  if (!id) return
+  if (checked) {
+    if (!selectedNotionLogIds.value.includes(id)) {
+      selectedNotionLogIds.value.push(id)
+    }
+    return
+  }
+  selectedNotionLogIds.value = selectedNotionLogIds.value.filter((item) => item !== id)
+}
+
+const deleteNotionLogs = async (ids: any[]) => {
+  const validIds = ids.filter(Boolean)
+  if (!validIds.length) return
+  await deleteNotionSyncLogsApi(validIds.join(','))
+  ElMessage.success('Notion 日志已删除')
+  selectedNotionLogIds.value = selectedNotionLogIds.value.filter((id) => !validIds.includes(id))
+  await refreshNotionLogs()
+  getList()
+}
+
+const handleDeleteNotionLog = async (row: any) => {
+  if (!row?.id) return
+  await ElMessageBox.confirm('确定删除这条 Notion 同步日志吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+  await deleteNotionLogs([row.id])
+}
+
+const handleDeleteSelectedNotionLogs = async () => {
+  if (!selectedNotionLogIds.value.length) {
+    ElMessage.warning('请先选择要删除的日志')
+    return
+  }
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedNotionLogIds.value.length} 条 Notion 同步日志吗？`, '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+  await deleteNotionLogs(selectedNotionLogIds.value)
+}
+
+const handleDeleteVisibleNotionLogs = async () => {
+  const ids = notionLogs.value.map((row) => row.id).filter(Boolean)
+  if (!ids.length) return
+  await ElMessageBox.confirm(`确定删除当前列表中的 ${ids.length} 条 Notion 同步日志吗？`, '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+  await deleteNotionLogs(ids)
 }
 
 const handleSyncNotion = async (row: any) => {
@@ -1417,6 +1552,167 @@ onUnmounted(() => {
   }
 }
 
+.notion-log-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.notion-log-toolbar__summary {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.notion-log-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.notion-log-list {
+  min-height: 220px;
+}
+
+.notion-log-card {
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-left: 4px solid var(--el-border-color);
+  border-radius: 8px;
+  background: var(--el-bg-color);
+}
+
+.notion-log-card.is-success {
+  border-left-color: var(--el-color-success);
+}
+
+.notion-log-card.is-failed {
+  border-left-color: var(--el-color-danger);
+}
+
+.notion-log-card.is-running {
+  border-left-color: var(--el-color-warning);
+}
+
+.notion-log-card__head {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.notion-log-card__title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.notion-log-card__title strong {
+  overflow: hidden;
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notion-log-card__title span {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.notion-log-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.notion-log-card__meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.notion-log-card__meta > div {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--el-fill-color-lighter);
+}
+
+.notion-log-card__meta span,
+.notion-log-source span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.notion-log-card__meta strong {
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+}
+
+.notion-log-source {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--el-fill-color-extra-light);
+}
+
+.notion-log-source :deep(.el-link__inner) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.notion-log-result {
+  margin-top: 12px;
+}
+
+.notion-log-message,
+.notion-log-warning {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.notion-log-message {
+  background: var(--el-fill-color-extra-light);
+  color: var(--el-text-color-primary);
+}
+
+.notion-log-warning {
+  margin-top: 8px;
+  background: var(--el-color-warning-light-9);
+  color: var(--el-color-warning-dark-2);
+}
+
+.notion-log-error-collapse {
+  margin-top: 8px;
+}
+
+.notion-log-error {
+  max-height: 220px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--el-color-danger-light-9);
+  color: var(--el-color-danger);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .app-container {
 
   .pagination-container {
@@ -1567,6 +1863,35 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
+  .notion-log-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .notion-log-toolbar__actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .notion-log-card {
+    padding: 12px;
+  }
+
+  .notion-log-card__head {
+    grid-template-columns: auto 1fr;
+    align-items: flex-start;
+  }
+
+  .notion-log-card__badges,
+  .notion-log-card__head > .el-button {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .notion-log-card__meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .app-container {
     .mobile-article-list {
       display: flex;

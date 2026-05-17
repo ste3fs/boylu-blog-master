@@ -164,6 +164,13 @@ public class NotionSyncLogService {
                 .last("limit 50"));
     }
 
+    public boolean deleteByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return false;
+        }
+        return notionArticleSyncLogMapper.deleteBatchIds(ids) > 0;
+    }
+
     private void updateImageStatus(Long logId, String imageStatus, String message, Exception error) {
         if (logId == null) {
             return;
