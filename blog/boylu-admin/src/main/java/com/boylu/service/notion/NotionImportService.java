@@ -92,6 +92,7 @@ public class NotionImportService {
     private String publicFileContentPrefix;
 
     public ImportPageResult importPage(NotionImportDto dto) {
+        preferIpv4StackForNotion();
         if (dto == null || StringUtils.isBlank(dto.getPageUrl())) {
             throw new ServiceException("请填写 Notion 页面地址或 Page ID");
         }
@@ -148,6 +149,7 @@ public class NotionImportService {
     }
 
     public LocalizeImagesResult localizeArticleImages(SysArticle article) {
+        preferIpv4StackForNotion();
         if (article == null || article.getId() == null) {
             return new LocalizeImagesResult(null, 0, Collections.emptyList(), 0, 0, 0);
         }
@@ -603,6 +605,7 @@ public class NotionImportService {
     }
 
     private JSONObject requestNotionObjectWithRetry(String pathAndQuery) {
+        preferIpv4StackForNotion();
         ServiceException lastException = null;
         for (int attempt = 1; attempt <= NOTION_REQUEST_RETRY_TIMES; attempt++) {
             try {
@@ -634,6 +637,12 @@ public class NotionImportService {
 
     private boolean isNotionHttpFailure(ServiceException ex) {
         return ex != null && StringUtils.contains(ex.getMessage(), "HTTP ");
+    }
+
+    private void preferIpv4StackForNotion() {
+        if (!StringUtils.equalsIgnoreCase(System.getProperty("java.net.preferIPv4Stack"), "true")) {
+            System.setProperty("java.net.preferIPv4Stack", "true");
+        }
     }
 
     private void sleepBeforeRetry(int failedAttempt) {
