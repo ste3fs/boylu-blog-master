@@ -551,7 +551,7 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="图片处理">
-          <el-switch v-model="notionForm.importImages" active-text="下载到本站" inactive-text="保留原链接" />
+          <el-tag type="info">先保留原链接，导入后后台下载到本站</el-tag>
         </el-form-item>
         <el-form-item label="摘要">
           <el-input

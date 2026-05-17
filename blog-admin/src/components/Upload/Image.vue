@@ -177,6 +177,8 @@ const pendingUploadCount = computed(() => {
 const CHUNK_THRESHOLD = 2 * 1024 * 1024
 const DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024
 
+const shouldComputeUploadHash = () => props.source !== 'article-cover'
+
 const computeFileHash = async (file: File) => {
   if (!(window.crypto && window.crypto.subtle)) {
     return ''
@@ -204,7 +206,7 @@ const uploadSingleRequest = async (file: File, options: UploadRequestOptions) =>
 }
 
 const uploadByChunk = async (file: File, options: UploadRequestOptions) => {
-  const fileHash = await computeFileHash(file)
+  const fileHash = shouldComputeUploadHash() ? await computeFileHash(file) : ''
   const roughTotalChunks = Math.max(1, Math.ceil(file.size / DEFAULT_CHUNK_SIZE))
   const initRes = await initChunkUploadApi({
     fileName: file.name,

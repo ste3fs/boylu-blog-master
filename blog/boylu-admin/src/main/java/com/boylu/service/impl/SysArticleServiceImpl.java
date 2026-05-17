@@ -150,6 +150,9 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
     @Override
     @Transactional(rollbackFor = Exception.class)
     public NotionImportResultVo importFromNotion(NotionImportDto dto) {
+        if (dto != null) {
+            dto.setImportImages(false);
+        }
         NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
         SysArticleDetailVo article = importResult.getArticle();
         SysArticle existingArticle = findExistingNotionArticle(article.getOriginalUrl());

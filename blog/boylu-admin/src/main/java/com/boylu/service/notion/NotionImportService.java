@@ -195,7 +195,16 @@ public class NotionImportService {
             if (StringUtils.isNotBlank(nextCursor)) {
                 path += "&start_cursor=" + urlEncode(nextCursor);
             }
-            JSONObject response = requestNotionObjectWithRetry(path);
+            JSONObject response;
+            try {
+                response = requestNotionObjectWithRetry(path);
+            } catch (ServiceException ex) {
+                if (depth <= 0) {
+                    throw ex;
+                }
+                context.getWarnings().add("Notion 子块读取失败，已跳过部分内容：" + shortText(ex.getMessage()));
+                return;
+            }
             JSONArray results = response.getJSONArray("results");
             if (results != null) {
                 for (Object item : results) {
@@ -502,7 +511,13 @@ public class NotionImportService {
             if (StringUtils.isNotBlank(nextCursor)) {
                 path += "&start_cursor=" + urlEncode(nextCursor);
             }
-            JSONObject response = requestNotionObjectWithRetry(path);
+            JSONObject response;
+            try {
+                response = requestNotionObjectWithRetry(path);
+            } catch (ServiceException ex) {
+                context.getWarnings().add("Notion 表格读取失败，已跳过该表格：" + shortText(ex.getMessage()));
+                return rows;
+            }
             JSONArray results = response.getJSONArray("results");
             if (results != null) {
                 for (Object item : results) {
