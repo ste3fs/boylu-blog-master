@@ -320,6 +320,12 @@ export default {
         transform: translateX(-16px);
     }
 }
+
+@media (max-width: 768px) {
+    .random-video {
+        display: none;
+    }
+}
 </style>
 
 <style lang="scss">

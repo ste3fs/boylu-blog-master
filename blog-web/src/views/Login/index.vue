@@ -1273,6 +1273,7 @@ export default {
   inset: 0;
   z-index: 2000;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   background:
     radial-gradient(circle at top left, rgba(108, 63, 245, 0.12), transparent 30%),
     radial-gradient(circle at bottom right, rgba(255, 155, 107, 0.12), transparent 28%),
@@ -1281,6 +1282,7 @@ export default {
 
 .login-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1.24fr) minmax(620px, 0.9fr);
 }
@@ -2051,6 +2053,7 @@ export default {
 
   .form-panel {
     min-height: 100vh;
+    min-height: 100dvh;
     padding: 24px 18px;
     align-items: stretch;
   }

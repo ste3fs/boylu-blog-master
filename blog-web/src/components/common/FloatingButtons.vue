@@ -173,13 +173,14 @@ export default {
 
 @include responsive(sm) {
   .floating-buttons {
-    right: 15px;
-    bottom: 80px;
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    z-index: 900;
   }
 
   .float-btn {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
   }
 }
 

@@ -70,6 +70,7 @@ export default {
   padding: $spacing-md $spacing-lg;
   margin-bottom: $spacing-xl;
   box-shadow: $shadow-sm;
+  overflow: hidden;
 }
 
 .moments-content {
@@ -111,6 +112,25 @@ export default {
     &:hover {
       color: $primary;
     }
+
+    :deep(*) {
+      color: inherit !important;
+      background: transparent !important;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .moments-list {
+    padding: 14px 16px;
+  }
+
+  .moments-content .moments-row {
+    gap: 10px;
+  }
+
+  .moments-header {
+    flex: 0 0 auto;
   }
 }
 
