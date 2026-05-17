@@ -153,6 +153,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
         SysArticleDetailVo article = importResult.getArticle();
         SysArticle existingArticle = findExistingNotionArticle(article.getOriginalUrl());
+        ensureNotionImportHasContent(importResult, existingArticle != null);
         boolean updated = existingArticle != null;
         saveImportedArticle(article, existingArticle);
         queueNotionImageLocalization(article.getId());
@@ -196,6 +197,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
 
         NotionImportService.ImportPageResult importResult = notionImportService.importPage(dto);
         SysArticleDetailVo article = importResult.getArticle();
+        ensureNotionImportHasContent(importResult, true);
         article.setId(existingArticle.getId());
         saveImportedArticle(article, existingArticle);
         queueNotionImageLocalization(article.getId());
@@ -207,6 +209,21 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
                 .imageLocalizationQueued(true)
                 .warnings(importResult.getWarnings())
                 .build();
+    }
+
+    private void ensureNotionImportHasContent(NotionImportService.ImportPageResult importResult, boolean updatingExistingArticle) {
+        SysArticleDetailVo article = importResult == null ? null : importResult.getArticle();
+        boolean emptyContent = article == null
+                || importResult.getImportedBlocks() == null
+                || importResult.getImportedBlocks() <= 0
+                || StringUtils.isBlank(article.getContentMd());
+        if (!emptyContent) {
+            return;
+        }
+        if (updatingExistingArticle) {
+            throw new ServiceException("Notion 本次没有读取到正文内容，已保护旧文章，不会覆盖原内容");
+        }
+        throw new ServiceException("Notion 页面没有可导入的正文内容，请确认页面已共享给 Integration，且页面正文不为空");
     }
 
     private void saveImportedArticle(SysArticleDetailVo article, SysArticle existingArticle) {

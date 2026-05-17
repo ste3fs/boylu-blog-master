@@ -17,6 +17,9 @@ import com.boylu.utils.CoverImageUtil;
 import com.boylu.utils.DateUtil;
 import com.boylu.vo.article.SysArticleDetailVo;
 import com.boylu.vo.article.CoverImageVo;
+import com.vladsch.flexmark.ext.gfm.strikethrough.StrikethroughExtension;
+import com.vladsch.flexmark.ext.gfm.tasklist.TaskListExtension;
+import com.vladsch.flexmark.ext.tables.TablesExtension;
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
@@ -41,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -110,6 +114,9 @@ public class NotionImportService {
         }
 
         String markdownContent = markdown.toString().trim();
+        if (StringUtils.isBlank(plainText.toString()) && (context.getImportedBlocks() <= 0 || markdownContent.startsWith("> Notion "))) {
+            markdownContent = "";
+        }
         SysArticleDetailVo article = new SysArticleDetailVo();
         article.setTitle(title);
         article.setCategoryName(StringUtils.defaultIfBlank(dto.getCategoryName(), "Notion"));
@@ -251,10 +258,26 @@ public class NotionImportService {
                 appendImage(markdown, plainText, body, context);
                 break;
             case "divider":
+                ensureMarkdownBlockBreak(markdown);
                 markdown.append("\n---\n\n");
                 break;
+            case "table":
+                appendTable(markdown, plainText, block, body, context);
+                return;
             case "bookmark":
                 appendBookmark(markdown, plainText, body);
+                break;
+            case "link_preview":
+                appendBookmark(markdown, plainText, body);
+                break;
+            case "file":
+            case "pdf":
+            case "video":
+            case "embed":
+                appendFileLikeBlock(markdown, plainText, body, type);
+                break;
+            case "equation":
+                appendEquation(markdown, plainText, body);
                 break;
             case "toggle":
                 appendToggle(markdown, plainText, body);
@@ -264,6 +287,11 @@ public class NotionImportService {
                 break;
             case "child_database":
                 appendChildDatabase(markdown, plainText, body);
+                break;
+            case "column_list":
+            case "column":
+            case "synced_block":
+            case "table_row":
                 break;
             default:
                 context.getWarnings().add("暂未支持 Notion 块类型：" + type);
@@ -280,7 +308,8 @@ public class NotionImportService {
         if (StringUtils.isBlank(text)) {
             return;
         }
-        markdown.append(text).append("\n\n");
+        ensureMarkdownBlockBreak(markdown);
+        markdown.append(formatInlineBreaks(text)).append("\n\n");
         appendPlainText(plainText, richTextPlain(body.getJSONArray("rich_text")));
     }
 
@@ -289,6 +318,7 @@ public class NotionImportService {
         if (StringUtils.isBlank(text)) {
             return;
         }
+        ensureMarkdownBlockBreak(markdown);
         markdown.append(prefix).append(text).append("\n\n");
         appendPlainText(plainText, richTextPlain(body.getJSONArray("rich_text")));
     }
@@ -317,6 +347,7 @@ public class NotionImportService {
         if (StringUtils.isBlank(text)) {
             return;
         }
+        ensureMarkdownBlockBreak(markdown);
         markdown.append("> ").append(text.replace("\n", "\n> ")).append("\n\n");
         appendPlainText(plainText, richTextPlain(body.getJSONArray("rich_text")));
     }
@@ -326,6 +357,7 @@ public class NotionImportService {
         if (StringUtils.isBlank(text)) {
             return;
         }
+        ensureMarkdownBlockBreak(markdown);
         markdown.append("> ").append(text.replace("\n", "\n> ")).append("\n\n");
         appendPlainText(plainText, richTextPlain(body.getJSONArray("rich_text")));
     }
@@ -336,6 +368,7 @@ public class NotionImportService {
             return;
         }
         String language = StringUtils.defaultIfBlank(body.getStr("language"), "");
+        ensureMarkdownBlockBreak(markdown);
         markdown.append("```").append(language).append("\n").append(code).append("\n```\n\n");
         appendPlainText(plainText, code);
     }
@@ -347,6 +380,7 @@ public class NotionImportService {
         }
         String caption = richTextPlain(body.getJSONArray("caption"));
         String finalUrl = persistImageIfNeeded(imageUrl, context);
+        ensureMarkdownBlockBreak(markdown);
         markdown.append("![").append(escapeMarkdownText(caption)).append("](").append(finalUrl).append(")").append("\n\n");
         if (StringUtils.isNotBlank(caption)) {
             appendPlainText(plainText, caption);
@@ -367,6 +401,7 @@ public class NotionImportService {
         if (StringUtils.isBlank(text)) {
             return;
         }
+        ensureMarkdownBlockBreak(markdown);
         markdown.append("**").append(text).append("**\n\n");
         appendPlainText(plainText, richTextPlain(body.getJSONArray("rich_text")));
     }
@@ -376,6 +411,7 @@ public class NotionImportService {
         if (StringUtils.isBlank(title)) {
             return;
         }
+        ensureMarkdownBlockBreak(markdown);
         markdown.append("## ").append(escapeMarkdownText(title)).append("\n\n");
         appendPlainText(plainText, title);
     }
@@ -387,6 +423,152 @@ public class NotionImportService {
         }
         markdown.append("> 已引用数据库：").append(escapeMarkdownText(title)).append("\n\n");
         appendPlainText(plainText, title);
+    }
+
+    private void appendFileLikeBlock(StringBuilder markdown, StringBuilder plainText, JSONObject body, String type) {
+        String url = extractFileObjectUrl(body);
+        if (StringUtils.isBlank(url)) {
+            url = body.getStr("url");
+        }
+        if (StringUtils.isBlank(url)) {
+            return;
+        }
+        String caption = richTextPlain(body.getJSONArray("caption"));
+        String label = StringUtils.defaultIfBlank(caption, defaultFileLabel(type));
+        ensureMarkdownBlockBreak(markdown);
+        markdown.append("[").append(escapeMarkdownText(label)).append("](").append(url).append(")").append("\n\n");
+        appendPlainText(plainText, label);
+    }
+
+    private String defaultFileLabel(String type) {
+        if ("video".equals(type)) {
+            return "视频";
+        }
+        if ("pdf".equals(type)) {
+            return "PDF 文件";
+        }
+        if ("embed".equals(type)) {
+            return "嵌入链接";
+        }
+        return "附件";
+    }
+
+    private void appendEquation(StringBuilder markdown, StringBuilder plainText, JSONObject body) {
+        String expression = body.getStr("expression");
+        if (StringUtils.isBlank(expression)) {
+            return;
+        }
+        ensureMarkdownBlockBreak(markdown);
+        markdown.append("$$\n").append(expression).append("\n$$\n\n");
+        appendPlainText(plainText, expression);
+    }
+
+    private void appendTable(StringBuilder markdown, StringBuilder plainText, JSONObject block, JSONObject body, ImportContext context) {
+        List<List<String>> rows = fetchTableRows(block.getStr("id"), context);
+        if (rows.isEmpty()) {
+            return;
+        }
+        int columnCount = 0;
+        for (List<String> row : rows) {
+            columnCount = Math.max(columnCount, row.size());
+        }
+        if (columnCount <= 0) {
+            return;
+        }
+
+        ensureMarkdownBlockBreak(markdown);
+        boolean hasColumnHeader = Boolean.TRUE.equals(body.getBool("has_column_header", false));
+        List<String> header = hasColumnHeader ? normalizeTableRow(rows.get(0), columnCount) : buildDefaultTableHeader(columnCount);
+        markdown.append("| ").append(String.join(" | ", escapeTableCells(header))).append(" |\n");
+        markdown.append("| ").append(String.join(" | ", Collections.nCopies(columnCount, "---"))).append(" |\n");
+
+        int startIndex = hasColumnHeader ? 1 : 0;
+        for (int i = startIndex; i < rows.size(); i++) {
+            List<String> row = normalizeTableRow(rows.get(i), columnCount);
+            markdown.append("| ").append(String.join(" | ", escapeTableCells(row))).append(" |\n");
+            appendPlainText(plainText, String.join(" ", row));
+        }
+        markdown.append("\n");
+    }
+
+    private List<List<String>> fetchTableRows(String blockId, ImportContext context) {
+        List<List<String>> rows = new ArrayList<>();
+        if (StringUtils.isBlank(blockId)) {
+            return rows;
+        }
+        String nextCursor = null;
+        do {
+            String path = "/blocks/" + urlEncode(blockId) + "/children?page_size=100";
+            if (StringUtils.isNotBlank(nextCursor)) {
+                path += "&start_cursor=" + urlEncode(nextCursor);
+            }
+            JSONObject response = requestNotionObjectWithRetry(path);
+            JSONArray results = response.getJSONArray("results");
+            if (results != null) {
+                for (Object item : results) {
+                    if (!(item instanceof JSONObject) || context.getImportedBlocks() >= MAX_BLOCK_COUNT) {
+                        continue;
+                    }
+                    JSONObject rowBlock = (JSONObject) item;
+                    if (!"table_row".equals(rowBlock.getStr("type"))) {
+                        continue;
+                    }
+                    context.setImportedBlocks(context.getImportedBlocks() + 1);
+                    JSONObject rowBody = rowBlock.getJSONObject("table_row");
+                    JSONArray cells = rowBody == null ? null : rowBody.getJSONArray("cells");
+                    List<String> row = new ArrayList<>();
+                    if (cells != null) {
+                        for (Object cell : cells) {
+                            row.add(cell instanceof JSONArray ? renderRichText((JSONArray) cell) : "");
+                        }
+                    }
+                    rows.add(row);
+                }
+            }
+            nextCursor = Boolean.TRUE.equals(response.getBool("has_more", false)) ? response.getStr("next_cursor") : null;
+        } while (StringUtils.isNotBlank(nextCursor));
+        return rows;
+    }
+
+    private List<String> normalizeTableRow(List<String> row, int columnCount) {
+        List<String> normalized = new ArrayList<>();
+        for (int i = 0; i < columnCount; i++) {
+            normalized.add(row != null && i < row.size() ? StringUtils.defaultString(row.get(i)) : "");
+        }
+        return normalized;
+    }
+
+    private List<String> buildDefaultTableHeader(int columnCount) {
+        List<String> header = new ArrayList<>();
+        for (int i = 1; i <= columnCount; i++) {
+            header.add("列 " + i);
+        }
+        return header;
+    }
+
+    private List<String> escapeTableCells(List<String> cells) {
+        List<String> escaped = new ArrayList<>();
+        for (String cell : cells) {
+            escaped.add(StringUtils.defaultString(cell).replace("|", "\\|").replace("\n", "<br>"));
+        }
+        return escaped;
+    }
+
+    private void ensureMarkdownBlockBreak(StringBuilder markdown) {
+        int length = markdown.length();
+        if (length == 0) {
+            return;
+        }
+        if (markdown.charAt(length - 1) != '\n') {
+            markdown.append('\n');
+        }
+        if (markdown.length() < 2 || markdown.charAt(markdown.length() - 2) != '\n') {
+            markdown.append('\n');
+        }
+    }
+
+    private String formatInlineBreaks(String text) {
+        return StringUtils.defaultString(text).replace("\n", "  \n");
     }
 
     private JSONObject requestNotionObjectWithRetry(String pathAndQuery) {
@@ -733,6 +915,12 @@ public class NotionImportService {
 
     private String renderMarkdown(String markdown) {
         MutableDataSet options = new MutableDataSet();
+        options.set(Parser.EXTENSIONS, Arrays.asList(
+                TablesExtension.create(),
+                TaskListExtension.create(),
+                StrikethroughExtension.create()
+        ));
+        options.set(HtmlRenderer.SOFT_BREAK, "<br />\n");
         Parser parser = Parser.builder(options).build();
         HtmlRenderer renderer = HtmlRenderer.builder(options).build();
         return renderer.render(parser.parse(StringUtils.defaultString(markdown)));
