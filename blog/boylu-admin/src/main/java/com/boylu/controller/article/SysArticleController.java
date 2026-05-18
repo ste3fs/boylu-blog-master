@@ -70,11 +70,27 @@ public class SysArticleController {
         return Result.success(notionSyncLogService.listRecent());
     }
 
+    @GetMapping("/notion/image-queue")
+    @ApiOperation(value = "Notion 图片本地化队列")
+    @SaCheckPermission("sys:article:list")
+    public Result<List<NotionArticleSyncLog>> notionImageQueue(
+            @RequestParam(required = false) String imageStatus,
+            @RequestParam(defaultValue = "200") Integer limit) {
+        return Result.success(notionSyncLogService.listImageQueue(imageStatus, limit));
+    }
+
     @GetMapping("/notion/logs/{articleId}")
     @ApiOperation(value = "Notion 同步日志")
     @SaCheckPermission("sys:article:list")
     public Result<List<NotionArticleSyncLog>> notionLogs(@PathVariable Long articleId) {
         return Result.success(notionSyncLogService.listByArticleId(articleId));
+    }
+
+    @PostMapping("/notion/image-retry/{logId}")
+    @ApiOperation(value = "重试 Notion 图片本地化")
+    @SaCheckPermission("sys:article:update")
+    public Result<Boolean> retryNotionImage(@PathVariable Long logId) {
+        return Result.success(sysArticleService.retryNotionImageLocalization(logId));
     }
 
     @DeleteMapping("/notion/logs/{ids}")

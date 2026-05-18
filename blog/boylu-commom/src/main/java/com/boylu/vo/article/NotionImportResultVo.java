@@ -11,6 +11,8 @@ public class NotionImportResultVo {
 
     private Long articleId;
 
+    private Long logId;
+
     private String title;
 
     private Integer importedBlocks;

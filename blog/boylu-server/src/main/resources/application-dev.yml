@@ -28,6 +28,12 @@ spring:
     timeout: 3000
     database: 8
 
+mybatis-plus:
+  global-config:
+    refresh: true
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
 
 #==============================knife4j配置==============================
 knife4j:
@@ -87,6 +93,9 @@ notion:
   request-retry-delay-ms: ${NOTION_REQUEST_RETRY_DELAY_MS:1200}
   import-images: ${NOTION_IMPORT_IMAGES:false}
   max-image-size-mb: ${NOTION_MAX_IMAGE_SIZE_MB:10}
+  image-localize-queue-enabled: ${NOTION_IMAGE_LOCALIZE_QUEUE_ENABLED:true}
+  image-localize-queue-fixed-delay-ms: ${NOTION_IMAGE_LOCALIZE_QUEUE_FIXED_DELAY_MS:15000}
+  image-localize-queue-batch-size: ${NOTION_IMAGE_LOCALIZE_QUEUE_BATCH_SIZE:5}
   auto-sync-enabled: ${NOTION_AUTO_SYNC_ENABLED:true}
   auto-sync-cron: "${NOTION_AUTO_SYNC_CRON:0 20 4 1/3 * ?}"
   auto-sync-limit: ${NOTION_AUTO_SYNC_LIMIT:100}

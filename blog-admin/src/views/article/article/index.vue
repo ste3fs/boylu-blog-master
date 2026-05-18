@@ -41,6 +41,8 @@
               @click="openNotionImport">导入 Notion</el-button>
               <el-button type="info" plain :icon="Setting" v-permission="['sys:article:list']"
               @click="openNotionLogs()">Notion 日志</el-button>
+              <el-button type="warning" plain :icon="Refresh" v-permission="['sys:article:list']"
+              @click="openNotionImageQueue">图片队列</el-button>
           </PageToolbarGroup>
           <PageToolbarGroup kind="danger">
               <el-button type="danger" plain :icon="Delete" :disabled="selectedIds.length === 0"
@@ -273,6 +275,19 @@
             :source="'article-cover'"
             @metadata-change="handleCoverImageMetadataChange"
           />
+          <div v-if="form.cover" class="cover-upload-receipt">
+            <div class="cover-upload-receipt__head">
+              <strong>封面上传回执</strong>
+              <el-tag size="small" effect="plain" :type="isManagedImageUrl(form.cover) ? 'success' : 'info'">
+                {{ isManagedImageUrl(form.cover) ? '已返回托管地址' : '旧地址/外链' }}
+              </el-tag>
+            </div>
+            <div class="cover-upload-receipt__url">{{ form.cover }}</div>
+            <div class="cover-upload-receipt__meta">
+              <span>尺寸：{{ coverReceiptSize }}</span>
+              <span>回退：{{ coverReceiptFallback }}</span>
+            </div>
+          </div>
         </el-form-item>
 
         <el-form-item label="文章简介" prop="summary">
@@ -615,8 +630,30 @@
     >
       <div class="notion-log-toolbar">
         <div class="notion-log-toolbar__summary">
-          共 {{ notionLogs.length }} 条
+          共 {{ filteredNotionLogs.length }} 条
           <span v-if="selectedNotionLogIds.length">，已选 {{ selectedNotionLogIds.length }} 条</span>
+          <span v-if="notionLogShouldAutoRefresh">，队列自动刷新中</span>
+        </div>
+        <div class="notion-log-toolbar__filters">
+          <el-select
+            v-model="notionLogFilter.imageStatus"
+            clearable
+            placeholder="图片状态"
+            style="width: 150px"
+          >
+            <el-option
+              v-for="item in notionImageStatusOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <el-input
+            v-model="notionLogFilter.keyword"
+            clearable
+            placeholder="筛选标题 / 链接 / 提示"
+            style="width: min(320px, 100%)"
+          />
         </div>
         <div class="notion-log-toolbar__actions">
           <el-button :icon="Refresh" :loading="notionLogLoading" @click="refreshNotionLogs">刷新</el-button>
@@ -640,11 +677,33 @@
         </div>
       </div>
 
+      <div v-if="notionLogDialog.mode === 'queue'" class="notion-queue-summary">
+        <div class="notion-queue-summary__card">
+          <span>处理中</span>
+          <strong>{{ notionQueueSummary.running }}</strong>
+        </div>
+        <div class="notion-queue-summary__card">
+          <span>待处理</span>
+          <strong>{{ notionQueueSummary.pending }}</strong>
+        </div>
+        <div class="notion-queue-summary__card is-danger">
+          <span>失败</span>
+          <strong>{{ notionQueueSummary.failed }}</strong>
+        </div>
+        <div class="notion-queue-summary__card is-warning">
+          <span>部分失败</span>
+          <strong>{{ notionQueueSummary.partialFailed }}</strong>
+        </div>
+      </div>
+
       <div v-loading="notionLogLoading" class="notion-log-list">
-        <el-empty v-if="!notionLogs.length" description="暂无 Notion 同步日志" />
+        <el-empty
+          v-if="!filteredNotionLogs.length"
+          :description="notionLogDialog.mode === 'queue' ? '当前没有待处理或异常的图片本地化任务' : '暂无 Notion 同步日志'"
+        />
         <el-scrollbar v-else :max-height="isMobile ? 'calc(100vh - 150px)' : '62vh'">
           <article
-            v-for="row in notionLogs"
+            v-for="row in filteredNotionLogs"
             :key="row.id"
             class="notion-log-card"
             :class="`is-${row.status || 'empty'}`"
@@ -667,7 +726,18 @@
                   图片：{{ notionImageStatusLabel(row) }}
                 </el-tag>
               </div>
-              <el-button link type="danger" :icon="Delete" @click="handleDeleteNotionLog(row)">删除</el-button>
+              <div class="notion-log-card__actions">
+                <el-button
+                  v-if="canRetryNotionImage(row)"
+                  link
+                  type="primary"
+                  :icon="Refresh"
+                  @click="handleRetryNotionImage(row)"
+                >
+                  重试图片
+                </el-button>
+                <el-button link type="danger" :icon="Delete" @click="handleDeleteNotionLog(row)">删除</el-button>
+              </div>
             </div>
 
             <div class="notion-log-card__meta">
@@ -725,7 +795,7 @@ import { getCategoryListApi } from '@/api/article/category'
 import { getTagListApi } from '@/api/article/tag'
 import {
   getArticleListApi, getDetailApi, deleteArticleApi,
-  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi, importNotionArticleApi, syncNotionArticleApi, getNotionSyncLogsApi, deleteNotionSyncLogsApi
+  addArticleApi, updateArticleApi, updateStatusApi, reptileArticleApi, pushBaiduApi, pushBaiduRecentApi, importNotionArticleApi, syncNotionArticleApi, getNotionSyncLogsApi, getNotionImageQueueApi, retryNotionImageLocalizationApi, deleteNotionSyncLogsApi
 } from '@/api/article'
 import { uploadApi, deleteFileApi } from '@/api/file'
 import { getDictDataByDictTypesApi } from '@/api/system/dict'
@@ -779,11 +849,18 @@ const notionDialog = reactive({
 const notionLogDialog = reactive({
   visible: false,
   title: '',
-  articleId: undefined as any
+  articleId: undefined as any,
+  mode: 'recent' as 'recent' | 'article' | 'queue'
 })
 const notionLogs = ref<any[]>([])
 const notionLogLoading = ref(false)
 const selectedNotionLogIds = ref<any[]>([])
+const notionLogFilter = reactive({
+  imageStatus: '',
+  keyword: ''
+})
+const notionLogAutoRefresh = ref(true)
+let notionLogRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 // 表单数据
 const form = reactive<any>({
@@ -980,6 +1057,20 @@ const resolveOptionMeta = (options: any[], value: string | number) => {
 const handleCoverImageMetadataChange = (metadata: any) => {
   form.coverImage = metadata || undefined
 }
+
+const coverReceiptSize = computed(() => {
+  const width = Number(form.coverImage?.width || 0)
+  const height = Number(form.coverImage?.height || 0)
+  if (width > 0 && height > 0) {
+    return `${width} x ${height}`
+  }
+  return '待服务端返回尺寸'
+})
+
+const coverReceiptFallback = computed(() => {
+  const fallback = String(form.coverImage?.fallback || form.cover || '').trim()
+  return fallback || '-'
+})
 
 const extractUploadUrl = (payload: any) => {
   if (!payload) {
@@ -1310,6 +1401,21 @@ const notionImageStatusType = (status?: string) => {
   return map[String(status || '')] || 'info'
 }
 
+const canRetryNotionImage = (row: any) => {
+  const imageStatus = String(row?.imageStatus || row?.notionImageStatus || '')
+  return Boolean(row?.id) && ['failed', 'partial_failed'].includes(imageStatus)
+}
+
+const notionImageStatusOptions = [
+  { label: '待处理', value: 'pending' },
+  { label: '处理中', value: 'running' },
+  { label: '完成', value: 'success' },
+  { label: '部分失败', value: 'partial_failed' },
+  { label: '失败', value: 'failed' },
+  { label: '无远程图', value: 'none' },
+  { label: '已跳过', value: 'skipped' }
+]
+
 const cleanNotionLogText = (text?: string) => {
   return String(text || '')
     .replace(/com\.boylu\.[\s\S]*$/g, '')
@@ -1317,13 +1423,84 @@ const cleanNotionLogText = (text?: string) => {
     .trim()
 }
 
+const filteredNotionLogs = computed(() => {
+  const keyword = String(notionLogFilter.keyword || '').trim().toLowerCase()
+  const imageStatus = String(notionLogFilter.imageStatus || '').trim()
+  return notionLogs.value.filter((row) => {
+    if (imageStatus && String(row?.imageStatus || row?.notionImageStatus || '') !== imageStatus) {
+      return false
+    }
+    if (!keyword) {
+      return true
+    }
+    return [
+      row?.articleTitle,
+      row?.sourceUrl,
+      row?.message,
+      row?.warnings,
+      row?.errorDetail
+    ].some((field) => String(field || '').toLowerCase().includes(keyword))
+  })
+})
+
+const notionQueueSummary = computed(() => {
+  return notionLogs.value.reduce((summary, row) => {
+    const status = String(row?.imageStatus || '')
+    if (status === 'running') {
+      summary.running += 1
+    } else if (status === 'pending') {
+      summary.pending += 1
+    } else if (status === 'failed') {
+      summary.failed += 1
+    } else if (status === 'partial_failed') {
+      summary.partialFailed += 1
+    }
+    return summary
+  }, {
+    running: 0,
+    pending: 0,
+    failed: 0,
+    partialFailed: 0
+  })
+})
+
+const notionLogHasActiveQueue = computed(() => {
+  return notionLogs.value.some((row) => {
+    const imageStatus = String(row?.imageStatus || row?.notionImageStatus || '')
+    const status = String(row?.status || row?.notionStatus || '')
+    return imageStatus === 'pending' || imageStatus === 'running' || status === 'running'
+  })
+})
+
+const notionLogShouldAutoRefresh = computed(() => {
+  return notionLogDialog.visible && notionLogAutoRefresh.value && notionLogHasActiveQueue.value
+})
+
+const stopNotionLogAutoRefresh = () => {
+  if (notionLogRefreshTimer) {
+    clearInterval(notionLogRefreshTimer)
+    notionLogRefreshTimer = null
+  }
+}
+
+const startNotionLogAutoRefresh = () => {
+  stopNotionLogAutoRefresh()
+  notionLogRefreshTimer = setInterval(() => {
+    if (!notionLogLoading.value) {
+      refreshNotionLogs()
+    }
+  }, 8000)
+}
+
 const loadNotionLogs = async (articleId?: any) => {
   notionLogLoading.value = true
   try {
-    const res: any = await getNotionSyncLogsApi(articleId)
+    const res: any = notionLogDialog.mode === 'queue'
+      ? await getNotionImageQueueApi({ limit: 200 })
+      : await getNotionSyncLogsApi(articleId)
     notionLogs.value = res.data || []
     selectedNotionLogIds.value = selectedNotionLogIds.value.filter((id) =>
-      notionLogs.value.some((row) => row.id === id)
+      filteredNotionLogs.value.some((row) => row.id === id)
     )
   } finally {
     notionLogLoading.value = false
@@ -1331,11 +1508,25 @@ const loadNotionLogs = async (articleId?: any) => {
 }
 
 const openNotionLogs = async (row?: any) => {
+  notionLogFilter.imageStatus = ''
+  notionLogFilter.keyword = ''
+  notionLogDialog.mode = row?.id ? 'article' : 'recent'
   notionLogDialog.title = row?.id ? `${row.title || '文章'} - Notion 同步日志` : '最近 Notion 同步日志'
   notionLogDialog.articleId = row?.id
   notionLogDialog.visible = true
   selectedNotionLogIds.value = []
   await loadNotionLogs(row?.id)
+}
+
+const openNotionImageQueue = async () => {
+  notionLogFilter.imageStatus = ''
+  notionLogFilter.keyword = ''
+  notionLogDialog.mode = 'queue'
+  notionLogDialog.title = 'Notion 图片本地化队列'
+  notionLogDialog.articleId = undefined
+  notionLogDialog.visible = true
+  selectedNotionLogIds.value = []
+  await loadNotionLogs()
 }
 
 const refreshNotionLogs = () => {
@@ -1387,7 +1578,7 @@ const handleDeleteSelectedNotionLogs = async () => {
 }
 
 const handleDeleteVisibleNotionLogs = async () => {
-  const ids = notionLogs.value.map((row) => row.id).filter(Boolean)
+  const ids = filteredNotionLogs.value.map((row) => row.id).filter(Boolean)
   if (!ids.length) return
   await ElMessageBox.confirm(`确定删除当前列表中的 ${ids.length} 条 Notion 同步日志吗？`, '提示', {
     confirmButtonText: '确定',
@@ -1397,15 +1588,28 @@ const handleDeleteVisibleNotionLogs = async () => {
   await deleteNotionLogs(ids)
 }
 
+const handleRetryNotionImage = async (row: any) => {
+  if (!row?.id) return
+  await retryNotionImageLocalizationApi(row.id)
+  ElMessage.success('图片本地化已重新加入队列，系统会先刷新 Notion 临时图链再重试')
+  await refreshNotionLogs()
+  getList()
+}
+
 const handleSyncNotion = async (row: any) => {
   if (!row?.id) return
   const res: any = await syncNotionArticleApi(row.id)
-  if (res?.data?.updated === false) {
+  const result = res?.data || {}
+  if (result.updated === false) {
     ElMessage.info('Notion 页面无变化，已跳过导入')
   } else {
     ElMessage.success('Notion 同步完成，图片会继续在后台下载到本站')
   }
   getList()
+  await openNotionLogs({
+    id: row.id,
+    title: result.title || row.title
+  })
 }
 
 // 搜索
@@ -1496,6 +1700,7 @@ const cancel = () => {
   dialog.visible = false
   reptileDialog.visible = false
   notionDialog.visible = false
+  notionLogDialog.visible = false
   contentEditorDialogVisible.value = false
   formRef.value?.resetFields()
   reptileForm.url = ''
@@ -1528,7 +1733,29 @@ onMounted(() => {
   window.addEventListener('resize', syncMobile)
 })
 
+watch(
+  notionLogShouldAutoRefresh,
+  (enabled) => {
+    if (enabled) {
+      startNotionLogAutoRefresh()
+      return
+    }
+    stopNotionLogAutoRefresh()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => notionLogDialog.visible,
+  (visible) => {
+    if (!visible) {
+      stopNotionLogAutoRefresh()
+    }
+  }
+)
+
 onUnmounted(() => {
+  stopNotionLogAutoRefresh()
   window.removeEventListener('resize', syncMobile)
   articleEditorRef.value?.destroy?.()
   fullscreenArticleEditorRef.value?.destroy?.()
@@ -1569,9 +1796,10 @@ onUnmounted(() => {
 
 .notion-log-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 14px;
 }
 
@@ -1580,11 +1808,54 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
+.notion-log-toolbar__filters {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .notion-log-toolbar__actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.notion-queue-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.notion-queue-summary__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  background: var(--el-fill-color-light);
+}
+
+.notion-queue-summary__card span {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.notion-queue-summary__card strong {
+  color: var(--el-text-color-primary);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.notion-queue-summary__card.is-danger {
+  background: rgba(245, 108, 108, 0.08);
+}
+
+.notion-queue-summary__card.is-warning {
+  background: rgba(230, 162, 60, 0.1);
 }
 
 .notion-log-list {
@@ -1649,6 +1920,13 @@ onUnmounted(() => {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.notion-log-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 .notion-log-card__meta {
@@ -1730,6 +2008,40 @@ onUnmounted(() => {
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.cover-upload-receipt {
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  background: linear-gradient(180deg, rgba(250, 250, 252, 0.96), rgba(245, 247, 250, 0.96));
+}
+
+.cover-upload-receipt__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.cover-upload-receipt__url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-primary);
+  word-break: break-all;
+}
+
+.cover-upload-receipt__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 
 .app-container {
@@ -1887,9 +2199,17 @@ onUnmounted(() => {
     flex-direction: column;
   }
 
+  .notion-log-toolbar__filters,
+  .notion-log-toolbar__actions {
+    width: 100%;
+  }
+
   .notion-log-toolbar__actions {
     justify-content: flex-start;
-    width: 100%;
+  }
+
+  .notion-queue-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .notion-log-card {
@@ -1902,7 +2222,7 @@ onUnmounted(() => {
   }
 
   .notion-log-card__badges,
-  .notion-log-card__head > .el-button {
+  .notion-log-card__actions {
     grid-column: 2;
     justify-content: flex-start;
   }

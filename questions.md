@@ -4,111 +4,20 @@
 
 ## 当前仓库状态
 
-- 当前工作树仍有未提交改动，主要集中在 Notion 同步、百度推送、图片缓存、`ip2region.xdb` 读取和文档记录。
-- 当前修改文件包括：
-  - `AGENTS.md`
-  - `questions.md`
-  - `blog-admin/src/views/article/article/index.vue`
-  - `blog-web/public/sw.js`
-  - `blog-web/public/sitemap.xml`
-  - `blog/boylu-admin/src/main/java/com/boylu/service/impl/SysArticleServiceImpl.java`
-  - `blog/boylu-admin/src/main/java/com/boylu/service/notion/NotionArticleSyncJob.java`
-  - `blog/boylu-admin/src/main/java/com/boylu/service/notion/NotionImportService.java`
-  - `blog/boylu-admin/src/main/java/com/boylu/service/notion/NotionSyncLogService.java`
-  - `blog/boylu-admin/src/main/java/com/boylu/service/seo/BaiduPushService.java`
-  - `blog/boylu-commom/src/main/java/com/boylu/config/WebMvcConfig.java`
-  - `blog/boylu-commom/src/main/java/com/boylu/utils/IpUtil.java`
-  - `blog/boylu-file/src/main/java/com/boylu/controller/FileController.java`
-  - `blog/boylu-file/src/main/java/com/boylu/controller/LocalImageStyleController.java`
-  - `blog/boylu-server/src/main/resources/application-dev.yml`
-  - `blog/boylu-server/src/main/resources/application-prod.yml`
-- `blog-admin/src/components.d.ts` 在 `git status` 中显示修改，但当前没有内容 diff，提交前需要再确认是否为生成文件/换行导致。
-- `blog-web/public/sitemap.xml` 是前台构建自动更新，主要把 `lastmod` 更新为 `2026-05-18`。
-
-## P1：Notion 页面读取连接拒绝
-
-- 原问题：服务器曾出现 `Notion 页面读取失败：Connection refused`，连续重试后导入失败。
-- 当前处理：
-  - Notion 请求链路保留 JDK `Proxy.NO_PROXY` 直连 + Hutool 备用请求。
-  - 默认超时提高到 20 秒。
-  - 默认重试次数提高到 6 次。
-  - 429、5xx、超时、连接拒绝会继续重试。
-  - 400、401、403、404 等明确权限或地址错误直接失败。
-  - 新增配置项：`NOTION_API_BASE`、`NOTION_REQUEST_TIMEOUT_MS`、`NOTION_REQUEST_RETRY_TIMES`、`NOTION_REQUEST_RETRY_DELAY_MS`。
-- 剩余风险：
-  - Notion 外部网络仍可能偶发失败，但失败不应再破坏已有文章。
-- 线上验证：
-  - 使用真实 Notion 链接导入一次。
-  - 查看同步日志里失败原因是否清晰，不应只显示大段堆栈。
-
-## P1：Baidu 推送 SSL 握手错误
-
-- 原问题：线上日志出现 `No subject alternative DNS name matching data.zz.baidu.com found`，百度主动推送失败。
-- 当前处理：
-  - 百度推送默认端点改为 `http://data.zz.baidu.com/urls`，避开服务器侧 HTTPS 证书握手异常。
-  - 推送会按顺序尝试配置端点、HTTPS 默认端点、HTTP 降级端点。
-  - 每个端点默认重试 2 次，并设置连接/读取超时。
-  - 百度返回 `error`、HTTP 4xx/5xx 或网络异常时返回失败。
-  - 推送失败不再把文章标记为 `is_baidu_pushed=1`。
-  - 后台手动推送按钮现在会显示真实成功或失败。
-- 剩余风险：
-  - 如果百度 token、站点域名或百度站长平台绑定关系错误，接口仍会失败，需要修正配置。
-- 线上验证：
-  - 后台单篇文章点击“推送百度”，成功时显示成功，失败时显示失败。
-  - 检查数据库 `is_baidu_pushed`，失败时不能被改成 1。
-
-## P1：`ip2region.xdb` 读取权限异常
-
-- 原问题：服务器日志出现 `failed to load content from ip2region.xdb: AccessDeniedException: ip2region.xdb`。
-- 当前处理：
-  - `IpUtil` 不再把 classpath 中的 `ip2region.xdb` 写到当前工作目录再读取。
-  - 现在优先从 classpath 直接读入内存。
-  - 支持 `-Dip2region.xdb.path=/path/to/ip2region.xdb` 或 `IP2REGION_XDB_PATH` 指定外部文件。
-  - 加载失败时返回 `UNKNOWN`，不影响主业务流程。
-  - 已确认打包后的 `boylu-blog.jar` 内包含 `BOOT-INF/classes/ip2region.xdb`。
-- 剩余风险：
-  - 需要部署后确认线上启动日志不再出现当前目录 `ip2region.xdb` 的 `AccessDeniedException`。
-
-## P1：图片每次进入页面加载慢
-
-- 原问题：文章、首页、相册图片已经接入样式图，但每次进入页面仍可能重新加载很久。
-- 当前处理：
-  - 前台 Service Worker 升级为 v2。
-  - `/localFile/`、`/img/local/`、文件网关图片、默认头像和 logo 改为 cache-first。
-  - `/localFile/...` 静态资源缓存从 30 天改为 365 天。
-  - 文件网关解析真实本地文件地址后的 Redis 缓存从 1 天延长到 30 天。
-  - 样式图接口命中已有 `/localFile/img-cache/...` 时直接重定向，不再每次读取图片元数据或解码源图。
-  - 样式图缓存名改为基于源文件路径、大小、修改时间生成，不再为了计算 hash 完整读取源图内容。
-- 剩余风险：
-  - 首次生成某个宽度/格式的样式图仍需要解码源图，第一次访问可能仍慢。
-  - 如果线上 Nginx 覆盖了 `/localFile/` 缓存头，浏览器缓存效果会打折。
-  - Service Worker 更新后，用户浏览器需要重新激活 v2，旧缓存不会立即全部失效。
-- 线上验证：
-  - 首次打开文章页后刷新，图片应明显更快。
-  - 检查 `/localFile/...` 响应头是否有长缓存。
-  - 检查 `/img/local/<encoded>!w320.webp` 第二次请求是否直接命中缓存图。
-
-## P1：Notion 同步日志可视化与删除
-
-- 原问题：导入失败只弹错或写服务器日志，后台看不清哪篇成功、失败、跳过、失败原因和图片本地化进度，也不能删除日志。
-- 当前处理：
-  - 后台文章列表已有“Notion 日志”入口。
-  - 日志弹窗改为卡片式展示，同步状态支持 `running`、`success`、`failed`、`skipped`。
-  - 日志中展示文章、来源地址、同步状态、图片状态、导入块数、变更字段数、图片数量、消息、警告和错误详情。
-  - 支持刷新日志。
-  - 支持删除单条日志、删除选中日志、删除当前可见日志。
-- 剩余风险：
-  - 仍不是独立的“同步任务中心”，只能从文章管理页查看最近或单篇文章日志。
-  - 需要线上浏览器复测删除权限、移动端弹窗宽度和长错误文本折行。
+- 本轮 Notion 图片本地化队列、失败重试、服务重启恢复、Notion 读取兜底和生产日志降噪已完成代码侧修复。
+- 当前代码已部署到线上并完成真实 Notion 导入/同步验证。
+- `blog-admin/src/components.d.ts` 仍显示修改但无内容 diff，疑似生成文件换行状态；不纳入本轮提交。
 
 ## P2：文章封面上传
 
 - 当前处理：
   - 上传组件成功后强制切换为 `success`，避免 100% 圆圈卡住。
   - 文章封面上传改为先保存原图并立即返回，不再同步生成多尺寸封面。
-- 剩余验证：
-  - 后台编辑文章上传封面后，封面卡片应立即显示图片。
-  - 保存文章后，前台首页和文章详情应显示新封面。
+  - 后台文章编辑弹窗新增“封面上传回执”，可直接看到当前返回地址、尺寸和回退地址，便于线上验收 canonical 返回值是否正确。
+- 验证状态：
+  - 后台已部署新版文章编辑页，封面上传回执可用于线上继续观察 canonical 地址。
+  - 仍需后续在真实编辑文章时复测一次：上传封面后卡片立即显示图片，保存后前台首页和文章详情显示新封面。
+  - 上传返回值仍需后续单独确认保持 `/boylu/file/content/{fileId}` 风格，而不是回退成 `/localFile/...` 直链。
 
 ## P2：Notion 图片本地化
 
@@ -116,20 +25,41 @@
   - 导入时可先保留原链接。
   - 后台异步下载图片到本站本地。
   - 同步日志会记录图片状态、总图片数、成功数、失败数。
+  - 后台文章页新增“图片队列”入口，单独查看 `pending/running/partial_failed/failed` 图片本地化任务。
+  - 队列视图支持按图片状态筛选、按标题/来源/提示词搜索，并在存在活动任务时自动刷新。
+  - Notion 导入/同步返回结果补充 `logId`，后续前端或排查脚本可以直接关联到具体日志。
+  - 后端新增持久化队列恢复任务：服务启动后会定时扫描 `pending/running` 图片日志并继续处理，不再只依赖当次 JVM 内存线程。
+  - 后台 Notion 日志卡片新增“重试图片”按钮，失败或部分失败任务可直接重新入队。
+  - 手动重试时会先重新读取 Notion 页面，刷新正文和封面里仍保留的远程临时图链，再执行本地化。
+  - 队列恢复任务对“旧的 pending/running 日志”会按更新时间判断是否需要先刷新最新 Notion 临时图链，避免服务重启后拿过期链接继续下载。
+  - 已修正文中“部分图片已本地化、部分仍是外链”时的临时图链刷新错位问题，改为按全文图片位置对齐刷新，避免把新临时链接替换到错误图片上。
+  - Notion 页面 ID 提取逻辑已修复，`MISC-ad003e...` 这类 slug 不会再把 slug 末尾十六进制字符拼进 Page ID。
+  - Notion 读取增加 `curl` 最终兜底：Java/Hutool 连接失败时走服务器已验证可通的系统 curl，请求 token 写入临时配置文件并在请求后删除，避免出现在进程参数中。
+  - curl 兜底解析已兼容“正文是有效 JSON 但状态码未带回”的异常输出，避免成功响应被误判失败。
+- 线上验证：
+  - MISC Notion 页面已真实导入成功：`articleId=393`、`logId=15`、导入块数 437。
+  - 首次图片本地化已完成：7/7 成功。
+  - 已做可恢复故障注入：把新导入草稿第一张图临时改成失效远程 URL 后，后台“重试图片”接口可先刷新 Notion 临时图链，再恢复为 `/boylu/file/content/...`，最终 1/1 成功。
+  - 已验证服务重启恢复：遗留 `running` 图片任务在 `boylu-blog` 重启后被调度器捞起，刷新临时图链后最终 1/1 成功。
+  - 最终部署版本再次同步 `articleId=393` 返回 `skipped`，说明线上 jar 可正常读取 Notion 元数据，并在无变化时跳过更新。
 - 剩余风险：
-  - 后台还没有专门的图片本地化队列页面。
-  - 某张图失败时，目前主要通过 Notion 日志查看，不适合批量排查大量图片。
-  - Notion 临时图片链接可能过期，长时间后再下载仍可能失败。
+  - 图片本地化仍是单机进程内消费模型，不是独立消息队列；极端高并发下仍不适合当作分布式任务系统使用。
+  - Notion 原文结构如果发生大幅改写，且当前站内文章已经人工插入/删除图片，按位置刷新临时图链仍可能需要人工复核个别图片对应关系。
+  - 失败任务重试、服务重启恢复、临时图链刷新三条链路已通过真实线上验证；后续主要观察极端网络抖动和大图下载耗时。
 
 ## P2：生产日志过于 verbose
 
 - 现象：线上日志曾大量输出 MyBatis SQL、用户记录、文章内容片段。
-- 风险：
-  - 日志体积变大。
-  - 服务器日志中可能出现手机号、邮箱、文章正文等敏感或半敏感信息。
-- 建议：
-  - 生产环境关闭 MyBatis SQL 明细日志。
-  - 只保留必要错误、慢接口和关键业务日志。
+- 当前处理：
+  - `application.yml` 已去掉全局 `StdOutImpl`，避免所有环境默认打印 MyBatis SQL。
+  - `application-dev.yml` 单独保留开发环境 SQL stdout 和 mapper refresh。
+  - `application-prod.yml` 新增 `root/com.boylu=INFO`、`org.apache.ibatis/com.baomidou/org.mybatis/org.springframework.jdbc=WARN`，用于压低生产日志噪音。
+- 线上验证：
+  - 新版后端已部署并重启，`boylu-blog` 服务处于 `active`。
+  - 重启后的 `prod` 日志未再命中 MyBatis `Preparing`、`Row`、`Total` 明细。
+  - 前台入口、后台入口和公开 API 均已返回 200。
+- 剩余风险：
+  - 仍需继续观察是否还有文章正文、用户记录等过长业务日志；如果出现，再做点位级裁剪。
 
 ## P2：公开仓库信息暴露
 
@@ -161,31 +91,64 @@
   - 提交前确认生成文件是否需要纳入提交。
   - 继续保持当前有效目录：`blog-web`、`blog-admin`、`blog/boylu-*`。
 
-## 已处理：相册与文章图片缺失修复
+## 已处理记录
 
-- `2025年10月` 相册封面和 12 张照片已恢复。
-- 全部相册与照片引用扫描结果已修到 `issue_count = 0`。
-- 全部文章共扫描 80 篇、417 个内部图片引用，最终内部图片引用扫描 `issue_count = 0`。
-- 无法找回原图的旧图片已替换为明确缺失占位图 `/localFile/local-plus/system/missing-image.svg`。
-- 不删除旧存储文件，不用其它无关图片冒充缺失图片。
+- 2026-05-18 线上部署与 Notion 队列验证：
+  - 已备份线上后端 jar、前台静态文件和后台静态文件后替换当前构建产物。
+  - Windows `Compress-Archive` 产物在 Linux `unzip` 下存在反斜杠路径问题，已改用 `tar.gz` 重新打包前后台静态产物完成部署。
+  - 后端新版 jar 已部署并重启，前台、后台入口和公开 API 验证为 200。
+  - 已确认生产日志不再持续输出 MyBatis SQL 明细。
+  - 已完成 MISC Notion 真实导入、图片本地化、失败重试、服务重启恢复和最终 `skipped` 同步验证。
+- Notion 图片本地化队列与排查：
+  - 已新增后台“图片队列”入口，面向活动任务和失败任务集中排查。
+  - 已支持队列摘要、图片状态筛选、关键字搜索和活动任务自动刷新。
+- Notion 自动同步保护：
+  - 已防止空正文、空摘要、空封面等空值覆盖旧文章。
+  - 无有效差异时记录 `skipped`，不更新正文、摘要、封面，也不排队图片本地化。
+- Notion 页面读取连接拒绝：
+  - 已增加直连 + 备用请求、超时、重试、非重试 HTTP 状态识别。
+- 百度推送 SSL 握手错误：
+  - 默认改为 HTTP 端点，保留 HTTPS/HTTP 候选端点重试；失败不再误标记已推送。
+- `ip2region.xdb` 读取权限异常：
+  - 已改为优先从 classpath 直接读入内存，不再依赖当前工作目录读写权限。
+- 图片每次进入页面加载慢：
+  - 已增加 Service Worker cache-first、长缓存、文件网关 Redis 缓存和样式图命中缓存快速返回。
+- Notion 同步日志可视化与删除：
+  - 已在后台文章管理页增加日志查看、刷新、单条删除、批量删除和可见日志删除。
+- 相册与文章图片缺失修复：
+  - `2025年10月` 相册封面和 12 张照片已恢复。
+  - 全部相册与照片引用扫描结果已修到 `issue_count = 0`。
+  - 全部文章共扫描 80 篇、417 个内部图片引用，最终内部图片引用扫描 `issue_count = 0`。
+  - 无法找回原图的旧图片已替换为明确缺失占位图 `/localFile/local-plus/system/missing-image.svg`。
 
 ## 最近验证结果
 
 - 后端 Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
 - 前台构建已通过：`blog-web npm run build`。
+- 后台构建已通过：`blog-admin npm run build`。
+- 线上三份包 SHA256 已和本地一致后再执行替换部署。
+- 线上 `boylu-blog` 重启后处于 active。
+- 线上 `prod` 日志已确认不再输出 MyBatis SQL 明细。
+- 线上公开接口和前后台入口已确认返回 200。
+- 线上真实 Notion 导入已通过：`articleId=393`、`logId=15`、图片本地化 7/7 成功。
+- 线上图片失败重试已通过：失效远程图刷新后恢复为 `/boylu/file/content/...`。
+- 线上服务重启恢复已通过：遗留 `running` 图片任务重启后最终 1/1 成功。
+- 最终线上 jar 对 `articleId=393` 再次同步返回 `skipped`，验证 Notion 元数据读取和无变化跳过逻辑正常。
+- 已补做代码侧校验：队列恢复会优先处理旧 `running/pending` 任务，失败任务支持后台直接重试，重试前会刷新最新 Notion 临时图链。
+- 这次本地 Maven 需要显式设置 `JAVA_HOME=C:\Program Files\Java\jdk1.8.0_311` 后才可运行；不是代码错误，是当前终端环境变量缺失。
 - 已确认 `boylu-blog.jar` 内包含 `BOOT-INF/classes/ip2region.xdb`。
+- 提交前敏感信息扫描未发现真实 Notion token、服务器密码或硬编码真实密钥；命中的均为环境变量占位或代码变量。
 - `git diff --check` 当前无格式错误，仅有 Windows 换行提示。
 
 ## 下一步优先级
 
-1. 部署当前后端和前台到服务器。
-2. 重启 `boylu-blog`，检查启动日志里是否还有 `ip2region.xdb AccessDeniedException`。
-3. 用浏览器复测首页、文章页、相册页图片二次加载速度。
-4. 手动推送一篇文章到百度，确认成功/失败结果真实。
-5. 检查 Notion 日志弹窗：状态展示、错误折行、删除功能。
+1. 后台编辑一篇文章，实测封面上传回执、保存后前台首页/详情封面展示是否正常。
+2. 用浏览器复测首页、文章页、相册页图片二次加载速度。
+3. 手动推送一篇文章到百度，确认成功/失败结果真实。
+4. 继续处理 P2：公开仓库脱敏、点位级业务日志裁剪。
 
 ## 记录规则
 
 - 后续每次修复完问题后，都要同步更新本文件。
-- 已修复的问题需要标明“当前处理/已处理”、剩余风险和验证结果。
+- 已修复的问题从活动问题清单删除，只保留必要的已处理记录。
 - 未完全解决的问题继续保留优先级，避免修完代码但问题台账滞后。

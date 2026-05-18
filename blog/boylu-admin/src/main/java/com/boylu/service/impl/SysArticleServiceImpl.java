@@ -51,11 +51,15 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArticle> implements SysArticleService {
+
+    private static final int DEFAULT_NOTION_IMAGE_QUEUE_BATCH_SIZE = 5;
 
     private final SysTagMapper sysTagMapper;
 
@@ -68,6 +72,9 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
     private final NotionImportService notionImportService;
 
     private final NotionSyncLogService notionSyncLogService;
+
+    private final Set<Long> notionImageProcessingLogIds = ConcurrentHashMap.newKeySet();
+    private final Set<Long> notionImageProcessingArticleIds = ConcurrentHashMap.newKeySet();
 
     @Override
     public IPage<ArticleListVo> selectPage(ArticleQueryDto articleQueryDto) {
@@ -180,6 +187,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             queueNotionImageLocalization(article.getId(), logId);
             return NotionImportResultVo.builder()
                     .articleId(article.getId())
+                    .logId(logId)
                     .title(article.getTitle())
                     .importedBlocks(importResult.getImportedBlocks())
                     .updated(updated)
@@ -230,6 +238,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
                 );
                 return NotionImportResultVo.builder()
                         .articleId(existingArticle.getId())
+                        .logId(logId)
                         .title(existingArticle.getTitle())
                         .importedBlocks(0)
                         .updated(false)
@@ -266,6 +275,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
                 );
                 return NotionImportResultVo.builder()
                         .articleId(existingArticle.getId())
+                        .logId(logId)
                         .title(existingArticle.getTitle())
                         .importedBlocks(importResult.getImportedBlocks())
                         .updated(false)
@@ -285,6 +295,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             queueNotionImageLocalization(article.getId(), logId);
             return NotionImportResultVo.builder()
                     .articleId(article.getId())
+                    .logId(logId)
                     .title(article.getTitle())
                     .importedBlocks(importResult.getImportedBlocks())
                     .updated(true)
@@ -301,6 +312,46 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             );
             throw ex;
         }
+    }
+
+    @Override
+    public Boolean retryNotionImageLocalization(Long logId) {
+        if (logId == null || logId <= 0) {
+            throw new ServiceException("日志ID不合法");
+        }
+        NotionArticleSyncLog syncLog = notionSyncLogService.getById(logId);
+        if (syncLog == null) {
+            throw new ServiceException("Notion 图片日志不存在");
+        }
+        if (syncLog.getArticleId() == null || syncLog.getArticleId() <= 0) {
+            throw new ServiceException("该日志没有关联文章，无法重试");
+        }
+        SysArticle article = baseMapper.selectById(syncLog.getArticleId());
+        if (article == null) {
+            throw new ServiceException("关联文章不存在，无法重试");
+        }
+        notionSyncLogService.markImagePending(logId, "图片本地化已重新加入队列");
+        dispatchNotionImageLocalization(logId, true);
+        return true;
+    }
+
+    @Override
+    public Integer processPendingNotionImageLocalizationQueue(Integer limit) {
+        int safeLimit = Math.max(1, Math.min(limit == null ? DEFAULT_NOTION_IMAGE_QUEUE_BATCH_SIZE : limit, 20));
+        List<NotionArticleSyncLog> queueLogs = notionSyncLogService.listProcessableImageQueue(safeLimit);
+        if (queueLogs == null || queueLogs.isEmpty()) {
+            return 0;
+        }
+        int dispatched = 0;
+        for (NotionArticleSyncLog queueLog : queueLogs) {
+            if (queueLog == null || queueLog.getId() == null) {
+                continue;
+            }
+            if (dispatchNotionImageLocalization(queueLog.getId(), shouldRefreshQueueRemoteImageUrls(queueLog))) {
+                dispatched++;
+            }
+        }
+        return dispatched;
     }
 
     private LocalDateTime resolveLastSuccessfulSyncTime(Long articleId) {
@@ -465,7 +516,7 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
     }
 
     private void queueNotionImageLocalization(Long articleId, Long logId) {
-        Runnable task = () -> ThreadUtil.execAsync(() -> localizeNotionArticleImages(articleId, logId));
+        Runnable task = () -> dispatchNotionImageLocalization(logId, false);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -478,11 +529,85 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         }
     }
 
-    private void localizeNotionArticleImages(Long articleId, Long logId) {
+    private boolean shouldRefreshQueueRemoteImageUrls(NotionArticleSyncLog queueLog) {
+        if (queueLog == null) {
+            return false;
+        }
+        if (StringUtils.equals(queueLog.getImageStatus(), NotionSyncLogService.IMAGE_RUNNING)) {
+            return true;
+        }
+        LocalDateTime referenceTime = queueLog.getUpdateTime() == null ? queueLog.getCreateTime() : queueLog.getUpdateTime();
+        if (referenceTime == null) {
+            return true;
+        }
+        return referenceTime.isBefore(LocalDateTime.now().minusMinutes(10));
+    }
+
+    private boolean dispatchNotionImageLocalization(Long logId, boolean refreshRemoteImageUrls) {
+        if (logId == null || logId <= 0) {
+            return false;
+        }
+        NotionArticleSyncLog syncLog = notionSyncLogService.getById(logId);
+        if (syncLog == null || syncLog.getArticleId() == null || syncLog.getArticleId() <= 0) {
+            return false;
+        }
+        Long articleId = syncLog.getArticleId();
+        if (!notionImageProcessingLogIds.add(logId)) {
+            return false;
+        }
+        if (!notionImageProcessingArticleIds.add(articleId)) {
+            notionImageProcessingLogIds.remove(logId);
+            return false;
+        }
+        ThreadUtil.execAsync(() -> {
+            try {
+                localizeNotionArticleImages(logId, refreshRemoteImageUrls);
+            } finally {
+                notionImageProcessingLogIds.remove(logId);
+                notionImageProcessingArticleIds.remove(articleId);
+            }
+        });
+        return true;
+    }
+
+    private void localizeNotionArticleImages(Long logId, boolean refreshRemoteImageUrls) {
+        Long articleId = null;
         try {
+            NotionArticleSyncLog syncLog = notionSyncLogService.getById(logId);
+            if (syncLog == null) {
+                log.warn("Skip Notion image localization because log does not exist, logId={}", logId);
+                return;
+            }
+            articleId = syncLog.getArticleId();
+            if (articleId == null || articleId <= 0) {
+                notionSyncLogService.markImageFailed(logId, new ServiceException("图片本地化日志缺少关联文章"));
+                return;
+            }
             notionSyncLogService.markImageRunning(logId);
             SysArticle article = baseMapper.selectById(articleId);
+            if (article == null) {
+                notionSyncLogService.markImageFailed(logId, new ServiceException("关联文章不存在，无法继续图片本地化"));
+                return;
+            }
+            List<String> refreshWarnings = Collections.emptyList();
+            if (refreshRemoteImageUrls) {
+                NotionImportService.RefreshRemoteImageUrlsResult refreshResult = notionImportService.refreshArticleRemoteImageUrls(article);
+                refreshWarnings = refreshResult.getWarnings() == null ? Collections.emptyList() : refreshResult.getWarnings();
+                if (refreshResult.getArticle() != null) {
+                    baseMapper.updateById(refreshResult.getArticle());
+                    clearHomePostsCache();
+                    clearArticleDetailCache(articleId);
+                    article = baseMapper.selectById(articleId);
+                }
+            }
             NotionImportService.LocalizeImagesResult result = notionImportService.localizeArticleImages(article);
+            if (!refreshWarnings.isEmpty()) {
+                List<String> mergedWarnings = new ArrayList<>(refreshWarnings);
+                if (result.getWarnings() != null && !result.getWarnings().isEmpty()) {
+                    mergedWarnings.addAll(result.getWarnings());
+                }
+                result.setWarnings(mergedWarnings);
+            }
             if (result.getArticle() != null) {
                 baseMapper.updateById(result.getArticle());
                 clearHomePostsCache();

@@ -104,6 +104,22 @@ export function getNotionSyncLogsApi(id: any) {
   })
 }
 
+export function getNotionImageQueueApi(params?: any) {
+  return request({
+    url: '/sys/article/notion/image-queue',
+    method: 'get',
+    params
+  })
+}
+
+export function retryNotionImageLocalizationApi(logId: any) {
+  return request({
+    url: `/sys/article/notion/image-retry/${logId}`,
+    method: 'post',
+    timeout: 120000
+  })
+}
+
 export function deleteNotionSyncLogsApi(ids: any) {
   return request({
     url: `/sys/article/notion/logs/${ids}`,

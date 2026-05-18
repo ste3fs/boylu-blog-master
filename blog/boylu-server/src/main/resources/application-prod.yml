@@ -73,6 +73,9 @@ notion:
   request-retry-delay-ms: ${NOTION_REQUEST_RETRY_DELAY_MS:1200}
   import-images: ${NOTION_IMPORT_IMAGES:false}
   max-image-size-mb: ${NOTION_MAX_IMAGE_SIZE_MB:10}
+  image-localize-queue-enabled: ${NOTION_IMAGE_LOCALIZE_QUEUE_ENABLED:true}
+  image-localize-queue-fixed-delay-ms: ${NOTION_IMAGE_LOCALIZE_QUEUE_FIXED_DELAY_MS:15000}
+  image-localize-queue-batch-size: ${NOTION_IMAGE_LOCALIZE_QUEUE_BATCH_SIZE:5}
   auto-sync-enabled: ${NOTION_AUTO_SYNC_ENABLED:true}
   auto-sync-cron: "${NOTION_AUTO_SYNC_CRON:0 20 4 1/3 * ?}"
   auto-sync-limit: ${NOTION_AUTO_SYNC_LIMIT:100}
@@ -119,3 +122,12 @@ seo:
       connect-timeout-ms: ${SEO_BAIDU_PUSH_CONNECT_TIMEOUT_MS:8000}
       read-timeout-ms: ${SEO_BAIDU_PUSH_READ_TIMEOUT_MS:12000}
       retry-times: ${SEO_BAIDU_PUSH_RETRY_TIMES:2}
+
+logging:
+  level:
+    root: INFO
+    com.boylu: INFO
+    org.apache.ibatis: WARN
+    com.baomidou: WARN
+    org.mybatis: WARN
+    org.springframework.jdbc: WARN

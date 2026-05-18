@@ -12,7 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -190,6 +192,52 @@ public class NotionSyncLogService {
                 .last("limit 50"));
     }
 
+    public List<NotionArticleSyncLog> listImageQueue(String imageStatus, Integer limit) {
+        int safeLimit = Math.max(20, Math.min(limit == null ? 200 : limit, 500));
+        LambdaQueryWrapper<NotionArticleSyncLog> wrapper = new LambdaQueryWrapper<NotionArticleSyncLog>()
+                .orderByDesc(NotionArticleSyncLog::getUpdateTime)
+                .orderByDesc(NotionArticleSyncLog::getId)
+                .last("limit " + safeLimit);
+        String normalizedStatus = StringUtils.trimToEmpty(imageStatus);
+        if (StringUtils.isNotBlank(normalizedStatus)) {
+            wrapper.eq(NotionArticleSyncLog::getImageStatus, normalizedStatus);
+        } else {
+            wrapper.in(NotionArticleSyncLog::getImageStatus,
+                    IMAGE_PENDING,
+                    IMAGE_RUNNING,
+                    IMAGE_PARTIAL_FAILED,
+                    IMAGE_FAILED);
+        }
+        List<NotionArticleSyncLog> logs = notionArticleSyncLogMapper.selectList(wrapper);
+        if (logs == null || logs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<NotionArticleSyncLog> sortedLogs = new ArrayList<>(logs);
+        sortedLogs.sort(Comparator
+                .comparingInt((NotionArticleSyncLog item) -> imageQueuePriority(item == null ? null : item.getImageStatus()))
+                .thenComparing(NotionArticleSyncLog::getUpdateTime, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(NotionArticleSyncLog::getId, Comparator.nullsLast(Comparator.reverseOrder())));
+        return sortedLogs;
+    }
+
+    public List<NotionArticleSyncLog> listProcessableImageQueue(Integer limit) {
+        int safeLimit = Math.max(1, Math.min(limit == null ? 10 : limit, 100));
+        List<NotionArticleSyncLog> logs = notionArticleSyncLogMapper.selectList(new LambdaQueryWrapper<NotionArticleSyncLog>()
+                .in(NotionArticleSyncLog::getImageStatus, IMAGE_PENDING, IMAGE_RUNNING)
+                .isNotNull(NotionArticleSyncLog::getArticleId)
+                .orderByAsc(NotionArticleSyncLog::getUpdateTime)
+                .orderByAsc(NotionArticleSyncLog::getId)
+                .last("limit " + safeLimit));
+        return logs == null ? Collections.emptyList() : logs;
+    }
+
+    public NotionArticleSyncLog getById(Long logId) {
+        if (logId == null || logId <= 0) {
+            return null;
+        }
+        return notionArticleSyncLogMapper.selectById(logId);
+    }
+
     public NotionArticleSyncLog findLastSuccessfulSync(Long articleId) {
         if (articleId == null || articleId <= 0) {
             return null;
@@ -207,6 +255,23 @@ public class NotionSyncLogService {
             return false;
         }
         return notionArticleSyncLogMapper.deleteBatchIds(ids) > 0;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markImagePending(Long logId, String message) {
+        if (logId == null) {
+            return;
+        }
+        try {
+            NotionArticleSyncLog update = new NotionArticleSyncLog();
+            update.setId(logId);
+            update.setImageStatus(IMAGE_PENDING);
+            update.setMessage(shortText(StringUtils.defaultIfBlank(message, "图片本地化等待重试"), 500));
+            update.setErrorDetail(null);
+            notionArticleSyncLogMapper.updateById(update);
+        } catch (Exception ex) {
+            log.warn("Failed to mark Notion image log pending, logId={}", logId, ex);
+        }
     }
 
     private void updateImageStatus(Long logId, String imageStatus, String message, Exception error) {
@@ -253,5 +318,21 @@ public class NotionSyncLogService {
         StringWriter writer = new StringWriter();
         error.printStackTrace(new PrintWriter(writer));
         return writer.toString();
+    }
+
+    private int imageQueuePriority(String imageStatus) {
+        if (IMAGE_RUNNING.equals(imageStatus)) {
+            return 0;
+        }
+        if (IMAGE_PENDING.equals(imageStatus)) {
+            return 1;
+        }
+        if (IMAGE_FAILED.equals(imageStatus)) {
+            return 2;
+        }
+        if (IMAGE_PARTIAL_FAILED.equals(imageStatus)) {
+            return 3;
+        }
+        return 9;
     }
 }

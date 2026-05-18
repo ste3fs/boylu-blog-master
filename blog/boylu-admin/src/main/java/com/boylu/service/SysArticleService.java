@@ -45,6 +45,10 @@ public interface SysArticleService extends IService<SysArticle> {
 
     NotionImportResultVo syncNotionArticle(Long articleId);
 
+    Boolean retryNotionImageLocalization(Long logId);
+
+    Integer processPendingNotionImageLocalizationQueue(Integer limit);
+
     /**
      * 删除
      * @param ids

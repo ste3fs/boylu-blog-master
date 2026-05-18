@@ -53,6 +53,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -224,6 +225,79 @@ public class NotionImportService {
                 context.getLocalizedImageUrls().size(),
                 context.getFailedImageUrls().size()
         );
+    }
+
+    public RefreshRemoteImageUrlsResult refreshArticleRemoteImageUrls(SysArticle article) {
+        preferIpv4StackForNotion();
+        if (article == null || article.getId() == null) {
+            return new RefreshRemoteImageUrlsResult(null, 0, Collections.emptyList());
+        }
+        if (StringUtils.isBlank(article.getOriginalUrl()) || !StringUtils.containsIgnoreCase(article.getOriginalUrl(), "notion.so")) {
+            return new RefreshRemoteImageUrlsResult(null, 0, Collections.singletonList("当前文章不是 Notion 导入文章，无法刷新图片临时链接。"));
+        }
+
+        NotionImportDto dto = new NotionImportDto();
+        dto.setPageUrl(article.getOriginalUrl());
+        dto.setImportImages(false);
+        ImportPageResult importResult = importPage(dto);
+        SysArticleDetailVo freshArticle = importResult == null ? null : importResult.getArticle();
+        if (freshArticle == null) {
+            return new RefreshRemoteImageUrlsResult(null, 0, Collections.singletonList("未能从 Notion 拉取到新的图片链接。"));
+        }
+
+        List<String> warnings = new ArrayList<>();
+        SysArticle update = new SysArticle();
+        update.setId(article.getId());
+        int changedCount = 0;
+        int refreshedCount = 0;
+
+        ReplaceRemoteUrlsResult refreshedMarkdown = replaceRemoteUrlsByOrder(
+                article.getContentMd(),
+                freshArticle.getContentMd(),
+                MARKDOWN_IMAGE_URL_PATTERN,
+                1,
+                null,
+                null
+        );
+        if (refreshedMarkdown.getChanged()) {
+            update.setContentMd(refreshedMarkdown.getValue());
+            changedCount++;
+        }
+        refreshedCount += refreshedMarkdown.getReplacedCount();
+        appendRefreshWarning(warnings, refreshedMarkdown, "Markdown");
+
+        ReplaceRemoteUrlsResult refreshedHtml = replaceRemoteUrlsByOrder(
+                article.getContent(),
+                freshArticle.getContent(),
+                HTML_IMAGE_SRC_PATTERN,
+                2,
+                1,
+                3
+        );
+        if (refreshedHtml.getChanged()) {
+            update.setContent(refreshedHtml.getValue());
+            changedCount++;
+        }
+        refreshedCount += refreshedHtml.getReplacedCount();
+        appendRefreshWarning(warnings, refreshedHtml, "HTML");
+
+        String currentCover = StringUtils.defaultString(article.getCover());
+        String freshCover = StringUtils.defaultString(freshArticle.getCover());
+        if (isRemoteImageUrl(currentCover) && isRemoteImageUrl(freshCover) && !StringUtils.equals(currentCover, freshCover)) {
+            update.setCover(freshCover);
+            CoverImageVo coverImage = CoverImageUtil.fromJson(article.getCoverImage(), freshCover, article.getTitle());
+            coverImage.setKey(freshCover);
+            coverImage.setFallback(freshCover);
+            update.setCoverImage(CoverImageUtil.toJson(coverImage));
+            changedCount++;
+            refreshedCount++;
+        }
+
+        if (warnings.isEmpty() && refreshedCount <= 0) {
+            warnings.add("当前文章中的远程图片链接无需刷新。");
+        }
+
+        return new RefreshRemoteImageUrlsResult(changedCount > 0 ? update : null, refreshedCount, warnings);
     }
 
     private void renderChildren(String blockId, int depth, StringBuilder markdown, StringBuilder plainText, ImportContext context) {
@@ -646,14 +720,22 @@ public class NotionImportService {
                     if (isNonRetryableNotionHttpFailure(fallbackEx)) {
                         throw fallbackEx;
                     }
-                    fallbackEx.addSuppressed(ex);
-                    lastException = fallbackEx;
-                    if (attempt >= retryTimes) {
-                        break;
+                    try {
+                        return requestNotionObjectByCurl(pathAndQuery);
+                    } catch (ServiceException curlEx) {
+                        if (isNonRetryableNotionHttpFailure(curlEx)) {
+                            throw curlEx;
+                        }
+                        curlEx.addSuppressed(ex);
+                        curlEx.addSuppressed(fallbackEx);
+                        lastException = curlEx;
+                        if (attempt >= retryTimes) {
+                            break;
+                        }
+                        log.warn("Notion request failed, will retry. attempt={}/{}, path={}, primary={}, fallback={}, curl={}",
+                                attempt, retryTimes, pathAndQuery, ex.getMessage(), fallbackEx.getMessage(), curlEx.getMessage());
+                        sleepBeforeRetry(attempt);
                     }
-                    log.warn("Notion request failed, will retry. attempt={}/{}, path={}, primary={}, fallback={}",
-                            attempt, retryTimes, pathAndQuery, ex.getMessage(), fallbackEx.getMessage());
-                    sleepBeforeRetry(attempt);
                 }
             }
         }
@@ -762,6 +844,72 @@ public class NotionImportService {
         } finally {
             if (response != null) {
                 response.close();
+            }
+        }
+    }
+
+    private JSONObject requestNotionObjectByCurl(String pathAndQuery) {
+        Path configPath = null;
+        try {
+            configPath = Files.createTempFile("notion-curl-", ".conf");
+            Files.write(configPath, Arrays.asList(
+                    "url = \"" + getNotionApiBase() + pathAndQuery + "\"",
+                    "request = \"GET\"",
+                    "header = \"Authorization: Bearer " + apiToken.trim().replace("\"", "\\\"") + "\"",
+                    "header = \"Notion-Version: " + StringUtils.defaultIfBlank(notionVersion, "2022-06-28").replace("\"", "\\\"") + "\"",
+                    "header = \"Accept: application/json\"",
+                    "silent",
+                    "show-error",
+                    "write-out = \"\\n%{http_code}\""
+            ), StandardCharsets.UTF_8);
+            Process process = new ProcessBuilder(
+                    "curl",
+                    "--connect-timeout", String.valueOf(Math.max(5, safeNotionTimeoutMs() / 1000)),
+                    "--max-time", String.valueOf(Math.max(5, safeNotionTimeoutMs() / 1000)),
+                    "-K", configPath.toString()
+            ).redirectErrorStream(true).start();
+            boolean finished = process.waitFor(Math.max(10, safeNotionTimeoutMs() / 1000 + 5), TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new ServiceException("Notion 页面读取失败：curl timeout");
+            }
+            String output;
+            try (InputStream input = process.getInputStream(); ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
+                byte[] bytes = new byte[4096];
+                int length;
+                while ((length = input.read(bytes)) != -1) {
+                    buffer.write(bytes, 0, length);
+                }
+                output = buffer.toString(StandardCharsets.UTF_8.name());
+            }
+            int splitIndex = output.lastIndexOf('\n');
+            if (splitIndex < 0) {
+                if (StringUtils.startsWith(StringUtils.trimToEmpty(output), "{")) {
+                    return JSONUtil.parseObj(output);
+                }
+                throw new ServiceException("Notion 页面读取失败：curl " + StrUtil.sub(output, 0, 180));
+            }
+            String body = output.substring(0, splitIndex);
+            String statusText = output.substring(splitIndex + 1).trim();
+            if (!StringUtils.isNumeric(statusText) && StringUtils.startsWith(StringUtils.trimToEmpty(output), "{")) {
+                return JSONUtil.parseObj(output);
+            }
+            int status = Integer.parseInt(statusText);
+            if (status < 200 || status >= 300) {
+                throw new ServiceException("Notion 页面读取失败，请确认页面已共享给 Integration。HTTP "
+                        + status + ": " + StrUtil.sub(body, 0, 180));
+            }
+            return JSONUtil.parseObj(body);
+        } catch (ServiceException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ServiceException("Notion 页面读取失败：curl " + ex.getMessage(), ex);
+        } finally {
+            if (configPath != null) {
+                try {
+                    Files.deleteIfExists(configPath);
+                } catch (Exception ignored) {
+                }
             }
         }
     }
@@ -898,6 +1046,69 @@ public class NotionImportService {
         String downloadUrl = imageUrl.replace("&amp;", "&");
         context.getAttemptedImageUrls().add(downloadUrl);
         return persistImageIfNeeded(downloadUrl, context);
+    }
+
+    private ReplaceRemoteUrlsResult replaceRemoteUrlsByOrder(String currentText, String freshText, Pattern pattern,
+                                                             int urlGroup, Integer prefixGroup, Integer suffixGroup) {
+        if (StringUtils.isBlank(currentText)) {
+            return new ReplaceRemoteUrlsResult(currentText, 0, 0, false);
+        }
+        List<String> freshImageUrls = extractImageUrlsByOrder(freshText, pattern, urlGroup);
+        if (freshImageUrls.isEmpty()) {
+            return new ReplaceRemoteUrlsResult(currentText, 0, 0, false);
+        }
+        Matcher matcher = pattern.matcher(currentText);
+        StringBuffer buffer = new StringBuffer();
+        int imageIndex = 0;
+        int replacedCount = 0;
+        int missingFreshUrls = 0;
+        boolean changed = false;
+        while (matcher.find()) {
+            String currentUrl = matcher.group(urlGroup);
+            String refreshedUrl = imageIndex < freshImageUrls.size() ? freshImageUrls.get(imageIndex) : null;
+            imageIndex++;
+            if (!isRemoteImageUrl(currentUrl)) {
+                matcher.appendReplacement(buffer, Matcher.quoteReplacement(matcher.group(0)));
+                continue;
+            }
+            if (!isRemoteImageUrl(refreshedUrl)) {
+                missingFreshUrls++;
+                matcher.appendReplacement(buffer, Matcher.quoteReplacement(matcher.group(0)));
+                continue;
+            }
+            String replacement;
+            if (prefixGroup != null && suffixGroup != null) {
+                replacement = matcher.group(prefixGroup) + refreshedUrl + matcher.group(suffixGroup);
+            } else {
+                replacement = matcher.group(0).replace(currentUrl, refreshedUrl);
+            }
+            if (!StringUtils.equals(currentUrl, refreshedUrl)) {
+                changed = true;
+                replacedCount++;
+            }
+            matcher.appendReplacement(buffer, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(buffer);
+        return new ReplaceRemoteUrlsResult(buffer.toString(), replacedCount, missingFreshUrls, changed);
+    }
+
+    private List<String> extractImageUrlsByOrder(String text, Pattern pattern, int urlGroup) {
+        if (StringUtils.isBlank(text)) {
+            return Collections.emptyList();
+        }
+        List<String> urls = new ArrayList<>();
+        Matcher matcher = pattern.matcher(text);
+        while (matcher.find()) {
+            urls.add(matcher.group(urlGroup));
+        }
+        return urls;
+    }
+
+    private void appendRefreshWarning(List<String> warnings, ReplaceRemoteUrlsResult result, String source) {
+        if (result == null || result.getMissingFreshUrls() <= 0) {
+            return;
+        }
+        warnings.add(source + " 图片临时链接刷新不完整，仍有 " + result.getMissingFreshUrls() + " 张保留旧地址。");
     }
 
     private boolean isRemoteImageUrl(String imageUrl) {
@@ -1077,9 +1288,9 @@ public class NotionImportService {
         if (uuidMatcher.find()) {
             return uuidMatcher.group(1);
         }
-        Matcher compactMatcher = COMPACT_UUID_PATTERN.matcher(normalized.replace("-", ""));
-        if (compactMatcher.find()) {
-            String value = compactMatcher.group(1);
+        String compactPageId = resolveCompactPageId(normalized);
+        if (StringUtils.isNotBlank(compactPageId)) {
+            String value = compactPageId;
             return value.substring(0, 8) + "-" + value.substring(8, 12) + "-" + value.substring(12, 16)
                     + "-" + value.substring(16, 20) + "-" + value.substring(20);
         }
@@ -1088,6 +1299,30 @@ public class NotionImportService {
 
     private int defaultInt(Integer value, int fallback) {
         return value == null ? fallback : value;
+    }
+
+    private String resolveCompactPageId(String normalized) {
+        String segment = StringUtils.defaultString(normalized);
+        int slashIndex = segment.lastIndexOf('/');
+        if (slashIndex >= 0) {
+            segment = segment.substring(slashIndex + 1);
+        }
+        segment = StringUtils.removeEnd(segment, "/");
+        int dashIndex = segment.lastIndexOf('-');
+        if (dashIndex >= 0 && dashIndex + 1 < segment.length()) {
+            String suffix = segment.substring(dashIndex + 1);
+            if (COMPACT_UUID_PATTERN.matcher(suffix).matches()) {
+                return suffix;
+            }
+        }
+        if (COMPACT_UUID_PATTERN.matcher(segment).matches()) {
+            return segment;
+        }
+        String compact = normalized.replace("-", "");
+        if (COMPACT_UUID_PATTERN.matcher(compact).matches()) {
+            return compact;
+        }
+        return null;
     }
 
     private String getPublicFileContentPrefix() {
@@ -1180,6 +1415,15 @@ public class NotionImportService {
     }
 
     @Data
+    @AllArgsConstructor
+    private static class ReplaceRemoteUrlsResult {
+        private String value;
+        private Integer replacedCount;
+        private Integer missingFreshUrls;
+        private Boolean changed;
+    }
+
+    @Data
     private static class ImportContext {
         private final boolean importImages;
         private final List<String> warnings;
@@ -1215,5 +1459,13 @@ public class NotionImportService {
         private Integer totalImages;
         private Integer localizedImages;
         private Integer failedImages;
+    }
+
+    @Data
+    @AllArgsConstructor
+    public static class RefreshRemoteImageUrlsResult {
+        private SysArticle article;
+        private Integer refreshedImages;
+        private List<String> warnings;
     }
 }
