@@ -23,10 +23,10 @@ public class NotionArticleSyncJob {
     @Value("${notion.auto-sync-enabled:true}")
     private boolean autoSyncEnabled;
 
-    @Value("${notion.auto-sync-limit:20}")
+    @Value("${notion.auto-sync-limit:100}")
     private int autoSyncLimit;
 
-    @Scheduled(cron = "${notion.auto-sync-cron:0 20 4 * * ?}")
+    @Scheduled(cron = "${notion.auto-sync-cron:0 20 4 1/3 * ?}")
     public void syncNotionArticles() {
         if (!autoSyncEnabled) {
             return;

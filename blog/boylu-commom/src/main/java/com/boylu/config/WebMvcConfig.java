@@ -48,7 +48,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         if (sysFileOss != null) {
             registry.addResourceHandler(sysFileOss.getPathPatterns())
                     .addResourceLocations("file:" + sysFileOss.getStoragePath())
-                    .setCacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic());
+                    .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic());
         }
     }
 

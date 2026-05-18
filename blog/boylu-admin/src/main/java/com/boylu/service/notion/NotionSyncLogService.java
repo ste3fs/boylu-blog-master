@@ -25,6 +25,7 @@ public class NotionSyncLogService {
     public static final String STATUS_RUNNING = "running";
     public static final String STATUS_SUCCESS = "success";
     public static final String STATUS_FAILED = "failed";
+    public static final String STATUS_SKIPPED = "skipped";
     public static final String IMAGE_PENDING = "pending";
     public static final String IMAGE_RUNNING = "running";
     public static final String IMAGE_SUCCESS = "success";
@@ -100,6 +101,31 @@ public class NotionSyncLogService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markSyncSkipped(Long logId, Long articleId, String articleTitle, String sourceUrl, String message) {
+        if (logId == null) {
+            return;
+        }
+        try {
+            NotionArticleSyncLog update = new NotionArticleSyncLog();
+            update.setId(logId);
+            update.setArticleId(articleId);
+            update.setArticleTitle(shortText(articleTitle, 180));
+            update.setSourceUrl(shortText(sourceUrl, 500));
+            update.setStatus(STATUS_SKIPPED);
+            update.setImageStatus(IMAGE_SKIPPED);
+            update.setImportedBlocks(0);
+            update.setChangedFields(0);
+            update.setTotalImages(0);
+            update.setLocalizedImages(0);
+            update.setFailedImages(0);
+            update.setMessage(shortText(message, 500));
+            notionArticleSyncLogMapper.updateById(update);
+        } catch (Exception ex) {
+            log.warn("Failed to update Notion sync skipped log, logId={}", logId, ex);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markImageRunning(Long logId) {
         updateImageStatus(logId, IMAGE_RUNNING, "图片正在后台下载到本站", null);
     }
@@ -162,6 +188,18 @@ public class NotionSyncLogService {
         return notionArticleSyncLogMapper.selectList(new LambdaQueryWrapper<NotionArticleSyncLog>()
                 .orderByDesc(NotionArticleSyncLog::getId)
                 .last("limit 50"));
+    }
+
+    public NotionArticleSyncLog findLastSuccessfulSync(Long articleId) {
+        if (articleId == null || articleId <= 0) {
+            return null;
+        }
+        return notionArticleSyncLogMapper.selectOne(new LambdaQueryWrapper<NotionArticleSyncLog>()
+                .select(NotionArticleSyncLog::getId, NotionArticleSyncLog::getCreateTime, NotionArticleSyncLog::getUpdateTime)
+                .eq(NotionArticleSyncLog::getArticleId, articleId)
+                .eq(NotionArticleSyncLog::getStatus, STATUS_SUCCESS)
+                .orderByDesc(NotionArticleSyncLog::getId)
+                .last("limit 1"));
     }
 
     public boolean deleteByIds(List<Long> ids) {

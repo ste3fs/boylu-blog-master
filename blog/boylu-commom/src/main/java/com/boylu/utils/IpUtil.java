@@ -1,6 +1,5 @@
 package com.boylu.utils;
 
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.json.JSONUtil;
 import com.boylu.common.Constants;
 import eu.bitwalker.useragentutils.UserAgent;
@@ -17,6 +16,9 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 
 public class IpUtil {
@@ -32,24 +34,74 @@ public class IpUtil {
     private static Searcher searcher = null;
 
     static {
-        // 1、从 dbPath 加载整个 xdb 到内存。
-        byte[] cBuff = new byte[0];
-        InputStream inputStream = IpUtil.class.getClassLoader().getResourceAsStream(resource_name);
-        try {
-            File file = new File("ip2region.xdb");
-            FileUtil.writeFromStream(inputStream, file);
-            RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
-            cBuff = Searcher.loadContent(randomAccessFile);
-        } catch (Exception e) {
-            System.out.printf("failed to load content from `%s`: %s\n", resource_name, e);
+        byte[] cBuff = loadIp2RegionContent();
+        if (cBuff == null || cBuff.length == 0) {
+            logger.warn("ip2region.xdb 未加载，IP 归属地将返回未知");
+        } else {
+            try {
+                searcher = Searcher.newWithBuffer(cBuff);
+            } catch (Exception e) {
+                logger.warn("创建 ip2region 查询器失败", e);
+            }
+        }
+    }
+
+    private static byte[] loadIp2RegionContent() {
+        byte[] classpathBytes = loadFromClasspath();
+        if (classpathBytes != null && classpathBytes.length > 0) {
+            return classpathBytes;
         }
 
-        // 2、使用上述的 cBuff 创建一个完全基于内存的查询对象。
-        try {
-            searcher = Searcher.newWithBuffer(cBuff);
-        } catch (Exception e) {
-            System.out.printf("failed to create content cached searcher: %s\n", e);
+        String configuredPath = StringUtils.defaultIfBlank(
+                System.getProperty("ip2region.xdb.path"),
+                System.getenv("IP2REGION_XDB_PATH")
+        );
+        byte[] configuredBytes = loadFromPath(configuredPath);
+        if (configuredBytes != null && configuredBytes.length > 0) {
+            return configuredBytes;
         }
+
+        return loadFromPath(resource_name);
+    }
+
+    private static byte[] loadFromClasspath() {
+        try (InputStream inputStream = IpUtil.class.getClassLoader().getResourceAsStream(resource_name)) {
+            if (inputStream == null) {
+                logger.warn("classpath 中未找到 {}", resource_name);
+                return null;
+            }
+            return readAllBytes(inputStream);
+        } catch (Exception e) {
+            logger.warn("从 classpath 读取 {} 失败", resource_name, e);
+            return null;
+        }
+    }
+
+    private static byte[] loadFromPath(String filePath) {
+        if (StringUtils.isBlank(filePath)) {
+            return null;
+        }
+        Path path = Paths.get(filePath).toAbsolutePath().normalize();
+        if (!Files.isRegularFile(path) || !Files.isReadable(path)) {
+            logger.warn("ip2region.xdb 文件不可读：{}", path);
+            return null;
+        }
+        try {
+            return Files.readAllBytes(path);
+        } catch (Exception e) {
+            logger.warn("读取 ip2region.xdb 文件失败：{}", path, e);
+            return null;
+        }
+    }
+
+    private static byte[] readAllBytes(InputStream inputStream) throws IOException {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int length;
+        while ((length = inputStream.read(buffer)) != -1) {
+            outputStream.write(buffer, 0, length);
+        }
+        return outputStream.toByteArray();
     }
 
 
@@ -140,7 +192,7 @@ public class IpUtil {
 
         if(searcher == null){
             logger.error("Error: DbSearcher is null");
-            return null;
+            return Constants.UNKNOWN;
         }
         String ipInfo = Constants.UNKNOWN;
         try {

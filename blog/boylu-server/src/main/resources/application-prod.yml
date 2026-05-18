@@ -67,11 +67,15 @@ hot-search:
 notion:
   api-token: ${NOTION_API_TOKEN:}
   version: ${NOTION_VERSION:2022-06-28}
+  api-base: ${NOTION_API_BASE:https://api.notion.com/v1}
+  request-timeout-ms: ${NOTION_REQUEST_TIMEOUT_MS:20000}
+  request-retry-times: ${NOTION_REQUEST_RETRY_TIMES:6}
+  request-retry-delay-ms: ${NOTION_REQUEST_RETRY_DELAY_MS:1200}
   import-images: ${NOTION_IMPORT_IMAGES:false}
   max-image-size-mb: ${NOTION_MAX_IMAGE_SIZE_MB:10}
   auto-sync-enabled: ${NOTION_AUTO_SYNC_ENABLED:true}
-  auto-sync-cron: "${NOTION_AUTO_SYNC_CRON:0 20 4 * * ?}"
-  auto-sync-limit: ${NOTION_AUTO_SYNC_LIMIT:20}
+  auto-sync-cron: "${NOTION_AUTO_SYNC_CRON:0 20 4 1/3 * ?}"
+  auto-sync-limit: ${NOTION_AUTO_SYNC_LIMIT:100}
 
 mail:
   smtp:
@@ -107,7 +111,11 @@ seo:
   baidu:
     push:
       enabled: ${SEO_BAIDU_PUSH_ENABLED:false}
-      endpoint: ${SEO_BAIDU_PUSH_ENDPOINT:https://data.zz.baidu.com/urls}
+      endpoint: ${SEO_BAIDU_PUSH_ENDPOINT:http://data.zz.baidu.com/urls}
       site: ${SEO_BAIDU_PUSH_SITE:https://boylu.cn}
       token: ${SEO_BAIDU_PUSH_TOKEN:}
       article-path: ${SEO_BAIDU_ARTICLE_PATH:/article/%d}
+      fallback-http-enabled: ${SEO_BAIDU_PUSH_FALLBACK_HTTP_ENABLED:true}
+      connect-timeout-ms: ${SEO_BAIDU_PUSH_CONNECT_TIMEOUT_MS:8000}
+      read-timeout-ms: ${SEO_BAIDU_PUSH_READ_TIMEOUT_MS:12000}
+      retry-times: ${SEO_BAIDU_PUSH_RETRY_TIMES:2}

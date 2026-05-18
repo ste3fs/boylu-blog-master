@@ -1,6 +1,6 @@
-const STATIC_CACHE = 'boylu-static-v1'
-const PAGE_CACHE = 'boylu-pages-v1'
-const API_CACHE = 'boylu-api-v1'
+const STATIC_CACHE = 'boylu-static-v2'
+const PAGE_CACHE = 'boylu-pages-v2'
+const API_CACHE = 'boylu-api-v2'
 const CORE_ASSETS = ['/', '/index.html', '/boylu-avatar.jpg', '/boylu-logo.png']
 
 self.addEventListener('install', event => {
@@ -42,6 +42,31 @@ async function staleWhileRevalidate(request, cacheName) {
   return cached || networkPromise
 }
 
+async function cacheFirst(request, cacheName) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request)
+  if (cached) {
+    return cached
+  }
+
+  const response = await fetch(request)
+  if (response && response.ok) {
+    cache.put(request, response.clone()).catch(() => {})
+  }
+  return response
+}
+
+function isImmutableImageRequest(request, url) {
+  if (request.destination !== 'image') {
+    return false
+  }
+  return url.pathname.startsWith('/localFile/')
+    || url.pathname.startsWith('/img/local/')
+    || /\/(boylu|mojian)?\/?file\/(content|view)\//.test(url.pathname)
+    || url.pathname === '/boylu-avatar.jpg'
+    || url.pathname === '/boylu-logo.png'
+}
+
 self.addEventListener('fetch', event => {
   const { request } = event
   if (request.method !== 'GET') {
@@ -50,6 +75,11 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) {
+    return
+  }
+
+  if (isImmutableImageRequest(request, url)) {
+    event.respondWith(cacheFirst(request, STATIC_CACHE))
     return
   }
 

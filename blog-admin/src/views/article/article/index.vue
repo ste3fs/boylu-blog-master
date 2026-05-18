@@ -1220,8 +1220,12 @@ const handleChangeStatus = (row: any) => {
 
 // 推送百度
 const handlePushBaidu = (row: any) => {
-  pushBaiduApi(row.id).then((res) => {
-    ElMessage.success('推送任务已提交')
+  pushBaiduApi(row.id).then((res: any) => {
+    if (res?.data) {
+      ElMessage.success('百度推送成功')
+    } else {
+      ElMessage.error('百度推送失败，请检查推送配置或稍后重试')
+    }
   }).catch(() => {
     ElMessage.error('推送失败，请检查百度收录配置')
   })
@@ -1229,7 +1233,12 @@ const handlePushBaidu = (row: any) => {
 
 const handlePushBaiduRecent = () => {
   pushBaiduRecentApi().then((res: any) => {
-    ElMessage.success(`成功提交 ${res.data} 篇文章的推送任务`)
+    const count = Number(res.data || 0)
+    if (count > 0) {
+      ElMessage.success(`成功推送 ${count} 篇文章`)
+    } else {
+      ElMessage.warning('本次没有成功推送的文章，请检查百度推送配置')
+    }
   }).catch(() => {
     ElMessage.error('推送失败，请检查百度收录配置')
   })
@@ -1251,7 +1260,8 @@ const notionStatusLabel = (status?: string) => {
   const map: Record<string, string> = {
     running: '同步中',
     success: '同步成功',
-    failed: '同步失败'
+    failed: '同步失败',
+    skipped: '已跳过'
   }
   return map[String(status || '')] || '暂无日志'
 }
@@ -1260,7 +1270,8 @@ const notionStatusType = (status?: string) => {
   const map: Record<string, any> = {
     running: 'warning',
     success: 'success',
-    failed: 'danger'
+    failed: 'danger',
+    skipped: 'info'
   }
   return map[String(status || '')] || 'info'
 }
@@ -1388,8 +1399,12 @@ const handleDeleteVisibleNotionLogs = async () => {
 
 const handleSyncNotion = async (row: any) => {
   if (!row?.id) return
-  await syncNotionArticleApi(row.id)
-  ElMessage.success('Notion 同步完成，图片会继续在后台下载到本站')
+  const res: any = await syncNotionArticleApi(row.id)
+  if (res?.data?.updated === false) {
+    ElMessage.info('Notion 页面无变化，已跳过导入')
+  } else {
+    ElMessage.success('Notion 同步完成，图片会继续在后台下载到本站')
+  }
   getList()
 }
 
@@ -1595,6 +1610,10 @@ onUnmounted(() => {
 
 .notion-log-card.is-running {
   border-left-color: var(--el-color-warning);
+}
+
+.notion-log-card.is-skipped {
+  border-left-color: var(--el-color-info);
 }
 
 .notion-log-card__head {

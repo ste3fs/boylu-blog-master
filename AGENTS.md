@@ -52,8 +52,9 @@
   - `/mojian/file/view/{id}`
 - 运行时本地文件仍优先落到 `/localFile/...`，由 Nginx 静态缓存返回。
 - 本地图片样式读取：`/img/local/<base64url旧地址>!w320.webp`，首次请求由后端生成 `/localFile/img-cache/...` 缓存图，后续由 Nginx 静态缓存返回。
-- 图片缓存只新增到 `img-cache`，按原图内容 hash、宽度、格式命名；不删除、不覆盖任何旧原图。
+- 图片缓存只新增到 `img-cache`，按源文件路径、大小、修改时间、宽度和格式生成缓存名；不删除、不覆盖任何旧原图。
 - 旧文章封面回填时，如果源文件不存在，只跳过并记录日志，不允许把原封面地址覆盖成默认图。
+- 旧相册或文章图片如果数据库、历史 SQL 和服务器存储中都找不到原图，不允许用其它无关图片冒充；可统一替换为 `/localFile/local-plus/system/missing-image.svg` 明确占位，后续找回原图后再人工替换。
 - 默认头像使用：`/boylu-avatar.jpg`
 
 ## 本轮改动记录
@@ -100,6 +101,53 @@
 - `FileController` 上传返回值统一为网关地址；如果能解析真实目标，会把目标写入 Redis 缓存，但不再把 `/localFile/...` 作为上传响应返回。
 - `ArticleCoverImageService` 的原图和响应式变体也统一返回 `/boylu/file/content/{fileId}`。
 - `docs/IMAGE_STORAGE.md` 已同步 canonical 策略，并把 `/localFile/` 缓存说明改为 365 天 immutable。
+
+### 2026-05-17 相册与文章图片修复
+
+- 线上数据库相关表已在修复前备份到 `/opt/boylu-blog/backups/image_repair_20260517_172411/image_tables.sql`。
+- `2025年10月` 相册问题原因：`sys_photo` 里 12 条照片记录仍存在，但 URL 指向的 `file_detail` 已不存在；相册封面同样指向缺失 `file_detail`。
+- `2025年10月` 相册已恢复：
+  - 封面改为 `/boylu/file/content/a382c41adc477120c16ee26e2c465985`。
+  - 12 张照片已按可确认的未引用真实文件恢复。
+  - `https://boylu.cn/boylu/api/album/photos/21` 已验证返回 `200`，共 12 张。
+  - 十月相册没有使用缺失占位图。
+- 全部相册和照片引用已扫描：
+  - `sys_album` / `sys_photo` 最终图片引用扫描 `issue_count = 0`。
+  - 其它月份无法从数据库、历史 SQL 和服务器存储找回原图的零散照片，已统一替换为 `/localFile/local-plus/system/missing-image.svg`，避免 404、白块或误加载成别的图片。
+- 全部文章图片已扫描：
+  - 共扫描 80 篇文章、417 个内部图片引用。
+  - 最终文章内部图片引用扫描 `issue_count = 0`。
+  - 已恢复可确认的文章封面和正文图片，包括 Docker、PHP、Linux 管道符、ARP、HTTP、Nmap 相关图片。
+  - 无法找回原图的旧文章图片已替换为 `/localFile/local-plus/system/missing-image.svg` 明确占位；后续如找回原图，可按占位位置人工替换。
+
+### 2026-05-17 Notion 同步保护
+
+- Notion 同步语义改为“先检查是否修改，再决定是否导入”。
+- 同步前先读取 Notion 页面元数据 `last_edited_time`；如果元数据未变化，写入一条 `skipped` 同步日志，不更新文章正文、摘要、封面，不排队图片本地化。
+- 如果 Notion 元数据变化但导入后的标题、摘要、正文、封面和关键词与本站当前内容没有有效差异，同样记录 `skipped`，不执行文章更新。
+- 如果 Notion 返回部分空字段，更新已有文章时会保留旧标题、摘要、正文、封面、封面元数据、关键词和原始链接，避免空值覆盖旧内容。
+- 如果 Notion 页面有新编辑时间，才重新导入并更新本站文章。
+- 自动同步默认频率改为约三天一次：`0 20 4 1/3 * ?`；默认每次检查最多 100 篇 Notion 文章，线上可通过 `NOTION_AUTO_SYNC_CRON` 和 `NOTION_AUTO_SYNC_LIMIT` 覆盖。
+- 后台文章列表和 Notion 日志弹窗已识别 `skipped` 状态，手动同步无变化时提示“已跳过导入”。
+
+### 2026-05-17 Notion 读取与百度推送稳定性
+
+- Notion 页面读取保留 JDK `Proxy.NO_PROXY` 直连 + Hutool 备用通道。
+- Notion 默认超时改为 20 秒，默认重试次数改为 6 次；429、5xx、超时和连接拒绝继续重试，400/401/403/404 这类明确权限或地址错误直接失败。
+- Notion 读取新增可配置项：`NOTION_API_BASE`、`NOTION_REQUEST_TIMEOUT_MS`、`NOTION_REQUEST_RETRY_TIMES`、`NOTION_REQUEST_RETRY_DELAY_MS`。
+- 百度推送默认端点改为 `http://data.zz.baidu.com/urls`，避免线上 HTTPS 证书握手异常。
+- 百度推送会按顺序尝试配置端点、HTTPS 默认端点、HTTP 降级端点；每个端点默认重试 2 次。
+- 百度推送现在返回真实成功/失败：失败时不再把文章标记为 `is_baidu_pushed=1`，手动推送按钮也会显示失败。
+- 百度推送新增可配置项：`SEO_BAIDU_PUSH_FALLBACK_HTTP_ENABLED`、`SEO_BAIDU_PUSH_CONNECT_TIMEOUT_MS`、`SEO_BAIDU_PUSH_READ_TIMEOUT_MS`、`SEO_BAIDU_PUSH_RETRY_TIMES`。
+
+### 2026-05-18 ip2region 与图片访问缓存
+
+- `IpUtil` 不再把 classpath 中的 `ip2region.xdb` 写到当前工作目录后再读取，改为优先从 classpath 直接读入内存，避免线上当前目录无写入/读取权限导致 `AccessDeniedException`。
+- `ip2region.xdb` 仍支持通过 JVM 参数 `-Dip2region.xdb.path=/path/to/ip2region.xdb` 或环境变量 `IP2REGION_XDB_PATH` 指定外部文件；加载失败时返回 `UNKNOWN`，不影响主流程。
+- `LocalImageStyleController` 命中已有 `/localFile/img-cache/...` 样式图时会直接重定向，不再每次读取图片元数据或解码源图。
+- 样式图缓存名不再通过完整读取源图内容计算 hash，改为基于源文件路径、大小和修改时间生成，减少大图访问时的磁盘读取。
+- `/boylu/file/content/{id}`、`/file/view/{id}` 等文件网关解析到真实本地地址后，Redis 缓存从 1 天延长到 30 天。
+- Spring 静态 `/localFile/...` 资源缓存从 30 天改为 365 天；前台 Service Worker 升级为 v2，对 `/localFile/`、`/img/local/`、文件网关图片和默认头像/logo 使用 cache-first。
 
 ### 图片处理降内存
 
@@ -172,3 +220,4 @@
 - 优先复用现有项目结构，不要随意推翻重做。
 - 博客页面优化重点是简洁、现代、留白、视觉层级和响应式。
 - 不要擅自删除核心功能，不要为了“高级感”引入复杂依赖。
+- 每次修复完问题后，必须同步更新 `questions.md`：把已修项从待处理改为当前处理/已处理，补充剩余风险和验证结果。

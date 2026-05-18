@@ -9,6 +9,7 @@ import com.boylu.common.Constants;
 import com.boylu.common.ResultCode;
 import com.boylu.dto.article.ArticleQueryDto;
 import com.boylu.dto.article.NotionImportDto;
+import com.boylu.entity.NotionArticleSyncLog;
 import com.boylu.entity.SysArticle;
 import com.boylu.entity.SysCategory;
 import com.boylu.entity.SysTag;
@@ -44,6 +45,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -210,6 +214,30 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
                 existingArticle.getTitle()
         );
         try {
+            NotionImportService.PageMetadata pageMetadata = notionImportService.fetchPageMetadata(existingArticle.getOriginalUrl());
+            LocalDateTime notionLastEditedTime = parseNotionLastEditedTime(pageMetadata.getLastEditedTime());
+            LocalDateTime lastSuccessfulSyncTime = resolveLastSuccessfulSyncTime(existingArticle.getId());
+            if (notionLastEditedTime != null
+                    && lastSuccessfulSyncTime != null
+                    && !notionLastEditedTime.isAfter(lastSuccessfulSyncTime)) {
+                String message = "Notion 页面无变化，已跳过导入；本站文章保持不变。";
+                notionSyncLogService.markSyncSkipped(
+                        logId,
+                        existingArticle.getId(),
+                        StringUtils.defaultIfBlank(pageMetadata.getTitle(), existingArticle.getTitle()),
+                        existingArticle.getOriginalUrl(),
+                        message
+                );
+                return NotionImportResultVo.builder()
+                        .articleId(existingArticle.getId())
+                        .title(existingArticle.getTitle())
+                        .importedBlocks(0)
+                        .updated(false)
+                        .imageLocalizationQueued(false)
+                        .warnings(Collections.singletonList(message))
+                        .build();
+            }
+
             SysArticleDetailVo currentDetail = detail(articleId.intValue());
             NotionImportDto dto = new NotionImportDto();
             dto.setPageUrl(existingArticle.getOriginalUrl());
@@ -227,6 +255,24 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             SysArticleDetailVo article = importResult.getArticle();
             ensureNotionImportHasContent(importResult, true);
             article.setId(existingArticle.getId());
+            if (!hasMeaningfulNotionChange(article, currentDetail)) {
+                String message = "Notion 页面内容无有效变化，已跳过导入；本站文章保持不变。";
+                notionSyncLogService.markSyncSkipped(
+                        logId,
+                        existingArticle.getId(),
+                        StringUtils.defaultIfBlank(article.getTitle(), existingArticle.getTitle()),
+                        existingArticle.getOriginalUrl(),
+                        message
+                );
+                return NotionImportResultVo.builder()
+                        .articleId(existingArticle.getId())
+                        .title(existingArticle.getTitle())
+                        .importedBlocks(importResult.getImportedBlocks())
+                        .updated(false)
+                        .imageLocalizationQueued(false)
+                        .warnings(Collections.singletonList(message))
+                        .build();
+            }
             saveImportedArticle(article, existingArticle);
             notionSyncLogService.markSyncSuccess(
                     logId,
@@ -257,6 +303,26 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         }
     }
 
+    private LocalDateTime resolveLastSuccessfulSyncTime(Long articleId) {
+        NotionArticleSyncLog lastSuccessLog = notionSyncLogService.findLastSuccessfulSync(articleId);
+        if (lastSuccessLog == null) {
+            return null;
+        }
+        return lastSuccessLog.getCreateTime() == null ? lastSuccessLog.getUpdateTime() : lastSuccessLog.getCreateTime();
+    }
+
+    private LocalDateTime parseNotionLastEditedTime(String value) {
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(value).atZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
+        } catch (Exception ex) {
+            log.warn("Failed to parse Notion last_edited_time: {}", value, ex);
+            return null;
+        }
+    }
+
     private void ensureNotionImportHasContent(NotionImportService.ImportPageResult importResult, boolean updatingExistingArticle) {
         SysArticleDetailVo article = importResult == null ? null : importResult.getArticle();
         boolean emptyContent = article == null
@@ -273,20 +339,24 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
     }
 
     private void saveImportedArticle(SysArticleDetailVo article, SysArticle existingArticle) {
+        SysArticle persistedExistingArticle = resolvePersistedExistingArticle(existingArticle);
         SysArticle obj = new SysArticle();
         BeanUtils.copyProperties(article, obj);
-        obj.setCoverImage(resolveCoverImageJson(article));
+        preserveExistingArticleFields(obj, persistedExistingArticle);
+        if (article.getCoverImage() != null || StringUtils.isNotBlank(article.getCover())) {
+            obj.setCoverImage(resolveCoverImageJson(article));
+        }
         normalizeArticleFileUrls(obj);
-        obj.setUserId(resolveImportedArticleUserId(existingArticle));
+        obj.setUserId(resolveImportedArticleUserId(persistedExistingArticle));
 
         addCategory(article, obj);
-        if (existingArticle == null) {
+        if (persistedExistingArticle == null) {
             baseMapper.insert(obj);
             article.setId(obj.getId());
         } else {
-            obj.setId(existingArticle.getId());
+            obj.setId(persistedExistingArticle.getId());
             baseMapper.updateById(obj);
-            article.setId(existingArticle.getId());
+            article.setId(persistedExistingArticle.getId());
             sysTagMapper.deleteArticleTagsByArticleIds(Collections.singletonList(obj.getId()));
         }
 
@@ -296,6 +366,70 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         if (existingArticle == null || (existingArticle.getStatus() != Constants.YES && obj.getStatus() == Constants.YES)) {
             triggerBaiduPushIfPublished(obj);
         }
+    }
+
+    private SysArticle resolvePersistedExistingArticle(SysArticle existingArticle) {
+        if (existingArticle == null || existingArticle.getId() == null) {
+            return null;
+        }
+        SysArticle persisted = baseMapper.selectById(existingArticle.getId());
+        return persisted == null ? existingArticle : persisted;
+    }
+
+    private void preserveExistingArticleFields(SysArticle target, SysArticle existingArticle) {
+        if (target == null || existingArticle == null) {
+            return;
+        }
+        if (StringUtils.isBlank(target.getTitle())) {
+            target.setTitle(existingArticle.getTitle());
+        }
+        if (StringUtils.isBlank(target.getCover())) {
+            target.setCover(existingArticle.getCover());
+        }
+        if (StringUtils.isBlank(target.getCoverImage())) {
+            target.setCoverImage(existingArticle.getCoverImage());
+        }
+        if (StringUtils.isBlank(target.getSummary())) {
+            target.setSummary(existingArticle.getSummary());
+        }
+        if (StringUtils.isBlank(target.getContent())) {
+            target.setContent(existingArticle.getContent());
+        }
+        if (StringUtils.isBlank(target.getContentMd())) {
+            target.setContentMd(existingArticle.getContentMd());
+        }
+        if (StringUtils.isBlank(target.getOriginalUrl())) {
+            target.setOriginalUrl(existingArticle.getOriginalUrl());
+        }
+        if (StringUtils.isBlank(target.getKeywords())) {
+            target.setKeywords(existingArticle.getKeywords());
+        }
+    }
+
+    private boolean hasMeaningfulNotionChange(SysArticleDetailVo importedArticle, SysArticleDetailVo currentArticle) {
+        if (importedArticle == null || currentArticle == null) {
+            return true;
+        }
+        return hasNonBlankChanged(importedArticle.getTitle(), currentArticle.getTitle())
+                || hasNonBlankChanged(importedArticle.getSummary(), currentArticle.getSummary())
+                || hasNonBlankChanged(importedArticle.getContentMd(), currentArticle.getContentMd())
+                || hasNonBlankChanged(importedArticle.getContent(), currentArticle.getContent())
+                || hasNonBlankChanged(importedArticle.getCover(), currentArticle.getCover())
+                || hasNonBlankChanged(importedArticle.getKeywords(), currentArticle.getKeywords());
+    }
+
+    private boolean hasNonBlankChanged(String importedValue, String currentValue) {
+        if (StringUtils.isBlank(importedValue)) {
+            return false;
+        }
+        return !StringUtils.equals(normalizeCompareText(importedValue), normalizeCompareText(currentValue));
+    }
+
+    private String normalizeCompareText(String value) {
+        return StringUtils.defaultString(value)
+                .replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .trim();
     }
 
     private Long resolveImportedArticleUserId(SysArticle existingArticle) {
@@ -410,14 +544,14 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
         if (article.getStatus() != Constants.YES) {
             throw new ServiceException("仅已发布文章支持推送");
         }
-        ThreadUtil.execAsync(() -> {
-            baiduPushService.pushArticleUrl(articleId);
+        boolean pushed = baiduPushService.pushArticleUrl(articleId);
+        if (pushed) {
             SysArticle updateEntity = new SysArticle();
             updateEntity.setId(articleId);
             updateEntity.setIsBaiduPushed(1);
             baseMapper.updateById(updateEntity);
-        });
-        return true;
+        }
+        return pushed;
     }
 
     @Override
@@ -441,13 +575,14 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             urls.add("https://boylu.cn/article/" + article.getId());
             ids.add(article.getId());
         }
-        ThreadUtil.execAsync(() -> {
-            baiduPushService.pushUrls(urls, "manual-recent-" + safeLimit);
+        boolean pushed = baiduPushService.pushUrls(urls, "manual-recent-" + safeLimit);
+        if (pushed) {
             SysArticle updateEntity = new SysArticle();
             updateEntity.setIsBaiduPushed(1);
             baseMapper.update(updateEntity, new LambdaQueryWrapper<SysArticle>().in(SysArticle::getId, ids));
-        });
-        return urls.size();
+            return urls.size();
+        }
+        return 0;
     }
 
 
@@ -566,7 +701,11 @@ public class SysArticleServiceImpl extends ServiceImpl<SysArticleMapper, SysArti
             return;
         }
         ThreadUtil.execAsync(() -> {
-            baiduPushService.pushArticleUrl(article.getId());
+            boolean pushed = baiduPushService.pushArticleUrl(article.getId());
+            if (!pushed) {
+                log.warn("Baidu push did not succeed, articleId={}", article.getId());
+                return;
+            }
             SysArticle updateEntity = new SysArticle();
             updateEntity.setId(article.getId());
             updateEntity.setIsBaiduPushed(1);

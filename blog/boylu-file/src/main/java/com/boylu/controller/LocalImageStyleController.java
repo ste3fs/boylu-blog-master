@@ -26,7 +26,6 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -62,6 +61,7 @@ public class LocalImageStyleController {
     private static final long MAX_SOURCE_SIZE_BYTES = 30L * MB;
     private static final long MAX_SOURCE_PIXELS = 36_000_000L;
     private static final Map<String, Object> CACHE_LOCKS = new ConcurrentHashMap<String, Object>();
+    private static final Map<String, Path> SOURCE_PATH_CACHE = new ConcurrentHashMap<String, Path>();
 
     private final FileDetailService fileDetailService;
 
@@ -90,6 +90,12 @@ public class LocalImageStyleController {
             return;
         }
 
+        Path cachePath = buildCachePath(sourcePath, request.width, request.format);
+        if (Files.isRegularFile(cachePath)) {
+            redirect(toLocalFileUrl(cachePath), response);
+            return;
+        }
+
         ImageInfo imageInfo = readImageInfo(sourcePath);
         if (imageInfo == null || imageInfo.shouldBypassStyle(request.format)) {
             redirect(sourceUrl, response);
@@ -97,9 +103,8 @@ public class LocalImageStyleController {
         }
 
         try {
-            Path cachePath = buildCacheImage(sourcePath, request.width, request.format);
-            String targetUrl = LOCAL_FILE_PREFIX + getLocalStorageRootPath(null).relativize(cachePath).toString().replace("\\", "/");
-            redirect(targetUrl, response);
+            Path generatedCachePath = buildCacheImage(sourcePath, cachePath, request.width, request.format);
+            redirect(toLocalFileUrl(generatedCachePath), response);
         } catch (Exception ex) {
             log.warn("Failed to build local styled image, source={}, style={}", sourceUrl, style, ex);
             redirect(sourceUrl, response);
@@ -167,14 +172,41 @@ public class LocalImageStyleController {
     private Path resolveSourcePath(String sourceUrl) {
         String fileId = extractPublicFileId(sourceUrl);
         if (StringUtils.isNotBlank(fileId)) {
+            Path cachedPath = getCachedSourcePath("file:" + fileId);
+            if (cachedPath != null) {
+                return cachedPath;
+            }
             FileDetail fileDetail = fileDetailService.getById(fileId);
-            return resolveLocalFilePath(fileDetail);
+            return cacheSourcePath("file:" + fileId, resolveLocalFilePath(fileDetail));
         }
 
         if (sourceUrl.startsWith(LOCAL_FILE_PREFIX)) {
-            return resolveLocalFilePathFromUrl(sourceUrl);
+            Path cachedPath = getCachedSourcePath("url:" + sourceUrl);
+            if (cachedPath != null) {
+                return cachedPath;
+            }
+            return cacheSourcePath("url:" + sourceUrl, resolveLocalFilePathFromUrl(sourceUrl));
         }
         return null;
+    }
+
+    private Path getCachedSourcePath(String cacheKey) {
+        Path cachedPath = SOURCE_PATH_CACHE.get(cacheKey);
+        if (cachedPath == null) {
+            return null;
+        }
+        if (Files.isRegularFile(cachedPath)) {
+            return cachedPath;
+        }
+        SOURCE_PATH_CACHE.remove(cacheKey, cachedPath);
+        return null;
+    }
+
+    private Path cacheSourcePath(String cacheKey, Path sourcePath) {
+        if (sourcePath != null && Files.isRegularFile(sourcePath)) {
+            SOURCE_PATH_CACHE.put(cacheKey, sourcePath);
+        }
+        return sourcePath;
     }
 
     private String resolveLegacyTarget(String sourceUrl) {
@@ -225,8 +257,8 @@ public class LocalImageStyleController {
         }
     }
 
-    private Path buildCacheImage(Path sourcePath, int width, String format) throws Exception {
-        String sourceHash = sha256(sourcePath);
+    private Path buildCachePath(Path sourcePath, int width, String format) throws IOException {
+        String sourceHash = fastSourceCacheKey(sourcePath);
         Path rootPath = getLocalStorageRootPath(null);
         Path cachePath = rootPath
                 .resolve(CACHE_PREFIX)
@@ -237,6 +269,10 @@ public class LocalImageStyleController {
         if (!cachePath.startsWith(rootPath)) {
             throw new IOException("unsafe cache path");
         }
+        return cachePath;
+    }
+
+    private Path buildCacheImage(Path sourcePath, Path cachePath, int width, String format) throws Exception {
         if (Files.isRegularFile(cachePath)) {
             return cachePath;
         }
@@ -294,6 +330,13 @@ public class LocalImageStyleController {
         }
     }
 
+    private String toLocalFileUrl(Path cachePath) throws IOException {
+        return LOCAL_FILE_PREFIX + getLocalStorageRootPath(null)
+                .relativize(cachePath)
+                .toString()
+                .replace("\\", "/");
+    }
+
     private BufferedImage resizeToWidth(BufferedImage original, int targetWidth, boolean preserveAlpha) {
         int targetHeight = Math.max(1, Math.round((float) original.getHeight() * targetWidth / original.getWidth()));
         boolean useAlpha = preserveAlpha && original.getColorModel().hasAlpha();
@@ -340,21 +383,26 @@ public class LocalImageStyleController {
         return outputStream.toByteArray();
     }
 
-    private String sha256(Path path) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (InputStream inputStream = Files.newInputStream(path)) {
-            byte[] buffer = new byte[8192];
-            int length;
-            while ((length = inputStream.read(buffer)) != -1) {
-                digest.update(buffer, 0, length);
+    private String fastSourceCacheKey(Path path) throws IOException {
+        Path normalizedPath = path.toAbsolutePath().normalize();
+        String value = normalizedPath + "|"
+                + Files.size(normalizedPath) + "|"
+                + Files.getLastModifiedTime(normalizedPath).toMillis();
+        return sha256(value);
+    }
+
+    private String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(StringUtils.defaultString(value).getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
             }
+            return builder.toString();
+        } catch (Exception ex) {
+            throw new IllegalStateException("SHA-256 is not available", ex);
         }
-        byte[] hash = digest.digest();
-        StringBuilder builder = new StringBuilder();
-        for (byte b : hash) {
-            builder.append(String.format("%02x", b));
-        }
-        return builder.toString();
     }
 
     private String extractPublicFileId(String url) {

@@ -61,7 +61,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class NotionImportService {
 
-    private static final String NOTION_API_BASE = "https://api.notion.com/v1";
+    private static final String DEFAULT_NOTION_API_BASE = "https://api.notion.com/v1";
     private static final String DEFAULT_PUBLIC_FILE_CONTENT_PREFIX = "/boylu/file/content/";
     private static final Pattern UUID_PATTERN = Pattern.compile("(?i)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})");
     private static final Pattern COMPACT_UUID_PATTERN = Pattern.compile("(?i)([0-9a-f]{32})");
@@ -69,9 +69,9 @@ public class NotionImportService {
     private static final Pattern HTML_IMAGE_SRC_PATTERN = Pattern.compile("(<img\\b[^>]*?\\bsrc=[\"'])(https?://[^\"']+)([\"'][^>]*>)", Pattern.CASE_INSENSITIVE);
     private static final int MAX_BLOCK_DEPTH = 8;
     private static final int MAX_BLOCK_COUNT = 600;
-    private static final int NOTION_REQUEST_TIMEOUT_MS = 15000;
-    private static final int NOTION_REQUEST_RETRY_TIMES = 4;
-    private static final long NOTION_REQUEST_RETRY_DELAY_MS = 1000L;
+    private static final int DEFAULT_NOTION_REQUEST_TIMEOUT_MS = 20000;
+    private static final int DEFAULT_NOTION_REQUEST_RETRY_TIMES = 6;
+    private static final long DEFAULT_NOTION_REQUEST_RETRY_DELAY_MS = 1200L;
 
     private final FileStorageService fileStorageService;
     private final FileDetailService fileDetailService;
@@ -81,6 +81,18 @@ public class NotionImportService {
 
     @Value("${notion.version:2022-06-28}")
     private String notionVersion;
+
+    @Value("${notion.api-base:" + DEFAULT_NOTION_API_BASE + "}")
+    private String notionApiBase;
+
+    @Value("${notion.request-timeout-ms:" + DEFAULT_NOTION_REQUEST_TIMEOUT_MS + "}")
+    private int notionRequestTimeoutMs;
+
+    @Value("${notion.request-retry-times:" + DEFAULT_NOTION_REQUEST_RETRY_TIMES + "}")
+    private int notionRequestRetryTimes;
+
+    @Value("${notion.request-retry-delay-ms:" + DEFAULT_NOTION_REQUEST_RETRY_DELAY_MS + "}")
+    private long notionRequestRetryDelayMs;
 
     @Value("${notion.import-images:true}")
     private boolean defaultImportImages;
@@ -138,6 +150,19 @@ public class NotionImportService {
         article.setIsRecommend(defaultInt(dto.getIsRecommend(), 0));
 
         return new ImportPageResult(article, context.getImportedBlocks(), warnings);
+    }
+
+    public PageMetadata fetchPageMetadata(String pageUrl) {
+        preferIpv4StackForNotion();
+        if (StringUtils.isBlank(pageUrl)) {
+            throw new ServiceException("请填写 Notion 页面地址或 Page ID");
+        }
+        if (StringUtils.isBlank(apiToken)) {
+            throw new ServiceException("后端未配置 NOTION_API_TOKEN，无法读取 Notion 页面");
+        }
+        String pageId = extractPageId(pageUrl);
+        JSONObject page = requestNotionObjectWithRetry("/pages/" + urlEncode(pageId));
+        return new PageMetadata(pageId, extractPageTitle(page), page.getStr("last_edited_time"));
     }
 
     public String extractPageIdSafely(String value) {
@@ -607,36 +632,50 @@ public class NotionImportService {
     private JSONObject requestNotionObjectWithRetry(String pathAndQuery) {
         preferIpv4StackForNotion();
         ServiceException lastException = null;
-        for (int attempt = 1; attempt <= NOTION_REQUEST_RETRY_TIMES; attempt++) {
+        int retryTimes = safeNotionRetryTimes();
+        for (int attempt = 1; attempt <= retryTimes; attempt++) {
             try {
                 return requestNotionObjectByJdk(pathAndQuery);
             } catch (ServiceException ex) {
-                if (isNotionHttpFailure(ex)) {
+                if (isNonRetryableNotionHttpFailure(ex)) {
                     throw ex;
                 }
                 try {
                     return requestNotionObject(pathAndQuery);
                 } catch (ServiceException fallbackEx) {
-                    if (isNotionHttpFailure(fallbackEx)) {
+                    if (isNonRetryableNotionHttpFailure(fallbackEx)) {
                         throw fallbackEx;
                     }
                     fallbackEx.addSuppressed(ex);
                     lastException = fallbackEx;
-                    if (attempt >= NOTION_REQUEST_RETRY_TIMES) {
+                    if (attempt >= retryTimes) {
                         break;
                     }
                     log.warn("Notion request failed, will retry. attempt={}/{}, path={}, primary={}, fallback={}",
-                            attempt, NOTION_REQUEST_RETRY_TIMES, pathAndQuery, ex.getMessage(), fallbackEx.getMessage());
+                            attempt, retryTimes, pathAndQuery, ex.getMessage(), fallbackEx.getMessage());
                     sleepBeforeRetry(attempt);
                 }
             }
         }
-        throw new ServiceException("Notion 页面读取失败，已重试 " + NOTION_REQUEST_RETRY_TIMES
+        throw new ServiceException("Notion 页面读取失败，已重试 " + retryTimes
                 + " 次：" + (lastException == null ? "unknown" : lastException.getMessage()), lastException);
     }
 
-    private boolean isNotionHttpFailure(ServiceException ex) {
-        return ex != null && StringUtils.contains(ex.getMessage(), "HTTP ");
+    private boolean isNonRetryableNotionHttpFailure(ServiceException ex) {
+        Integer status = extractHttpStatus(ex == null ? null : ex.getMessage());
+        return status != null && status >= 400 && status < 500 && status != 408 && status != 429;
+    }
+
+    private Integer extractHttpStatus(String message) {
+        Matcher matcher = Pattern.compile("HTTP\\s+(\\d{3})").matcher(StringUtils.defaultString(message));
+        if (!matcher.find()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private void preferIpv4StackForNotion() {
@@ -647,7 +686,7 @@ public class NotionImportService {
 
     private void sleepBeforeRetry(int failedAttempt) {
         try {
-            Thread.sleep(NOTION_REQUEST_RETRY_DELAY_MS * failedAttempt);
+            Thread.sleep(Math.min(10000L, safeNotionRetryDelayMs() * failedAttempt));
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         }
@@ -656,10 +695,10 @@ public class NotionImportService {
     private JSONObject requestNotionObjectByJdk(String pathAndQuery) {
         HttpsURLConnection connection = null;
         try {
-            URL url = new URL(NOTION_API_BASE + pathAndQuery);
+            URL url = new URL(getNotionApiBase() + pathAndQuery);
             connection = (HttpsURLConnection) url.openConnection(Proxy.NO_PROXY);
-            connection.setConnectTimeout(NOTION_REQUEST_TIMEOUT_MS);
-            connection.setReadTimeout(NOTION_REQUEST_TIMEOUT_MS);
+            connection.setConnectTimeout(safeNotionTimeoutMs());
+            connection.setReadTimeout(safeNotionTimeoutMs());
             connection.setRequestMethod("GET");
             connection.setRequestProperty("Authorization", "Bearer " + apiToken.trim());
             connection.setRequestProperty("Notion-Version", StringUtils.defaultIfBlank(notionVersion, "2022-06-28"));
@@ -701,11 +740,11 @@ public class NotionImportService {
     }
 
     private JSONObject requestNotionObject(String pathAndQuery) {
-        String url = NOTION_API_BASE + pathAndQuery;
+        String url = getNotionApiBase() + pathAndQuery;
         HttpResponse response = null;
         try {
             response = HttpRequest.get(url)
-                    .timeout(NOTION_REQUEST_TIMEOUT_MS)
+                    .timeout(safeNotionTimeoutMs())
                     .header(Header.AUTHORIZATION, "Bearer " + apiToken.trim())
                     .header("Notion-Version", StringUtils.defaultIfBlank(notionVersion, "2022-06-28"))
                     .header(Header.CONTENT_TYPE, "application/json")
@@ -725,6 +764,22 @@ public class NotionImportService {
                 response.close();
             }
         }
+    }
+
+    private String getNotionApiBase() {
+        return StringUtils.defaultIfBlank(notionApiBase, DEFAULT_NOTION_API_BASE).replaceAll("/+$", "");
+    }
+
+    private int safeNotionTimeoutMs() {
+        return Math.max(5000, Math.min(notionRequestTimeoutMs, 60000));
+    }
+
+    private int safeNotionRetryTimes() {
+        return Math.max(1, Math.min(notionRequestRetryTimes, 10));
+    }
+
+    private long safeNotionRetryDelayMs() {
+        return Math.max(300L, Math.min(notionRequestRetryDelayMs, 5000L));
     }
 
     private String persistImageIfNeeded(String imageUrl, ImportContext context) {
@@ -1141,6 +1196,14 @@ public class NotionImportService {
         private SysArticleDetailVo article;
         private Integer importedBlocks;
         private List<String> warnings;
+    }
+
+    @Data
+    @AllArgsConstructor
+    public static class PageMetadata {
+        private String pageId;
+        private String title;
+        private String lastEditedTime;
     }
 
     @Data

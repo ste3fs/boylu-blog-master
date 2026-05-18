@@ -994,7 +994,7 @@ public class FileController {
         if (StringUtils.isBlank(targetUrl)) {
             targetUrl = resolveFileTarget(fileDetail);
             if (StringUtils.isNotBlank(targetUrl)) {
-                redisUtil.set(cacheKey, targetUrl, RedisConstants.DAY_EXPIRE, TimeUnit.SECONDS);
+                redisUtil.set(cacheKey, targetUrl, RedisConstants.MONTH_EXPIRE, TimeUnit.SECONDS);
             }
         }
         return targetUrl;
