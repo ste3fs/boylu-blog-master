@@ -107,6 +107,8 @@
   - 新增 `.semgrepignore`，排除 `node_modules`、`dist`、`target`、`.tmp` 和 uniapp 生成目录，降低扫描噪声。
   - `blog/pom.xml` 新增 SpotBugs Maven 插件版本与默认配置；插件不绑定生产构建生命周期，不影响正常打包。
   - 首轮 GitHub Actions 审查中 reviewdog/actionlint 指出 `fail_on_error` 已废弃，已改为 `fail_level: none`。
+  - 第二轮 GitHub Actions 审查已通过：CodeQL、Semgrep、SpotBugs、reviewdog/actionlint 均成功，Code Scanning open alerts 为 0。
+  - 已在 PR #2 手动发送 `@coderabbitai review`；CodeRabbit 接受触发请求，但提示增量审查不会重复审已审过提交，当前没有新增行级问题。
 - 2026-05-19 前台轻量 UI 与等待策略优化：
   - `App.vue` 站点配置请求增加 900ms 首屏兜底，避免配置接口慢时启动骨架长时间占位；通知请求改为空闲期再拉取。
   - 首页文章分页滚动补齐 `postsSection` 锚点，避免分页时滚动目标为 `NaN`。
@@ -153,6 +155,7 @@
   - `.github/dependabot.yml`、`.github/workflows/codeql.yml`、`.github/workflows/static-review.yml` 已通过本地 YAML 解析。
   - `blog/pom.xml` 已通过 XML 解析，SpotBugs Maven 插件版本 `4.9.8.3` 已在 Maven 仓库确认存在。
   - 后端 Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
+  - PR #2 最新检查结果：CodeQL、CodeQL Java、CodeQL JavaScript、Semgrep、SpotBugs、reviewdog/actionlint、Dependabot 配置校验均为 success。
 - 后端 Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
 - 前台构建已通过：`blog-web npm run build`。
 - 后台构建已通过：`blog-admin npm run build`。
