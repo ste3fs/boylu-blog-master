@@ -100,6 +100,12 @@
   - 启用 GitHub Checks、ESLint、Stylelint、PMD、Semgrep/OpenGrep、密钥扫描、ShellCheck、actionlint 和 yamllint；关闭 markdownlint 与 LanguageTool，避免中文文档风格类噪声。
   - 已创建 GitHub PR #2 并触发 CodeRabbit；首轮审查指出的移动端侧边栏初始布局闪烁和 `scheduleIdleTask` SSR 兜底问题已修复。
   - 修复后 `blog-web npm run build` 通过，并已同步最新前台构建产物到线上服务器；`nginx -t`、首页和首页文章接口检查均通过。
+- 2026-05-19 GitHub Actions 静态审查配置：
+  - 新增 `.github/dependabot.yml`，覆盖 GitHub Actions、`blog-web`、`blog-admin`、`uniapp-blog` 和 `blog` Maven 依赖更新。
+  - 新增 `.github/workflows/codeql.yml`，对 JavaScript/TypeScript 和 Java 执行 CodeQL 安全扫描。
+  - 新增 `.github/workflows/static-review.yml`，接入 reviewdog/actionlint、Semgrep 和 SpotBugs；Semgrep 结果上传 SARIF，SpotBugs 报告上传为 Actions artifact。
+  - 新增 `.semgrepignore`，排除 `node_modules`、`dist`、`target`、`.tmp` 和 uniapp 生成目录，降低扫描噪声。
+  - `blog/pom.xml` 新增 SpotBugs Maven 插件版本与默认配置；插件不绑定生产构建生命周期，不影响正常打包。
 - 2026-05-19 前台轻量 UI 与等待策略优化：
   - `App.vue` 站点配置请求增加 900ms 首屏兜底，避免配置接口慢时启动骨架长时间占位；通知请求改为空闲期再拉取。
   - 首页文章分页滚动补齐 `postsSection` 锚点，避免分页时滚动目标为 `NaN`。
@@ -142,6 +148,10 @@
   - `blog-admin npm run build` 已通过；仍保留已知 Sass legacy API 和大 chunk 警告。
   - `blog` Maven 编译已通过：显式设置 `JAVA_HOME=C:\Program Files\Java\jdk1.8.0_311` 后执行 `mvn -pl boylu-server -am package -DskipTests`。
   - 第二轮优化后再次执行 `blog-web npm run build`、`blog-admin npm run build`、`blog` Maven 编译，均已通过；`git diff --check` 无格式错误，仅保留 Windows 换行提示。
+- 2026-05-19 GitHub Actions 静态审查配置验证：
+  - `.github/dependabot.yml`、`.github/workflows/codeql.yml`、`.github/workflows/static-review.yml` 已通过本地 YAML 解析。
+  - `blog/pom.xml` 已通过 XML 解析，SpotBugs Maven 插件版本 `4.9.8.3` 已在 Maven 仓库确认存在。
+  - 后端 Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
 - 后端 Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
 - 前台构建已通过：`blog-web npm run build`。
 - 后台构建已通过：`blog-admin npm run build`。
