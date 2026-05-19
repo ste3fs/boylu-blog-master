@@ -1,6 +1,6 @@
 <template>
   <div class="home" >
-    <div class="content-layout">
+    <div class="content-layout" :class="{ 'is-desktop-layout': isDesktopLayout }">
       <main class="home-main-content">
         <Carousel
           v-if="carouselSlides?.length > 0"
@@ -9,7 +9,7 @@
         />
         <MomentsList />
 
-        <div>
+        <div ref="postsSection" class="home-posts-section">
           <el-tabs v-model="activeName" @tab-click="handleClick">
             <el-tab-pane
               v-for="category in categories"
@@ -35,7 +35,15 @@
           </el-tabs>
         </div>
       </main>
-      <Sidebar :category-count="Math.max(categories.length - 1, 0)" />
+      <Sidebar
+        v-if="showSidebar"
+        :category-count="Math.max(categories.length - 1, 0)"
+      />
+      <aside
+        v-else-if="isDesktopLayout"
+        class="sidebar-placeholder"
+        aria-hidden="true"
+      ></aside>
     </div>
   </div>
 </template>
@@ -58,6 +66,7 @@ import { prewarmImageUrls, resolveImageUrl } from "@/utils/image";
 
 const ARTICLE_LIST_STATE_KEY = "boylu:article-list-state";
 const ARTICLE_LIST_STATE_MAX_AGE = 30 * 60 * 1000;
+const SIDEBAR_DESKTOP_QUERY = "(min-width: 1025px)";
 
 export default {
   name: "Home",
@@ -82,6 +91,10 @@ export default {
       articleRequestSeq: 0,
       activeName: "all",
       restoreListState: null,
+      sidebarReady: false,
+      isDesktopLayout: false,
+      sidebarMediaQuery: null,
+      sidebarIdleTimer: null,
       categories: [
         {
           id: "all",
@@ -91,7 +104,55 @@ export default {
       ],
     };
   },
+  computed: {
+    showSidebar() {
+      return this.isDesktopLayout && this.sidebarReady;
+    },
+  },
   methods: {
+    scheduleIdleTask(callback, timeout = 1200) {
+      if (typeof window === "undefined") {
+        return () => {};
+      }
+      if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+        const handle = window.requestIdleCallback(callback, { timeout });
+        return () => window.cancelIdleCallback(handle);
+      }
+      const timer = window.setTimeout(callback, Math.min(timeout, 1200));
+      return () => window.clearTimeout(timer);
+    },
+    updateDesktopLayout(event) {
+      this.isDesktopLayout = event && typeof event.matches === "boolean"
+        ? event.matches
+        : window.matchMedia(SIDEBAR_DESKTOP_QUERY).matches;
+      if (!this.isDesktopLayout) {
+        this.sidebarReady = false;
+        return;
+      }
+      this.deferSidebarMount();
+    },
+    deferSidebarMount() {
+      if (!this.isDesktopLayout || this.sidebarReady || this.sidebarIdleTimer) {
+        return;
+      }
+      this.sidebarIdleTimer = this.scheduleIdleTask(() => {
+        this.sidebarReady = this.isDesktopLayout;
+        this.sidebarIdleTimer = null;
+      }, 1200);
+    },
+    setupSidebarVisibility() {
+      if (typeof window === "undefined") {
+        return;
+      }
+      this.sidebarMediaQuery = window.matchMedia(SIDEBAR_DESKTOP_QUERY);
+      this.updateDesktopLayout(this.sidebarMediaQuery);
+      if (typeof this.sidebarMediaQuery.addEventListener === "function") {
+        this.sidebarMediaQuery.addEventListener("change", this.updateDesktopLayout);
+      } else if (typeof this.sidebarMediaQuery.addListener === "function") {
+        this.sidebarMediaQuery.addListener(this.updateDesktopLayout);
+      }
+      this.deferSidebarMount();
+    },
     prewarmHomeCriticalImages(records = []) {
       const warmupUrls = records
         .slice(0, 2)
@@ -176,8 +237,11 @@ export default {
     changePage(page) {
       this.params.pageNum = page;
       this.getArticleList();
+      const targetTop = this.$refs.postsSection
+        ? this.$refs.postsSection.offsetTop - 80
+        : 0
       window.scrollTo({
-        top: this.$refs.postsSection?.offsetTop - 80,
+        top: Math.max(targetTop, 0),
         behavior: "smooth",
       });
     },
@@ -256,6 +320,23 @@ export default {
     this.getCarouselArticles();
     this.getAllCategories();
   },
+  mounted() {
+    this.setupSidebarVisibility();
+  },
+  beforeDestroy() {
+    if (this.sidebarIdleTimer) {
+      this.sidebarIdleTimer();
+      this.sidebarIdleTimer = null;
+    }
+    if (this.sidebarMediaQuery) {
+      if (typeof this.sidebarMediaQuery.removeEventListener === "function") {
+        this.sidebarMediaQuery.removeEventListener("change", this.updateDesktopLayout);
+      } else if (typeof this.sidebarMediaQuery.removeListener === "function") {
+        this.sidebarMediaQuery.removeListener(this.updateDesktopLayout);
+      }
+      this.sidebarMediaQuery = null;
+    }
+  },
 };
 </script>
 
@@ -273,12 +354,16 @@ export default {
 
 .content-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr);
   gap: $spacing-lg * 2;
   padding: 0 $spacing-xl;
   margin-bottom: $spacing-xl * 2;
   min-height: calc(100vh - 80px);
   align-items: stretch;
+
+  &.is-desktop-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
 
   @include responsive(lg) {
     grid-template-columns: 1fr;
@@ -289,6 +374,12 @@ export default {
   @include responsive(md) {
     gap: $spacing-md;
   }
+}
+
+.sidebar-placeholder {
+  width: 100%;
+  max-width: 320px;
+  min-height: 1px;
 }
 
 .home-main-content {
@@ -329,6 +420,11 @@ export default {
 :deep(.el-tabs__header) {
   margin-bottom: $spacing-md;
 }
+
+.home-posts-section {
+  min-width: 0;
+}
+
 .label-info {
   display: flex;
   align-items: center;

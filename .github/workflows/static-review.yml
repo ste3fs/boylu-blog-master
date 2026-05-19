@@ -1,0 +1,118 @@
+name: Static Review
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  checks: write
+  contents: read
+  pull-requests: write
+  security-events: write
+
+concurrency:
+  group: static-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    name: reviewdog actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Review GitHub Actions workflows
+        uses: reviewdog/action-actionlint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          filter_mode: added
+          fail_level: none
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Semgrep
+        run: python -m pip install --upgrade semgrep
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --config p/ci \
+            --sarif \
+            --output semgrep.sarif \
+            --exclude "blog-web/dist" \
+            --exclude "blog-admin/dist" \
+            --exclude "uniapp-blog/unpackage" \
+            --exclude "**/node_modules" \
+            --exclude "**/target" \
+            --exclude ".tmp" \
+            .
+        continue-on-error: true
+
+      - name: Upload Semgrep SARIF
+        if: always() && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  spotbugs:
+    name: SpotBugs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build backend classes
+        run: mvn -B -ntp -f blog/pom.xml -pl boylu-server -am -DskipTests package
+
+      - name: Run SpotBugs
+        run: |
+          mvn -B -ntp -f blog/pom.xml -pl boylu-server -am \
+            com.github.spotbugs:spotbugs-maven-plugin:4.9.8.3:spotbugs \
+            -Dspotbugs.effort=Max \
+            -Dspotbugs.threshold=High \
+            -Dspotbugs.failOnError=false \
+            -Dspotbugs.xmlOutput=true \
+            -Dspotbugs.sarifOutput=true
+        continue-on-error: true
+
+      - name: Collect SpotBugs reports
+        if: always()
+        run: |
+          mkdir -p spotbugs-reports
+          find blog -path "*/target/spotbugsXml.xml" -print -exec cp --parents {} spotbugs-reports/ \; || true
+          find blog -path "*/target/spotbugsSarif.json" -print -exec cp --parents {} spotbugs-reports/ \; || true
+          find spotbugs-reports -type f -print
+
+      - name: Upload SpotBugs reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spotbugs-reports
+          path: spotbugs-reports
+          if-no-files-found: ignore

@@ -1,6 +1,6 @@
 # 项目问题清单与当前状态
 
-更新时间：2026-05-18
+更新时间：2026-05-19
 
 ## 当前仓库状态
 
@@ -93,6 +93,29 @@
 
 ## 已处理记录
 
+- 2026-05-19 CodeRabbit 仓库审查配置：
+  - 新增仓库根目录 `.coderabbit.yaml`，配置 CodeRabbit 以中文输出、自动审查发往 `main` 的 PR，并开启增量审查。
+  - 按项目结构补充前台 `blog-web`、后台 `blog-admin`、后端 `blog/boylu-*`、部署脚本和文档/SQL 的路径级审查重点。
+  - 排除 `node_modules`、`dist`、`target`、`.tmp`、source map、压缩文件和 `blog-admin/src/components.d.ts` 等噪声文件，减少无效审查评论。
+  - 启用 GitHub Checks、ESLint、Stylelint、PMD、Semgrep/OpenGrep、密钥扫描、ShellCheck、actionlint 和 yamllint；关闭 markdownlint 与 LanguageTool，避免中文文档风格类噪声。
+  - 已创建 GitHub PR #2 并触发 CodeRabbit；首轮审查指出的移动端侧边栏初始布局闪烁和 `scheduleIdleTask` SSR 兜底问题已修复。
+  - 修复后 `blog-web npm run build` 通过，并已同步最新前台构建产物到线上服务器；`nginx -t`、首页和首页文章接口检查均通过。
+- 2026-05-19 GitHub Actions 静态审查配置：
+  - 新增 `.github/dependabot.yml`，覆盖 GitHub Actions、`blog-web`、`blog-admin`、`uniapp-blog` 和 `blog` Maven 依赖更新。
+  - 新增 `.github/workflows/codeql.yml`，对 JavaScript/TypeScript 和 Java 执行 CodeQL 安全扫描。
+  - 新增 `.github/workflows/static-review.yml`，接入 reviewdog/actionlint、Semgrep 和 SpotBugs；Semgrep 结果上传 SARIF，SpotBugs 报告上传为 Actions artifact。
+  - 新增 `.semgrepignore`，排除 `node_modules`、`dist`、`target`、`.tmp` 和 uniapp 生成目录，降低扫描噪声。
+  - `blog/pom.xml` 新增 SpotBugs Maven 插件版本与默认配置；插件不绑定生产构建生命周期，不影响正常打包。
+  - 首轮 GitHub Actions 审查中 reviewdog/actionlint 指出 `fail_on_error` 已废弃，已改为 `fail_level: none`。
+  - 第二轮 GitHub Actions 审查已通过：CodeQL、Semgrep、SpotBugs、reviewdog/actionlint 均成功，Code Scanning open alerts 为 0。
+  - 已在 PR #2 手动发送 `@coderabbitai review`；CodeRabbit 接受触发请求，但提示增量审查不会重复审已审过提交，当前没有新增行级问题。
+- 2026-05-19 前台轻量 UI 与等待策略优化：
+  - `App.vue` 站点配置请求增加 900ms 首屏兜底，避免配置接口慢时启动骨架长时间占位；通知请求改为空闲期再拉取。
+  - 首页文章分页滚动补齐 `postsSection` 锚点，避免分页时滚动目标为 `NaN`。
+  - 首页文章卡片减少 `transition: all`，改为只过渡 transform、shadow、border-color；同时微调边框、阴影、行高和移动端内边距。
+  - 第二轮继续优化首页首屏：桌面端侧边栏改为空闲后挂载，移动端不再创建隐藏侧边栏，减少推荐文章、标签云和状态面板的首屏并发请求与动画负担。
+  - 最新说说组件增加空数据/单条数据保护，避免无内容时仍启动轮播定时器；同时轻量调整容器边框、阴影和文本 hover 过渡。
+  - 本轮没有引入 HyperFrames 到主工程；HyperFrames 仅适合后续制作博客宣传视频或文章转视频。
 - 2026-05-18 线上部署与 Notion 队列验证：
   - 已备份线上后端 jar、前台静态文件和后台静态文件后替换当前构建产物。
   - Windows `Compress-Archive` 产物在 Linux `unzip` 下存在反斜杠路径问题，已改用 `tar.gz` 重新打包前后台静态产物完成部署。
@@ -123,6 +146,16 @@
 
 ## 最近验证结果
 
+- 2026-05-19 前台轻量优化验证：
+  - `blog-web npm run build` 已通过，并同步更新 `blog-web/public/sitemap.xml` 的 `lastmod` 到 2026-05-19。
+  - `blog-admin npm run build` 已通过；仍保留已知 Sass legacy API 和大 chunk 警告。
+  - `blog` Maven 编译已通过：显式设置 `JAVA_HOME=C:\Program Files\Java\jdk1.8.0_311` 后执行 `mvn -pl boylu-server -am package -DskipTests`。
+  - 第二轮优化后再次执行 `blog-web npm run build`、`blog-admin npm run build`、`blog` Maven 编译，均已通过；`git diff --check` 无格式错误，仅保留 Windows 换行提示。
+- 2026-05-19 GitHub Actions 静态审查配置验证：
+  - `.github/dependabot.yml`、`.github/workflows/codeql.yml`、`.github/workflows/static-review.yml` 已通过本地 YAML 解析。
+  - `blog/pom.xml` 已通过 XML 解析，SpotBugs Maven 插件版本 `4.9.8.3` 已在 Maven 仓库确认存在。
+  - 后端 Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
+  - PR #2 最新检查结果：CodeQL、CodeQL Java、CodeQL JavaScript、Semgrep、SpotBugs、reviewdog/actionlint、Dependabot 配置校验均为 success。
 - 后端 Maven 编译已通过：`mvn -pl boylu-server -am package -DskipTests`。
 - 前台构建已通过：`blog-web npm run build`。
 - 后台构建已通过：`blog-admin npm run build`。

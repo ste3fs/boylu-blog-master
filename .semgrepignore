@@ -1,0 +1,7 @@
+**/node_modules/
+**/dist/
+**/target/
+**/.tmp/
+blog-web/dist/
+blog-admin/dist/
+uniapp-blog/unpackage/
