@@ -106,6 +106,7 @@
   - 新增 `.github/workflows/static-review.yml`，接入 reviewdog/actionlint、Semgrep 和 SpotBugs；Semgrep 结果上传 SARIF，SpotBugs 报告上传为 Actions artifact。
   - 新增 `.semgrepignore`，排除 `node_modules`、`dist`、`target`、`.tmp` 和 uniapp 生成目录，降低扫描噪声。
   - `blog/pom.xml` 新增 SpotBugs Maven 插件版本与默认配置；插件不绑定生产构建生命周期，不影响正常打包。
+  - 首轮 GitHub Actions 审查中 reviewdog/actionlint 指出 `fail_on_error` 已废弃，已改为 `fail_level: none`。
 - 2026-05-19 前台轻量 UI 与等待策略优化：
   - `App.vue` 站点配置请求增加 900ms 首屏兜底，避免配置接口慢时启动骨架长时间占位；通知请求改为空闲期再拉取。
   - 首页文章分页滚动补齐 `postsSection` 锚点，避免分页时滚动目标为 `NaN`。
