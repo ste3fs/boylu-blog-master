@@ -45,7 +45,8 @@ export default {
     return {
       deferredUiReady: false,
       ambientUiReady: false,
-      siteBootstrapped: false
+      siteBootstrapped: false,
+      bootstrapFallbackTimer: null
     }
   },
 
@@ -75,7 +76,21 @@ export default {
       }
       window.setTimeout(callback, Math.min(timeout, 1200))
     },
+    markSiteBootstrapped() {
+      if (this.siteBootstrapped) {
+        return
+      }
+      this.siteBootstrapped = true
+      if (this.bootstrapFallbackTimer) {
+        window.clearTimeout(this.bootstrapFallbackTimer)
+        this.bootstrapFallbackTimer = null
+      }
+    },
     bootstrapAppData() {
+      this.bootstrapFallbackTimer = window.setTimeout(() => {
+        this.markSiteBootstrapped()
+      }, 900)
+
       getWebConfigApi()
         .then(res => {
           this.setSiteInfo(res.data)
@@ -94,17 +109,19 @@ export default {
               : null
           )
           this.initWebsiteSeo(res.data)
-          this.siteBootstrapped = true
+          this.markSiteBootstrapped()
         })
         .catch(() => {
-          this.siteBootstrapped = true
+          this.markSiteBootstrapped()
         })
 
-      getNoticeApi()
-        .then(noticeRes => {
-          this.$store.commit('SET_NOTICE', noticeRes.data)
-        })
-        .catch(() => {})
+      this.scheduleIdleTask(() => {
+        getNoticeApi()
+          .then(noticeRes => {
+            this.$store.commit('SET_NOTICE', noticeRes.data)
+          })
+          .catch(() => {})
+      }, 1400)
 
       this.scheduleIdleTask(() => {
         reportApi().catch(() => {})
@@ -221,6 +238,12 @@ export default {
       this.ambientUiReady = true
       this.initCursorEffect()
     }, 2200)
+  },
+  beforeDestroy() {
+    if (this.bootstrapFallbackTimer) {
+      window.clearTimeout(this.bootstrapFallbackTimer)
+      this.bootstrapFallbackTimer = null
+    }
   }
 }
 </script>
@@ -242,10 +265,11 @@ export default {
 .app-shell-skeleton__header,
 .app-shell-skeleton__hero,
 .app-shell-skeleton__card {
-  background: linear-gradient(90deg, rgba(64, 158, 255, 0.08) 25%, rgba(64, 158, 255, 0.18) 37%, rgba(64, 158, 255, 0.08) 63%);
+  background: linear-gradient(90deg, rgba(64, 158, 255, 0.07) 25%, rgba(168, 85, 247, 0.14) 37%, rgba(64, 158, 255, 0.07) 63%);
   background-size: 400% 100%;
   animation: appSkeletonShimmer 1.4s ease infinite;
   border-radius: 14px;
+  border: 1px solid rgba(64, 158, 255, 0.08);
 }
 
 .app-shell-skeleton__header {

@@ -254,12 +254,15 @@ export default {
   @include card;
   background: var(--card-bg);
   padding: $spacing-lg;
-  transition: all 0.3s ease;
+  border: 1px solid rgba(var(--border-color-rgb), 0.08);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
   width: 100%;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border-color: rgba(64, 158, 255, 0.18);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
   }
 }
 
@@ -272,9 +275,9 @@ export default {
 
   .post-text {
     h3 {
-      font-size: 1.2em;
+      font-size: 1.22em;
       margin-bottom: $spacing-md;
-      line-height: 1.4;
+      line-height: 1.45;
       color: var(--text-primary);
       cursor: pointer;
       .stick-tag {
@@ -302,7 +305,7 @@ export default {
 
     .post-excerpt {
       color: var(--text-secondary);
-      line-height: 1.6;
+      line-height: 1.7;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
@@ -323,10 +326,11 @@ export default {
     .post-cover {
       height: 100%;
       min-height: 100%;
+      transform: translateZ(0);
     }
 
     &:hover :deep(.smart-image__img) {
-      transform: scale(1.05);
+      transform: scale(1.035);
     }
   }
 }
@@ -431,7 +435,8 @@ export default {
 
 @include responsive(sm) {
   .post-item {
-    padding: $spacing-sm;
+    padding: $spacing-md;
+    border-radius: $border-radius-md;
   }
 
   .post-main {

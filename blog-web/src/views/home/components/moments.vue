@@ -32,19 +32,21 @@ export default {
     this.getMomentsList()
   },
   mounted() {
-    this.startRotation()
+    if (this.moments.length > 1) {
+      this.startRotation()
+    }
   },
   beforeDestroy() {
-    if (this.timer) {
-      clearInterval(this.timer)
-    }
+    this.stopRotation()
   },
   methods: {
     getMomentsList() {
       getMoments({ pageSize: 5, pageNum: 1 }).then(res => {
         if (res.data && res.data.records) {
           this.moments = res.data.records
-          this.startRotation()
+          if (this.moments.length > 1) {
+            this.startRotation()
+          }
         }
       })
     },
@@ -55,9 +57,18 @@ export default {
       if (this.timer) {
         clearInterval(this.timer)
       }
+      if (this.moments.length < 2) {
+        return
+      }
       this.timer = setInterval(() => {
         this.currentIndex = (this.currentIndex + 1) % this.moments.length
       }, 4000) // 每4秒切换一次
+    },
+    stopRotation() {
+      if (this.timer) {
+        clearInterval(this.timer)
+        this.timer = null
+      }
     }
   }
 }
@@ -69,7 +80,8 @@ export default {
   border-radius: $border-radius-lg;
   padding: $spacing-md $spacing-lg;
   margin-bottom: $spacing-xl;
-  box-shadow: $shadow-sm;
+  border: 1px solid rgba(var(--border-color-rgb), 0.08);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
   overflow: hidden;
 }
 
@@ -109,6 +121,8 @@ export default {
     text-overflow: ellipsis;
     width: 100%;
     cursor: pointer;
+    line-height: 1.6;
+    transition: color 0.2s ease;
     &:hover {
       color: $primary;
     }

@@ -1,0 +1,99 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: zh-CN
+enable_free_tier: true
+tone_instructions: "Keep reviews concise, practical, and focused on actionable bugs, security risks, maintainability, and UX regressions."
+
+reviews:
+  profile: chill
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  changed_files_summary: true
+  review_status: true
+  review_details: true
+  commit_status: true
+  fail_commit_status: false
+  collapse_walkthrough: true
+  estimate_code_review_effort: true
+  sequence_diagrams: false
+  assess_linked_issues: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: true
+  auto_apply_labels: false
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  poem: false
+  in_progress_fortune: false
+  enable_prompt_for_ai_agents: true
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/target/**"
+    - "!**/.tmp/**"
+    - "!**/.idea/**"
+    - "!**/.vscode/**"
+    - "!**/*.min.js"
+    - "!**/*.map"
+    - "!blog-admin/src/components.d.ts"
+  path_instructions:
+    - path: "blog-web/**/*.{vue,js,scss,css}"
+      instructions: "This is the public Vue blog frontend. Prioritize first-screen performance, responsive layout, clean Apple-like visual hierarchy, accessibility, image fallback behavior, and avoiding heavy mount-time requests or broad transition: all rules."
+    - path: "blog-admin/**/*.{vue,js,ts,scss,css}"
+      instructions: "This is the admin Vue application. Prioritize form validation, auth-sensitive flows, predictable admin UX, safe file upload feedback, and avoiding fake frontend-only state when a backend API is required."
+    - path: "blog/boylu-*/**/*.{java,xml,yml,yaml,properties}"
+      instructions: "This is the Spring Boot backend. Prioritize null safety, auth checks, permission boundaries, Redis/cache correctness, canonical image URL compatibility, upload memory safety, and preserving existing /localFile, /file, /boylu/file, and /mojian/file compatibility."
+    - path: "{deploy,scripts,.github}/**/*"
+      instructions: "Review deployment and automation files for idempotence, clear rollback behavior, Nginx/systemd safety, and accidental hardcoded credentials. Do not recommend storing passwords, database secrets, or tokens in tracked files."
+    - path: "**/*.{md,sql}"
+      instructions: "Review documentation and SQL for accidental sensitive data exposure, public repository hygiene, and consistency with the current boylu-blog deployment model. Avoid noisy style-only comments on Chinese prose."
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    auto_pause_after_reviewed_commits: 5
+    drafts: false
+    base_branches:
+      - "main"
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT REVIEW"
+  tools:
+    github-checks:
+      enabled: true
+      timeout_ms: 90000
+    eslint:
+      enabled: true
+    stylelint:
+      enabled: true
+    pmd:
+      enabled: true
+    semgrep:
+      enabled: true
+    opengrep:
+      enabled: true
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+    shellcheck:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+  learnings:
+    scope: local
+  issues:
+    scope: local
+  pull_requests:
+    scope: local
